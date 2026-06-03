@@ -65,4 +65,12 @@ router.get('/doi-stages', (req, res) => {
   res.json(stages);
 });
 
+router.get('/apps/:appId/doi-history', (req, res) => {
+  const { appId } = req.params;
+  const history = db
+    .prepare('SELECT * FROM doi_history WHERE app_id = ? ORDER BY changed_at ASC')
+    .all(appId);
+  res.json(history);
+});
+
 module.exports = router;

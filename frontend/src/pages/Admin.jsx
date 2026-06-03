@@ -35,6 +35,7 @@ function Admin() {
   const [projectForm, setProjectForm] = useState({ ...emptyProjectForm });
   const [editingProject, setEditingProject] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
 
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
@@ -376,6 +377,21 @@ function Admin() {
         {/* Projects */}
         {activeTab === 'projects' && (
           <div className="admin-table-container">
+            <div className="admin-search-bar">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                type="text"
+                placeholder="Search projects by name, ID, division, status..."
+                value={projectSearchQuery}
+                onChange={(e) => setProjectSearchQuery(e.target.value)}
+              />
+              {projectSearchQuery && (
+                <button className="search-clear" onClick={() => setProjectSearchQuery('')}>×</button>
+              )}
+            </div>
             <table className="admin-table">
               <thead>
                 <tr>
@@ -389,7 +405,20 @@ function Admin() {
                 </tr>
               </thead>
               <tbody>
-                {projects.map(project => (
+                {projects.filter(project => {
+                  if (!projectSearchQuery) return true;
+                  const query = projectSearchQuery.toLowerCase();
+                  return (
+                    project.name?.toLowerCase().includes(query) ||
+                    project.project_id?.toLowerCase().includes(query) ||
+                    project.business_division?.toLowerCase().includes(query) ||
+                    project.business_function?.toLowerCase().includes(query) ||
+                    project.current_status?.toLowerCase().includes(query) ||
+                    project.platform?.toLowerCase().includes(query) ||
+                    project.requester_name?.toLowerCase().includes(query) ||
+                    project.ai_spoc?.toLowerCase().includes(query)
+                  );
+                }).map(project => (
                   <tr key={project.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -419,6 +448,21 @@ function Admin() {
                 ))}
                 {projects.length === 0 && (
                   <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No projects. Click "Add Project" to create one.</td></tr>
+                )}
+                {projects.length > 0 && projectSearchQuery && projects.filter(p => {
+                  const query = projectSearchQuery.toLowerCase();
+                  return (
+                    p.name?.toLowerCase().includes(query) ||
+                    p.project_id?.toLowerCase().includes(query) ||
+                    p.business_division?.toLowerCase().includes(query) ||
+                    p.business_function?.toLowerCase().includes(query) ||
+                    p.current_status?.toLowerCase().includes(query) ||
+                    p.platform?.toLowerCase().includes(query) ||
+                    p.requester_name?.toLowerCase().includes(query) ||
+                    p.ai_spoc?.toLowerCase().includes(query)
+                  );
+                }).length === 0 && (
+                  <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No projects match your search.</td></tr>
                 )}
               </tbody>
             </table>

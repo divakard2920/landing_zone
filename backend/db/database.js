@@ -82,6 +82,16 @@ db.exec(`
     label TEXT NOT NULL,
     description TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS doi_history (
+    id TEXT PRIMARY KEY,
+    app_id TEXT NOT NULL,
+    from_stage INTEGER,
+    to_stage INTEGER NOT NULL,
+    changed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT,
+    FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+  );
 `);
 
 // Seed DOI stages if empty

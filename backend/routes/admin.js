@@ -57,6 +57,8 @@ router.post('/apps', (req, res) => {
   }
 
   const id = uuidv4();
+  const initialDoiStage = doi_stage || 0;
+
   db.prepare(`
     INSERT INTO apps (
       id, name, description, url, icon, category,
@@ -68,10 +70,16 @@ router.post('/apps', (req, res) => {
   `).run(
     id, name, description || null, url || null, icon || null, category || null,
     business_division || null, business_function || null, requester_name || null, ai_spoc || null,
-    priority || null, strategic_focus || null, doi_stage || 0, project_id || null,
+    priority || null, strategic_focus || null, initialDoiStage, project_id || null,
     current_status || null, last_status || null, demand_type || null, platform || null,
     estimated_costs || null, start_date || null, end_date || null, ai_skills || null
   );
+
+  // Record initial DOI stage in history
+  db.prepare(`
+    INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(uuidv4(), id, null, initialDoiStage, 'Project created');
 
   res.status(201).json({ id, message: 'Project added successfully' });
 });
@@ -85,6 +93,10 @@ router.put('/apps/:id', (req, res) => {
     current_status, last_status, demand_type, platform,
     estimated_costs, start_date, end_date, ai_skills
   } = req.body;
+
+  // Get current DOI stage before update
+  const currentApp = db.prepare('SELECT doi_stage FROM apps WHERE id = ?').get(id);
+  const oldDoiStage = currentApp ? currentApp.doi_stage : null;
 
   db.prepare(`
     UPDATE apps SET
@@ -103,6 +115,14 @@ router.put('/apps/:id', (req, res) => {
     estimated_costs, start_date, end_date, ai_skills,
     id
   );
+
+  // Record DOI stage change if it changed
+  if (oldDoiStage !== null && oldDoiStage !== doi_stage) {
+    db.prepare(`
+      INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(uuidv4(), id, oldDoiStage, doi_stage, 'Stage updated');
+  }
 
   res.json({ message: 'Project updated successfully' });
 });

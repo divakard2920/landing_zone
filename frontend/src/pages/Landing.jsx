@@ -33,8 +33,21 @@ function Landing() {
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
   };
 
+  const formatDate = (dateStr, includeTime = false) => {
+    // SQLite stores UTC time, append Z to parse as UTC then convert to local
+    const date = new Date(dateStr.replace(' ', 'T') + 'Z');
+    const options = {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      ...(includeTime && { hour: '2-digit', minute: '2-digit' })
+    };
+    return date.toLocaleDateString('en-US', options);
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApp, setSelectedApp] = useState(null);
+  const [doiHistory, setDoiHistory] = useState([]);
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [feedback, setFeedback] = useState({
@@ -53,6 +66,16 @@ function Landing() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (selectedApp) {
+      api.getDoiHistory(selectedApp.id)
+        .then(res => setDoiHistory(res.data))
+        .catch(err => console.error('Failed to load DOI history:', err));
+    } else {
+      setDoiHistory([]);
+    }
+  }, [selectedApp]);
 
   const loadData = async () => {
     try {
@@ -395,6 +418,49 @@ function Landing() {
                           <div className="dash-team-info">
                             <span className="dash-team-name">{member.name}</span>
                             {member.role && <span className="dash-team-role">{member.role}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* DOI Stage History */}
+                {(doiHistory.length > 0 || selectedApp.created_at) && (
+                  <div className="dash-card dash-card-wide">
+                    <h4>DOI Stage Journey</h4>
+                    <div className="doi-timeline">
+                      {/* Show initial DOI 0 from project creation if no initial history entry */}
+                      {doiHistory.length === 0 || doiHistory[0].from_stage !== null ? (
+                        <div className="doi-timeline-item">
+                          <div className="doi-timeline-marker">
+                            <span className="doi-dot doi-0">0</span>
+                            {doiHistory.length > 0 && <div className="doi-timeline-line" />}
+                          </div>
+                          <div className="doi-timeline-content">
+                            <div className="doi-timeline-header">
+                              <strong>DOI 0 - {doiStages.find(d => d.id === 0)?.label || 'Ideation'}</strong>
+                            </div>
+                            <div className="doi-timeline-date">
+                              {formatDate(selectedApp.created_at)}
+                              <span className="doi-timeline-note">Project Created</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      {doiHistory.map((entry, idx) => (
+                        <div key={entry.id} className="doi-timeline-item">
+                          <div className="doi-timeline-marker">
+                            <span className={`doi-dot doi-${entry.to_stage}`}>{entry.to_stage}</span>
+                            {idx < doiHistory.length - 1 && <div className="doi-timeline-line" />}
+                          </div>
+                          <div className="doi-timeline-content">
+                            <div className="doi-timeline-header">
+                              <strong>DOI {entry.to_stage} - {doiStages.find(d => d.id === entry.to_stage)?.label || ''}</strong>
+                            </div>
+                            <div className="doi-timeline-date">
+                              {formatDate(entry.changed_at, true)}
+                            </div>
                           </div>
                         </div>
                       ))}
