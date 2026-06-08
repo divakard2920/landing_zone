@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Tooltip } from 'react-tooltip';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import WidgetRenderer from '../components/WidgetRenderer';
 
 const DefaultAppIcon = () => (
@@ -89,43 +91,95 @@ function Landing() {
     await loadData();
   };
 
-  const handleExport = () => {
-    const dataToExport = filteredApps.map(app => ({
-      'Project Name': app.name,
-      'Project ID': app.project_id || '',
-      'Description': app.description || '',
-      'DOI Stage': `DOI ${app.doi_stage || 0}`,
-      'Status': app.current_status || '',
-      'Priority': app.priority || '',
-      'Platform': app.platform || '',
-      'Division': app.business_division || '',
-      'Function': app.business_function || '',
-      'Demand Type': app.demand_type || '',
-      'Requester': app.requester_name || '',
-      'AI SPOC': app.ai_spoc || '',
-      'Start Date': app.start_date || '',
-      'End Date': app.end_date || '',
-      'Budget': app.estimated_costs || '',
-      'AI Skills': app.ai_skills || '',
-      'Team Members': app.team?.map(t => t.role ? `${t.name} (${t.role})` : t.name).join(', ') || '',
-    }));
+  const handleExport = async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'KBase';
+    workbook.created = new Date();
 
-    const headers = Object.keys(dataToExport[0] || {});
-    const csvContent = [
-      headers.join(','),
-      ...dataToExport.map(row =>
-        headers.map(header => {
-          const value = row[header] || '';
-          return `"${String(value).replace(/"/g, '""')}"`;
-        }).join(',')
-      )
-    ].join('\n');
+    const worksheet = workbook.addWorksheet('Projects', {
+      views: [{ state: 'frozen', ySplit: 1 }]
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `kbase_projects_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    const headers = [
+      'Project Name', 'Project ID', 'Description', 'DOI Stage', 'Status',
+      'Priority', 'Platform', 'Division', 'Function', 'Demand Type',
+      'Requester', 'AI SPOC', 'Start Date', 'End Date', 'Budget',
+      'AI Skills', 'Team Members'
+    ];
+
+    const headerRow = worksheet.addRow(headers);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF00457E' }
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 25;
+
+    filteredApps.forEach(app => {
+      const row = worksheet.addRow([
+        app.name,
+        app.project_id || '',
+        app.description || '',
+        `DOI ${app.doi_stage || 0}`,
+        app.current_status || '',
+        app.priority || '',
+        app.platform || '',
+        app.business_division || '',
+        app.business_function || '',
+        app.demand_type || '',
+        app.requester_name || '',
+        app.ai_spoc || '',
+        app.start_date || '',
+        app.end_date || '',
+        app.estimated_costs || '',
+        app.ai_skills || '',
+        app.team?.map(t => t.role ? `${t.name} (${t.role})` : t.name).join(', ') || '',
+      ]);
+
+      row.alignment = { vertical: 'middle', wrapText: true };
+
+      if (app.priority === 'High') {
+        row.getCell(6).font = { bold: true, color: { argb: 'FFDC2626' } };
+        row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
+      } else if (app.priority === 'Medium') {
+        row.getCell(6).font = { color: { argb: 'FFD97706' } };
+        row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+      } else if (app.priority === 'Low') {
+        row.getCell(6).font = { color: { argb: 'FF16A34A' } };
+        row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
+      }
+    });
+
+    worksheet.columns = [
+      { width: 25 }, { width: 15 }, { width: 40 }, { width: 12 }, { width: 18 },
+      { width: 10 }, { width: 12 }, { width: 15 }, { width: 15 }, { width: 20 },
+      { width: 18 }, { width: 18 }, { width: 12 }, { width: 12 }, { width: 12 },
+      { width: 25 }, { width: 35 }
+    ];
+
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+      });
+      if (rowNumber > 1 && rowNumber % 2 === 0) {
+        row.eachCell((cell) => {
+          if (!cell.fill || cell.fill.fgColor?.argb === undefined) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+          }
+        });
+      }
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `KBase_Projects_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   useEffect(() => {
@@ -345,7 +399,7 @@ function Landing() {
                   <path d="M21 3v5h-5"/>
                 </svg>
               </button>
-              <button className="action-btn" onClick={handleExport} data-tooltip-id="tooltip" data-tooltip-content="Export to CSV">
+              <button className="action-btn" onClick={handleExport} data-tooltip-id="tooltip" data-tooltip-content="Export to Excel">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                   <polyline points="7 10 12 15 17 10"/>
