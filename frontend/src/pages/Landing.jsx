@@ -68,6 +68,7 @@ function Landing() {
     division: ''
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState('card');
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [feedback, setFeedback] = useState({
@@ -417,6 +418,33 @@ function Landing() {
                   <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
               </button>
+              <div className="view-toggle">
+                <button
+                  className={`view-toggle-btn ${viewMode === 'card' ? 'active' : ''}`}
+                  onClick={() => setViewMode('card')}
+                  data-tooltip-id="tooltip"
+                  data-tooltip-content="Card View"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                  </svg>
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+                  onClick={() => setViewMode('table')}
+                  data-tooltip-id="tooltip"
+                  data-tooltip-content="Table View"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Filter Panel */}
@@ -534,97 +562,170 @@ function Landing() {
             </>
           ) : (
             <>
-              <div className="projects-grid">
-                {filteredApps.length > 0 ? (
-                  filteredApps.map(app => (
-                  <div key={app.id} className="project-card" onClick={() => setSelectedApp(app)} style={{
-                      '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
-                    }}>
-                    <div className="project-card-header">
-                      <div className="project-card-icon">
-                        <AppIcon icon={app.icon} />
+              {viewMode === 'card' ? (
+                <div className="projects-grid">
+                  {filteredApps.length > 0 ? (
+                    filteredApps.map(app => (
+                    <div key={app.id} className="project-card" onClick={() => setSelectedApp(app)} style={{
+                        '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
+                      }}>
+                      <div className="project-card-header">
+                        <div className="project-card-icon">
+                          <AppIcon icon={app.icon} />
+                        </div>
+                        <div className="project-card-header-right">
+                          {(app.start_date || app.end_date) && (
+                            <span className="project-card-timeline">{app.start_date || 'TBD'} → {app.end_date || 'TBD'}</span>
+                          )}
+                          {app.priority && <span className={`priority-badge-sm priority-${app.priority.toLowerCase()}`}>{app.priority}</span>}
+                        </div>
                       </div>
-                      <div className="project-card-header-right">
-                        {(app.start_date || app.end_date) && (
-                          <span className="project-card-timeline">{app.start_date || 'TBD'} → {app.end_date || 'TBD'}</span>
+
+                      <div className="doi-progress" style={{
+                        '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
+                      }}>
+                        <div className="doi-progress-bar">
+                          {[0, 1, 2, 3, 4, 5].map(stage => (
+                            <div
+                              key={stage}
+                              className={`doi-progress-step ${stage <= (app.doi_stage || 0) ? 'active' : ''}`}
+                              title={doiStages.find(d => d.id === stage)?.label || `DOI ${stage}`}
+                            />
+                          ))}
+                        </div>
+                        <span className="doi-progress-label">DOI {app.doi_stage || 0} - {doiStages.find(d => d.id === (app.doi_stage || 0))?.label || ''}</span>
+                      </div>
+                      <h4 className="project-card-title">{app.name}</h4>
+                      {app.project_id && <span className="project-card-id">#{app.project_id}</span>}
+
+                      <div className="project-card-info">
+                        {app.current_status && (
+                          <div className="card-info-item">
+                            <span className="card-info-label">Status</span>
+                            <span className="card-info-value status">{app.current_status}</span>
+                          </div>
                         )}
-                        {app.priority && <span className={`priority-badge-sm priority-${app.priority.toLowerCase()}`}>{app.priority}</span>}
+                        {app.platform && (
+                          <div className="card-info-item">
+                            <span className="card-info-label">Platform</span>
+                            <span className="card-info-value">{app.platform}</span>
+                          </div>
+                        )}
+                        {app.business_division && (
+                          <div className="card-info-item">
+                            <span className="card-info-label">Division</span>
+                            <span className="card-info-value">{app.business_division}</span>
+                          </div>
+                        )}
+                        {app.demand_type && (
+                          <div className="card-info-item">
+                            <span className="card-info-label">Demand Type</span>
+                            <span className="card-info-value">{app.demand_type}</span>
+                          </div>
+                        )}
+                        {app.estimated_costs && (
+                          <div className="card-info-item">
+                            <span className="card-info-label">Budget</span>
+                            <span className="card-info-value">{app.estimated_costs}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {/* DOI Progress Bar */}
-                    <div className="doi-progress" style={{
-                      '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
-                    }}>
-                      <div className="doi-progress-bar">
-                        {[0, 1, 2, 3, 4, 5].map(stage => (
-                          <div
-                            key={stage}
-                            className={`doi-progress-step ${stage <= (app.doi_stage || 0) ? 'active' : ''}`}
-                            title={doiStages.find(d => d.id === stage)?.label || `DOI ${stage}`}
-                          />
-                        ))}
-                      </div>
-                      <span className="doi-progress-label">DOI {app.doi_stage || 0} - {doiStages.find(d => d.id === (app.doi_stage || 0))?.label || ''}</span>
-                    </div>
-                    <h4 className="project-card-title">{app.name}</h4>
-                    {app.project_id && <span className="project-card-id">#{app.project_id}</span>}
-
-                    {/* Quick Info Grid */}
-                    <div className="project-card-info">
-                      {app.current_status && (
-                        <div className="card-info-item">
-                          <span className="card-info-label">Status</span>
-                          <span className="card-info-value status">{app.current_status}</span>
-                        </div>
-                      )}
-                      {app.platform && (
-                        <div className="card-info-item">
-                          <span className="card-info-label">Platform</span>
-                          <span className="card-info-value">{app.platform}</span>
-                        </div>
-                      )}
-                      {app.business_division && (
-                        <div className="card-info-item">
-                          <span className="card-info-label">Division</span>
-                          <span className="card-info-value">{app.business_division}</span>
-                        </div>
-                      )}
-                      {app.demand_type && (
-                        <div className="card-info-item">
-                          <span className="card-info-label">Demand Type</span>
-                          <span className="card-info-value">{app.demand_type}</span>
-                        </div>
-                      )}
-                      {app.estimated_costs && (
-                        <div className="card-info-item">
-                          <span className="card-info-label">Budget</span>
-                          <span className="card-info-value">{app.estimated_costs}</span>
-                        </div>
-                      )}
-                    </div>
+                  ))
+                ) : (
+                  <div className="no-projects-message">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <rect width="7" height="7" x="3" y="3" rx="1"/>
+                      <rect width="7" height="7" x="14" y="3" rx="1"/>
+                      <rect width="7" height="7" x="14" y="14" rx="1"/>
+                      <rect width="7" height="7" x="3" y="14" rx="1"/>
+                    </svg>
+                    <p>{activeFiltersCount > 0 ? 'No matching projects' : 'No projects yet'}</p>
+                    <span style={{ fontSize: '0.85rem' }}>
+                      {activeFiltersCount > 0 ? 'Try adjusting your filters' : 'Projects will appear here once added by admins'}
+                    </span>
+                    {activeFiltersCount > 0 && (
+                      <button className="btn btn-outline btn-sm" style={{ marginTop: '12px' }} onClick={clearFilters}>
+                        Clear Filters
+                      </button>
+                    )}
                   </div>
-                ))
+                )}
+                </div>
               ) : (
-                <div className="no-projects-message">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <rect width="7" height="7" x="3" y="3" rx="1"/>
-                    <rect width="7" height="7" x="14" y="3" rx="1"/>
-                    <rect width="7" height="7" x="14" y="14" rx="1"/>
-                    <rect width="7" height="7" x="3" y="14" rx="1"/>
-                  </svg>
-                  <p>{activeFiltersCount > 0 ? 'No matching projects' : 'No projects yet'}</p>
-                  <span style={{ fontSize: '0.85rem' }}>
-                    {activeFiltersCount > 0 ? 'Try adjusting your filters' : 'Projects will appear here once added by admins'}
-                  </span>
-                  {activeFiltersCount > 0 && (
-                    <button className="btn btn-outline btn-sm" style={{ marginTop: '12px' }} onClick={clearFilters}>
-                      Clear Filters
-                    </button>
+                <div className="projects-table-container">
+                  {filteredApps.length > 0 ? (
+                    <table className="projects-table">
+                      <thead>
+                        <tr>
+                          <th>Project</th>
+                          <th>DOI Stage</th>
+                          <th>Status</th>
+                          <th>Priority</th>
+                          <th>Division</th>
+                          <th>Platform</th>
+                          <th>Timeline</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredApps.map(app => (
+                          <tr key={app.id} onClick={() => setSelectedApp(app)} className="projects-table-row">
+                            <td>
+                              <div className="table-project-cell">
+                                <div className="table-project-icon">
+                                  <AppIcon icon={app.icon} />
+                                </div>
+                                <div className="table-project-info">
+                                  <span className="table-project-name">{app.name}</span>
+                                  {app.project_id && <span className="table-project-id">#{app.project_id}</span>}
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className="doi-badge" style={{
+                                '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
+                              }}>
+                                DOI {app.doi_stage || 0}
+                              </span>
+                            </td>
+                            <td><span className="status-text">{app.current_status || '-'}</span></td>
+                            <td>
+                              {app.priority ? (
+                                <span className={`priority-badge-sm priority-${app.priority.toLowerCase()}`}>{app.priority}</span>
+                              ) : '-'}
+                            </td>
+                            <td>{app.business_division || '-'}</td>
+                            <td>{app.platform || '-'}</td>
+                            <td className="timeline-cell">
+                              {app.start_date || app.end_date ? (
+                                <span>{app.start_date || 'TBD'} → {app.end_date || 'TBD'}</span>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="no-projects-message">
+                      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <rect width="7" height="7" x="3" y="3" rx="1"/>
+                        <rect width="7" height="7" x="14" y="3" rx="1"/>
+                        <rect width="7" height="7" x="14" y="14" rx="1"/>
+                        <rect width="7" height="7" x="3" y="14" rx="1"/>
+                      </svg>
+                      <p>{activeFiltersCount > 0 ? 'No matching projects' : 'No projects yet'}</p>
+                      <span style={{ fontSize: '0.85rem' }}>
+                        {activeFiltersCount > 0 ? 'Try adjusting your filters' : 'Projects will appear here once added by admins'}
+                      </span>
+                      {activeFiltersCount > 0 && (
+                        <button className="btn btn-outline btn-sm" style={{ marginTop: '12px' }} onClick={clearFilters}>
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-              </div>
             </>
           )}
         </section>
