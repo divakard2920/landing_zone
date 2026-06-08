@@ -2,6 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 const db = require('../db/database');
 
 const router = express.Router();
@@ -49,7 +50,7 @@ router.post('/apps', (req, res) => {
     business_division, business_function, requester_name, ai_spoc,
     priority, strategic_focus, doi_stage, project_id,
     current_status, last_status, demand_type, platform,
-    estimated_costs, start_date, end_date, ai_skills
+    estimated_costs, start_date, end_date, ai_skills, risks, dependencies
   } = req.body;
 
   if (!name) {
@@ -65,14 +66,15 @@ router.post('/apps', (req, res) => {
       business_division, business_function, requester_name, ai_spoc,
       priority, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
-      estimated_costs, start_date, end_date, ai_skills
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      estimated_costs, start_date, end_date, ai_skills, risks, dependencies
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, name, description || null, url || null, icon || null, category || null,
     business_division || null, business_function || null, requester_name || null, ai_spoc || null,
     priority || null, strategic_focus || null, initialDoiStage, project_id || null,
     current_status || null, last_status || null, demand_type || null, platform || null,
-    estimated_costs || null, start_date || null, end_date || null, ai_skills || null
+    estimated_costs || null, start_date || null, end_date || null, ai_skills || null,
+    risks || null, dependencies || null
   );
 
   // Record initial DOI stage in history
@@ -91,7 +93,7 @@ router.put('/apps/:id', (req, res) => {
     business_division, business_function, requester_name, ai_spoc,
     priority, strategic_focus, doi_stage, project_id,
     current_status, last_status, demand_type, platform,
-    estimated_costs, start_date, end_date, ai_skills
+    estimated_costs, start_date, end_date, ai_skills, risks, dependencies
   } = req.body;
 
   // Get current DOI stage before update
@@ -105,6 +107,7 @@ router.put('/apps/:id', (req, res) => {
       priority = ?, strategic_focus = ?, doi_stage = ?, project_id = ?,
       current_status = ?, last_status = ?, demand_type = ?, platform = ?,
       estimated_costs = ?, start_date = ?, end_date = ?, ai_skills = ?,
+      risks = ?, dependencies = ?,
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(
@@ -113,6 +116,7 @@ router.put('/apps/:id', (req, res) => {
     priority, strategic_focus, doi_stage, project_id,
     current_status, last_status, demand_type, platform,
     estimated_costs, start_date, end_date, ai_skills,
+    risks, dependencies,
     id
   );
 
@@ -319,6 +323,137 @@ router.put('/doi-stages/:id', (req, res) => {
     .run(label, description || null, id);
 
   res.json({ message: 'DOI stage updated successfully' });
+});
+
+// App Requests management
+router.get('/app-requests', (req, res) => {
+  const requests = db
+    .prepare('SELECT * FROM app_requests ORDER BY created_at DESC')
+    .all();
+  res.json(requests);
+});
+
+router.put('/app-requests/:id/approve', (req, res) => {
+  const { id } = req.params;
+  const { admin_notes } = req.body;
+
+  const request = db.prepare('SELECT * FROM app_requests WHERE id = ?').get(id);
+  if (!request) {
+    return res.status(404).json({ error: 'Request not found' });
+  }
+
+  // Create the app from the request
+  const appId = uuidv4();
+  db.prepare(`
+    INSERT INTO apps (
+      id, name, description, business_division, business_function,
+      requester_name, priority, doi_stage
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    appId, request.name, request.description, request.business_division,
+    request.business_function, request.requester_name, request.priority, 0
+  );
+
+  // Record initial DOI stage
+  db.prepare(`
+    INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(uuidv4(), appId, null, 0, 'Project created from approved request');
+
+  // Update request status
+  db.prepare(`
+    UPDATE app_requests
+    SET status = 'approved', admin_notes = ?, reviewed_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(admin_notes || null, id);
+
+  res.json({ appId, message: 'Request approved and app created' });
+});
+
+router.put('/app-requests/:id/reject', (req, res) => {
+  const { id } = req.params;
+  const { admin_notes } = req.body;
+
+  db.prepare(`
+    UPDATE app_requests
+    SET status = 'rejected', admin_notes = ?, reviewed_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(admin_notes || null, id);
+
+  res.json({ message: 'Request rejected' });
+});
+
+router.delete('/app-requests/:id', (req, res) => {
+  const { id } = req.params;
+  db.prepare('DELETE FROM app_requests WHERE id = ?').run(id);
+  res.json({ message: 'Request deleted' });
+});
+
+// Admin users management
+router.get('/users', (req, res) => {
+  const admins = db.prepare('SELECT id, name, email, is_active, created_at, last_login FROM admins ORDER BY created_at DESC').all();
+  res.json(admins);
+});
+
+router.post('/users', (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Name, email and password are required' });
+  }
+
+  const existing = db.prepare('SELECT id FROM admins WHERE LOWER(email) = LOWER(?)').get(email);
+  if (existing) {
+    return res.status(400).json({ error: 'An admin with this email already exists' });
+  }
+
+  const id = uuidv4();
+  const passwordHash = bcrypt.hashSync(password, 10);
+
+  db.prepare(`
+    INSERT INTO admins (id, name, email, password_hash)
+    VALUES (?, ?, ?, ?)
+  `).run(id, name, email, passwordHash);
+
+  res.status(201).json({ id, message: 'Admin user created successfully' });
+});
+
+router.put('/users/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, email, password, is_active } = req.body;
+
+  const admin = db.prepare('SELECT * FROM admins WHERE id = ?').get(id);
+  if (!admin) {
+    return res.status(404).json({ error: 'Admin not found' });
+  }
+
+  if (password) {
+    const passwordHash = bcrypt.hashSync(password, 10);
+    db.prepare('UPDATE admins SET name = ?, email = ?, password_hash = ?, is_active = ? WHERE id = ?')
+      .run(name, email, passwordHash, is_active ? 1 : 0, id);
+  } else {
+    db.prepare('UPDATE admins SET name = ?, email = ?, is_active = ? WHERE id = ?')
+      .run(name, email, is_active ? 1 : 0, id);
+  }
+
+  res.json({ message: 'Admin updated successfully' });
+});
+
+router.delete('/users/:id', (req, res) => {
+  const { id } = req.params;
+
+  // Prevent deleting the last active admin
+  const activeCount = db.prepare('SELECT COUNT(*) as count FROM admins WHERE is_active = 1').get();
+  const admin = db.prepare('SELECT is_active FROM admins WHERE id = ?').get(id);
+
+  if (admin?.is_active && activeCount.count <= 1) {
+    return res.status(400).json({ error: 'Cannot delete the last active admin' });
+  }
+
+  db.prepare('DELETE FROM admins WHERE id = ?').run(id);
+  db.prepare('DELETE FROM admin_sessions WHERE admin_id = ?').run(id);
+
+  res.json({ message: 'Admin deleted successfully' });
 });
 
 module.exports = router;

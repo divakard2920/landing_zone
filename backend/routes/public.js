@@ -73,4 +73,20 @@ router.get('/apps/:appId/doi-history', (req, res) => {
   res.json(history);
 });
 
+router.post('/app-requests', (req, res) => {
+  const { name, description, requester_name, requester_email, business_division, business_function, priority, justification } = req.body;
+
+  if (!name || !requester_name) {
+    return res.status(400).json({ error: 'App name and requester name are required' });
+  }
+
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO app_requests (id, name, description, requester_name, requester_email, business_division, business_function, priority, justification)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, description || null, requester_name, requester_email || null, business_division || null, business_function || null, priority || null, justification || null);
+
+  res.status(201).json({ id, message: 'App request submitted successfully' });
+});
+
 module.exports = router;

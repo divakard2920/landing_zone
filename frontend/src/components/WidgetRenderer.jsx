@@ -209,6 +209,34 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
     }
   };
 
+  const verticalBarOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      datalabels: {
+        anchor: 'end',
+        align: 'top',
+        color: '#64748b',
+        font: { weight: 'bold', size: 11 },
+        formatter: (value) => value
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45
+        }
+      },
+      y: {
+        grid: { color: '#f1f5f9' },
+        beginAtZero: true
+      }
+    }
+  };
+
   if (widget.chart_type === 'stat') {
     return (
       <div className="widget-card">
@@ -287,6 +315,7 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
             {widget.chart_type === 'pie' && <Pie data={chartData} options={chartOptions} />}
             {widget.chart_type === 'donut' && <Doughnut data={chartData} options={chartOptions} />}
             {widget.chart_type === 'bar' && <Bar data={chartData} options={barOptions} />}
+            {widget.chart_type === 'vertical_bar' && <Bar data={chartData} options={verticalBarOptions} />}
           </>
         )}
       </div>

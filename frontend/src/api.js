@@ -2,13 +2,43 @@ import axios from 'axios';
 
 const API_BASE = '/api';
 
+// Add auth token to requests
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('adminToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Handle 401 responses
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && window.location.pathname.startsWith('/admin')) {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const api = {
+  // Auth
+  auth: {
+    login: (email, password) => axios.post(`${API_BASE}/auth/login`, { email, password }),
+    logout: () => axios.post(`${API_BASE}/auth/logout`),
+    me: () => axios.get(`${API_BASE}/auth/me`),
+  },
+
   getApps: () => axios.get(`${API_BASE}/apps`),
   getAnnouncements: () => axios.get(`${API_BASE}/announcements`),
   getWidgets: () => axios.get(`${API_BASE}/widgets`),
   getDoiStages: () => axios.get(`${API_BASE}/doi-stages`),
   getDoiHistory: (appId) => axios.get(`${API_BASE}/apps/${appId}/doi-history`),
   submitFeedback: (data) => axios.post(`${API_BASE}/feedback`, data),
+  submitAppRequest: (data) => axios.post(`${API_BASE}/app-requests`, data),
 
   admin: {
     getApps: () => axios.get(`${API_BASE}/admin/apps`),
@@ -46,5 +76,16 @@ export const api = {
 
     getDoiStages: () => axios.get(`${API_BASE}/admin/doi-stages`),
     updateDoiStage: (id, data) => axios.put(`${API_BASE}/admin/doi-stages/${id}`, data),
+
+    getAppRequests: () => axios.get(`${API_BASE}/admin/app-requests`),
+    approveAppRequest: (id, notes) => axios.put(`${API_BASE}/admin/app-requests/${id}/approve`, { admin_notes: notes }),
+    rejectAppRequest: (id, notes) => axios.put(`${API_BASE}/admin/app-requests/${id}/reject`, { admin_notes: notes }),
+    deleteAppRequest: (id) => axios.delete(`${API_BASE}/admin/app-requests/${id}`),
+
+    // Admin users management
+    getAdminUsers: () => axios.get(`${API_BASE}/admin/users`),
+    createAdminUser: (data) => axios.post(`${API_BASE}/admin/users`, data),
+    updateAdminUser: (id, data) => axios.put(`${API_BASE}/admin/users/${id}`, data),
+    deleteAdminUser: (id) => axios.delete(`${API_BASE}/admin/users/${id}`),
   },
 };

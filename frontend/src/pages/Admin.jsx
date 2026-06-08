@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const STATUS_OPTIONS = [
+  'Active', 'On Hold', 'Completed', 'Cancelled', 'In Review',
   'Ongoing Project', 'POC active', 'POC completed', 'Use case defined',
   'Active in progress', 'Awaiting decision', 'To be started', 'MVP has been built'
 ];
@@ -22,15 +23,35 @@ const emptyProjectForm = {
   business_division: '', business_function: '', requester_name: '', ai_spoc: '',
   priority: '', strategic_focus: '', doi_stage: 0, project_id: '',
   current_status: '', last_status: '', demand_type: '', platform: '',
-  estimated_costs: '', start_date: '', end_date: '', ai_skills: ''
+  estimated_costs: '', start_date: '', end_date: '', ai_skills: '',
+  risks: '', dependencies: ''
 };
 
 function Admin() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'dashboard';
+
+  const setActiveTab = (tab) => {
+    if (tab === 'dashboard') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ tab });
+    }
+  };
+
+  const [currentAdmin, setCurrentAdmin] = useState(() => {
+    const saved = localStorage.getItem('adminUser');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [projects, setProjects] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [feedback, setFeedback] = useState([]);
   const [doiStages, setDoiStages] = useState([]);
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminForm, setAdminForm] = useState({ name: '', email: '', password: '' });
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [showAdminModal, setShowAdminModal] = useState(false);
 
   const [projectForm, setProjectForm] = useState({ ...emptyProjectForm });
   const [editingProject, setEditingProject] = useState(null);
@@ -55,24 +76,24 @@ function Admin() {
   const [editingWidget, setEditingWidget] = useState(null);
   const [showWidgetModal, setShowWidgetModal] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
-  const [confirmDialog, setConfirmDialog] = useState({ show: false, title: '', message: '', onConfirm: null });
+  const [confirmDialog, setConfirmDialog] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
 
   const showToast = (message, type = 'error') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'error' }), 3000);
   };
 
-  const showConfirm = (title, message, onConfirm) => {
-    setConfirmDialog({ show: true, title, message, onConfirm });
+  const showConfirm = (title, message, onConfirm, confirmText = 'Delete', type = 'danger') => {
+    setConfirmDialog({ show: true, title, message, onConfirm, confirmText, type });
   };
 
   const handleConfirm = () => {
     if (confirmDialog.onConfirm) confirmDialog.onConfirm();
-    setConfirmDialog({ show: false, title: '', message: '', onConfirm: null });
+    setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
   };
 
   const handleCancelConfirm = () => {
-    setConfirmDialog({ show: false, title: '', message: '', onConfirm: null });
+    setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
   };
 
   useEffect(() => {
@@ -81,25 +102,104 @@ function Admin() {
 
   const loadData = async () => {
     try {
-      const [appsRes, annRes, fbRes, widgetsRes, doiRes] = await Promise.all([
+      const [appsRes, annRes, fbRes, widgetsRes, doiRes, usersRes] = await Promise.all([
         api.admin.getApps(),
         api.admin.getAnnouncements(),
         api.admin.getFeedback(),
         api.admin.getWidgets(),
-        api.admin.getDoiStages()
+        api.admin.getDoiStages(),
+        api.admin.getAdminUsers()
       ]);
       setProjects(appsRes.data);
       setAnnouncements(annRes.data);
       setFeedback(fbRes.data);
       setWidgets(widgetsRes.data);
       setDoiStages(doiRes.data);
+      setAdminUsers(usersRes.data);
     } catch (error) {
       console.error('Failed to load admin data:', error);
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await api.auth.logout();
+    } catch (e) {
+      // Ignore errors
+    }
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    navigate('/login');
+  };
+
+  const handleAdminSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (editingAdmin) {
+        await api.admin.updateAdminUser(editingAdmin.id, adminForm);
+        showToast('Admin updated successfully', 'success');
+      } else {
+        await api.admin.createAdminUser(adminForm);
+        showToast('Admin created successfully', 'success');
+      }
+      setAdminForm({ name: '', email: '', password: '' });
+      setEditingAdmin(null);
+      setShowAdminModal(false);
+      loadData();
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Failed to save admin', 'error');
+    }
+  };
+
+  const handleEditAdmin = (admin) => {
+    setEditingAdmin(admin);
+    setAdminForm({ name: admin.name, email: admin.email, password: '' });
+    setShowAdminModal(true);
+  };
+
+  const handleDeleteAdmin = (admin) => {
+    showConfirm('Delete Admin', `Are you sure you want to delete ${admin.name}? They will no longer be able to access the admin panel.`, async () => {
+      try {
+        await api.admin.deleteAdminUser(admin.id);
+        showToast('Admin deleted', 'success');
+        loadData();
+      } catch (error) {
+        showToast(error.response?.data?.error || 'Failed to delete admin', 'error');
+      }
+    });
+  };
+
+  const handleToggleAdminStatus = async (admin) => {
+    try {
+      await api.admin.updateAdminUser(admin.id, { ...admin, is_active: !admin.is_active });
+      showToast(`Admin ${admin.is_active ? 'deactivated' : 'activated'}`, 'success');
+      loadData();
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Failed to update admin', 'error');
+    }
+  };
+
   const handleProjectSubmit = async (e) => {
     e.preventDefault();
+
+    // Check if DOI stage is being lowered
+    if (editingProject && projectForm.doi_stage < editingProject.doi_stage) {
+      showConfirm(
+        'Lower DOI Stage?',
+        `You are about to lower the DOI stage from DOI ${editingProject.doi_stage} to DOI ${projectForm.doi_stage}. This is an unusual action. Are you sure you want to proceed?`,
+        async () => {
+          await saveProject();
+        },
+        'Proceed',
+        'warning'
+      );
+      return;
+    }
+
+    await saveProject();
+  };
+
+  const saveProject = async () => {
     try {
       if (editingProject) {
         await api.admin.updateApp(editingProject.id, projectForm);
@@ -287,22 +387,73 @@ function Admin() {
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
   };
 
+  const handleApproveUsecaseRequest = (request) => {
+    showConfirm('Approve Usecase', `Are you sure you want to approve "${request.subject}"? This will create a new project.`, async () => {
+      try {
+        // Create the project from the request
+        await api.admin.createApp({
+          name: request.subject,
+          description: request.message,
+          requester_name: request.name || 'Unknown',
+          doi_stage: 0
+        });
+        // Mark the request as resolved
+        await api.admin.updateFeedbackStatus(request.id, 'resolved');
+        showToast('Usecase approved and project created', 'success');
+        loadData();
+      } catch (error) {
+        showToast('Failed to approve usecase', 'error');
+      }
+    });
+  };
+
+  const handleRejectUsecaseRequest = (request) => {
+    showConfirm('Reject Usecase', `Are you sure you want to reject "${request.subject}"?`, async () => {
+      try {
+        await api.admin.updateFeedbackStatus(request.id, 'closed');
+        showToast('Usecase rejected', 'success');
+        loadData();
+      } catch (error) {
+        showToast('Failed to reject usecase', 'error');
+      }
+    });
+  };
+
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
         <h2>KBase Admin</h2>
+        {currentAdmin && (
+          <div className="admin-user-info">
+            <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
+            <div className="admin-user-details">
+              <span className="admin-user-name">{currentAdmin.name}</span>
+              <span className="admin-user-email">{currentAdmin.email}</span>
+            </div>
+          </div>
+        )}
         <nav>
           <a href="#" className={activeTab === 'dashboard' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>Dashboard</a>
           <a href="#" className={activeTab === 'projects' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('projects'); }}>Projects</a>
           <a href="#" className={activeTab === 'teams' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('teams'); }}>Teams</a>
           <a href="#" className={activeTab === 'widgets' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('widgets'); }}>Widgets</a>
           <a href="#" className={activeTab === 'announcements' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('announcements'); }}>Announcements</a>
-          <a href="#" className={activeTab === 'feedback' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('feedback'); }}>Requests</a>
+          <a href="#" className={activeTab === 'feedback' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('feedback'); }}>Feedback</a>
+          <a href="#" className={activeTab === 'usecase-requests' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('usecase-requests'); }}>
+            Usecase Requests
+            {feedback.filter(f => f.type === 'request' && f.status === 'new').length > 0 && (
+              <span className="nav-badge">{feedback.filter(f => f.type === 'request' && f.status === 'new').length}</span>
+            )}
+          </a>
+          <a href="#" className={activeTab === 'admin-users' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('admin-users'); }}>Admin Users</a>
         </nav>
-        <div style={{ marginTop: 'auto', padding: '24px 12px' }}>
+        <div style={{ marginTop: 'auto', padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <Link to="/" className="btn btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
             Back to Portal
           </Link>
+          <button onClick={handleLogout} className="btn btn-danger" style={{ width: '100%', justifyContent: 'center' }}>
+            Logout
+          </button>
         </div>
       </aside>
 
@@ -510,7 +661,7 @@ function Admin() {
                             <td>{m.role || '-'}</td>
                             <td>{m.email || '-'}</td>
                             <td>
-                              <div className="action-btns">
+                              <div className="action-buttons">
                                 <button className="btn btn-sm" onClick={() => handleEditTeamMember(m)}>Edit</button>
                                 <button className="btn btn-danger btn-sm" onClick={() => handleDeleteTeamMember(m.id)}>Remove</button>
                               </div>
@@ -596,7 +747,7 @@ function Admin() {
                       <td style={{ fontWeight: 600 }}>{item.title}</td>
                       <td>{new Date(item.created_at).toLocaleDateString()}</td>
                       <td>
-                        <div className="action-btns">
+                        <div className="action-buttons">
                           <button className="btn btn-sm" onClick={() => handleEditAnnouncement(item)}>Edit</button>
                           <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAnnouncement(item.id)}>Delete</button>
                         </div>
@@ -636,13 +787,13 @@ function Admin() {
           </div>
         )}
 
-        {/* Feedback/Requests */}
+        {/* Feedback */}
         {activeTab === 'feedback' && (
           <div className="admin-table-container">
             <table className="admin-table">
               <thead><tr><th>Type</th><th>Contact</th><th>Project</th><th>Subject & Message</th><th>Status</th></tr></thead>
               <tbody>
-                {feedback.map(item => (
+                {feedback.filter(item => item.type !== 'request').map(item => (
                   <tr key={item.id}>
                     <td><span className={`ticker-badge ${item.type === 'bug' ? 'warning' : 'info'}`}>{item.type}</span></td>
                     <td>
@@ -666,7 +817,64 @@ function Admin() {
                     </td>
                   </tr>
                 ))}
-                {feedback.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No requests</td></tr>}
+                {feedback.filter(item => item.type !== 'request').length === 0 && <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No feedback</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Usecase Requests */}
+        {activeTab === 'usecase-requests' && (
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Requester</th>
+                  <th>Description</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {feedback.filter(f => f.type === 'request').map(request => (
+                  <tr key={request.id}>
+                    <td style={{ fontWeight: 600 }}>{request.subject}</td>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{request.name || 'Anonymous'}</div>
+                      {request.email && (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{request.email}</div>
+                      )}
+                    </td>
+                    <td style={{ maxWidth: '300px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                      {request.message}
+                    </td>
+                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      {new Date(request.created_at).toLocaleDateString()}
+                    </td>
+                    <td>
+                      <span className={`status-badge status-${request.status === 'new' ? 'pending' : request.status === 'resolved' ? 'approved' : request.status === 'closed' ? 'rejected' : 'pending'}`}>
+                        {request.status === 'new' ? 'Pending' : request.status.charAt(0).toUpperCase() + request.status.slice(1).replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      {request.status === 'new' ? (
+                        <div className="action-buttons">
+                          <button className="btn btn-success btn-sm" onClick={() => handleApproveUsecaseRequest(request)}>Approve</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleRejectUsecaseRequest(request)}>Reject</button>
+                        </div>
+                      ) : (
+                        <div className="action-buttons">
+                          <button className="btn btn-secondary btn-sm" onClick={() => handleUpdateFeedbackStatus(request.id, 'new')}>Reopen</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {feedback.filter(f => f.type === 'request').length === 0 && (
+                  <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No usecase requests</td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -708,7 +916,7 @@ function Admin() {
                         </button>
                       </td>
                       <td>
-                        <div className="action-btns">
+                        <div className="action-buttons">
                           <button className="btn btn-sm" onClick={() => handleEditWidget(widget)}>Edit</button>
                           <button className="btn btn-sm btn-danger" onClick={() => handleDeleteWidget(widget.id)}>Delete</button>
                         </div>
@@ -724,6 +932,116 @@ function Admin() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Admin Users */}
+        {activeTab === 'admin-users' && (
+          <div className="admin-table-container">
+            <div className="admin-section-header">
+              <p>Manage admin users who can access this panel.</p>
+              <button className="btn btn-primary" onClick={() => { setEditingAdmin(null); setAdminForm({ name: '', email: '', password: '' }); setShowAdminModal(true); }}>
+                + Add Admin
+              </button>
+            </div>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Last Login</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {adminUsers.map(admin => (
+                  <tr key={admin.id}>
+                    <td style={{ fontWeight: 600 }}>{admin.name}</td>
+                    <td>{admin.email}</td>
+                    <td>
+                      {currentAdmin?.id !== admin.id ? (
+                        <button
+                          className={`btn btn-sm ${admin.is_active ? 'btn-success' : 'btn-outline'}`}
+                          onClick={() => handleToggleAdminStatus(admin)}
+                        >
+                          {admin.is_active ? 'Active' : 'Inactive'}
+                        </button>
+                      ) : (
+                        <span className="btn btn-sm btn-success" style={{ cursor: 'default' }}>Active</span>
+                      )}
+                    </td>
+                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      {admin.last_login ? new Date(admin.last_login).toLocaleString() : 'Never'}
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        <button className="btn btn-sm" onClick={() => handleEditAdmin(admin)}>Edit</button>
+                        {currentAdmin?.id !== admin.id && (
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteAdmin(admin)}>Delete</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {adminUsers.length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                      No admin users found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Admin User Modal */}
+        {showAdminModal && (
+          <div className="modal-overlay" onClick={() => setShowAdminModal(false)}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>{editingAdmin ? 'Edit Admin' : 'Add Admin'}</h2>
+                <button className="modal-close" onClick={() => setShowAdminModal(false)}>&times;</button>
+              </div>
+              <form onSubmit={handleAdminSubmit}>
+                <div className="form-group">
+                  <label>Name *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={adminForm.name}
+                    onChange={e => setAdminForm({...adminForm, name: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={adminForm.email}
+                    onChange={e => setAdminForm({...adminForm, email: e.target.value})}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>{editingAdmin ? 'New Password (leave blank to keep current)' : 'Password *'}</label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    value={adminForm.password}
+                    onChange={e => setAdminForm({...adminForm, password: e.target.value})}
+                    required={!editingAdmin}
+                    placeholder={editingAdmin ? 'Leave blank to keep current password' : ''}
+                  />
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowAdminModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">{editingAdmin ? 'Update' : 'Create'} Admin</button>
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -757,7 +1075,8 @@ function Admin() {
                   >
                     <option value="donut">Donut Chart</option>
                     <option value="pie">Pie Chart</option>
-                    <option value="bar">Bar Chart</option>
+                    <option value="bar">Horizontal Bar Chart</option>
+                    <option value="vertical_bar">Vertical Bar Chart</option>
                     <option value="progress">Progress Bars</option>
                     <option value="stat">Stat Cards</option>
                     <option value="dropdown">Dropdown Select</option>
@@ -951,6 +1270,14 @@ function Admin() {
                     <label>Description</label>
                     <textarea className="form-control" value={projectForm.description} onChange={e => setProjectForm({...projectForm, description: e.target.value})} rows="3" />
                   </div>
+                  <div className="form-group full-width">
+                    <label>Risks</label>
+                    <textarea className="form-control" value={projectForm.risks} onChange={e => setProjectForm({...projectForm, risks: e.target.value})} rows="2" placeholder="List potential risks for this project" />
+                  </div>
+                  <div className="form-group full-width">
+                    <label>Dependencies</label>
+                    <textarea className="form-control" value={projectForm.dependencies} onChange={e => setProjectForm({...projectForm, dependencies: e.target.value})} rows="2" placeholder="List dependencies (other projects, systems, teams)" />
+                  </div>
                 </div>
                 <div className="modal-actions">
                   <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>Cancel</button>
@@ -1000,7 +1327,7 @@ function Admin() {
             <p className="confirm-message">{confirmDialog.message}</p>
             <div className="confirm-actions">
               <button className="btn btn-outline" onClick={handleCancelConfirm}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleConfirm}>Delete</button>
+              <button className={`btn btn-${confirmDialog.type === 'warning' ? 'warning' : 'danger'}`} onClick={handleConfirm}>{confirmDialog.confirmText}</button>
             </div>
           </div>
         </div>

@@ -27,6 +27,8 @@ db.exec(`
     start_date TEXT,
     end_date TEXT,
     ai_skills TEXT,
+    risks TEXT,
+    dependencies TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -92,6 +94,41 @@ db.exec(`
     notes TEXT,
     FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS app_requests (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    requester_name TEXT NOT NULL,
+    requester_email TEXT,
+    business_division TEXT,
+    business_function TEXT,
+    priority TEXT,
+    justification TEXT,
+    status TEXT DEFAULT 'pending',
+    admin_notes TEXT,
+    reviewed_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS admins (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME
+  );
+
+  CREATE TABLE IF NOT EXISTS admin_sessions (
+    id TEXT PRIMARY KEY,
+    admin_id TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE CASCADE
+  );
 `);
 
 // Seed DOI stages if empty
@@ -111,6 +148,35 @@ try {
   db.exec(`ALTER TABLE feedback ADD COLUMN app_id TEXT`);
 } catch (e) {
   // Column already exists, ignore
+}
+
+// Migration: Add risks column to apps if it doesn't exist
+try {
+  db.exec(`ALTER TABLE apps ADD COLUMN risks TEXT`);
+} catch (e) {
+  // Column already exists, ignore
+}
+
+// Migration: Add dependencies column to apps if it doesn't exist
+try {
+  db.exec(`ALTER TABLE apps ADD COLUMN dependencies TEXT`);
+} catch (e) {
+  // Column already exists, ignore
+}
+
+// Seed initial admin if no admins exist
+const adminCount = db.prepare('SELECT COUNT(*) as count FROM admins').get();
+if (adminCount.count === 0) {
+  const { v4: uuidv4 } = require('uuid');
+  const bcrypt = require('bcryptjs');
+  const defaultPassword = bcrypt.hashSync('admin123', 10);
+
+  db.prepare(`
+    INSERT INTO admins (id, name, email, password_hash)
+    VALUES (?, ?, ?, ?)
+  `).run(uuidv4(), 'Divakar Doreiswamy', 'Divakar.Doreiswamy@knorr-bremse.com', defaultPassword);
+
+  console.log('Default admin created: Divakar.Doreiswamy@knorr-bremse.com / admin123');
 }
 
 module.exports = db;
