@@ -275,6 +275,11 @@ function Landing() {
     const matchesDivision = !filters.division || (app.business_division || '').split(',').map(v => v.trim()).includes(filters.division);
 
     return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision;
+  }).sort((a, b) => {
+    if (a.created_at && b.created_at) {
+      return new Date(a.created_at) - new Date(b.created_at);
+    }
+    return a.id - b.id;
   });
 
   const activeFiltersCount = Object.values(filters).filter(v => v !== '').length;
