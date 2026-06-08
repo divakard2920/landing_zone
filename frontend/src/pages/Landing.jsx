@@ -232,11 +232,17 @@ function Landing() {
     setFeedback({ ...feedback, [e.target.name]: e.target.value });
   };
 
+  // Helper to split comma-separated values and get unique items
+  const splitAndUnique = (arr, field) => {
+    const values = arr.flatMap(a => (a[field] || '').split(',').map(v => v.trim()).filter(Boolean));
+    return [...new Set(values)].sort();
+  };
+
   // Get unique filter options from apps
   const filterOptions = {
-    statuses: [...new Set(apps.map(a => a.current_status).filter(Boolean))],
-    platforms: [...new Set(apps.map(a => a.platform).filter(Boolean))],
-    divisions: [...new Set(apps.map(a => a.business_division).filter(Boolean))],
+    statuses: [...new Set(apps.map(a => a.current_status).filter(Boolean))].sort(),
+    platforms: splitAndUnique(apps, 'platform'),
+    divisions: splitAndUnique(apps, 'business_division'),
     priorities: ['High', 'Medium', 'Low']
   };
 
@@ -265,8 +271,8 @@ function Landing() {
     const matchesDoi = !filters.doi_stage || (app.doi_stage || 0) === parseInt(filters.doi_stage);
     const matchesPriority = !filters.priority || app.priority === filters.priority;
     const matchesStatus = !filters.status || app.current_status === filters.status;
-    const matchesPlatform = !filters.platform || app.platform === filters.platform;
-    const matchesDivision = !filters.division || app.business_division === filters.division;
+    const matchesPlatform = !filters.platform || (app.platform || '').split(',').map(v => v.trim()).includes(filters.platform);
+    const matchesDivision = !filters.division || (app.business_division || '').split(',').map(v => v.trim()).includes(filters.division);
 
     return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision;
   });

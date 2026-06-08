@@ -77,21 +77,28 @@ function aggregateData(apps, dataField, doiStages = []) {
     return doi ? doi.label : `DOI ${stage}`;
   };
 
+  const multiValueFields = ['business_division', 'platform'];
+
   apps.forEach(app => {
     let value = app[dataField];
 
     if (dataField === 'doi_stage') {
       value = getDoiLabel(value);
+      counts[value] = (counts[value] || 0) + 1;
+    } else if (multiValueFields.includes(dataField) && value && value.includes(',')) {
+      const values = value.split(',').map(v => v.trim()).filter(Boolean);
+      values.forEach(v => {
+        counts[v] = (counts[v] || 0) + 1;
+      });
+    } else {
+      if (value === null || value === undefined || value === '') {
+        value = 'Unspecified';
+      }
+      counts[value] = (counts[value] || 0) + 1;
     }
-
-    if (value === null || value === undefined || value === '') {
-      value = 'Unspecified';
-    }
-
-    counts[value] = (counts[value] || 0) + 1;
   });
 
-  return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
 }
 
 function getAppFieldValue(app, dataField, doiStages = []) {
