@@ -387,38 +387,6 @@ function Admin() {
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
   };
 
-  const handleApproveUsecaseRequest = (request) => {
-    showConfirm('Approve Usecase', `Are you sure you want to approve "${request.subject}"? This will create a new project.`, async () => {
-      try {
-        // Create the project from the request
-        await api.admin.createApp({
-          name: request.subject,
-          description: request.message,
-          requester_name: request.name || 'Unknown',
-          doi_stage: 0
-        });
-        // Mark the request as resolved
-        await api.admin.updateFeedbackStatus(request.id, 'resolved');
-        showToast('Usecase approved and project created', 'success');
-        loadData();
-      } catch (error) {
-        showToast('Failed to approve usecase', 'error');
-      }
-    });
-  };
-
-  const handleRejectUsecaseRequest = (request) => {
-    showConfirm('Reject Usecase', `Are you sure you want to reject "${request.subject}"?`, async () => {
-      try {
-        await api.admin.updateFeedbackStatus(request.id, 'closed');
-        showToast('Usecase rejected', 'success');
-        loadData();
-      } catch (error) {
-        showToast('Failed to reject usecase', 'error');
-      }
-    });
-  };
-
   return (
     <div className="admin-layout">
       <aside className="admin-sidebar">
@@ -439,12 +407,6 @@ function Admin() {
           <a href="#" className={activeTab === 'widgets' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('widgets'); }}>Widgets</a>
           <a href="#" className={activeTab === 'announcements' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('announcements'); }}>Announcements</a>
           <a href="#" className={activeTab === 'feedback' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('feedback'); }}>Feedback</a>
-          <a href="#" className={activeTab === 'usecase-requests' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('usecase-requests'); }}>
-            Usecase Requests
-            {feedback.filter(f => f.type === 'request' && f.status === 'new').length > 0 && (
-              <span className="nav-badge">{feedback.filter(f => f.type === 'request' && f.status === 'new').length}</span>
-            )}
-          </a>
           <a href="#" className={activeTab === 'admin-users' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('admin-users'); }}>Admin Users</a>
         </nav>
         <div style={{ marginTop: 'auto', padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -793,7 +755,7 @@ function Admin() {
             <table className="admin-table">
               <thead><tr><th>Type</th><th>Contact</th><th>Project</th><th>Subject & Message</th><th>Status</th></tr></thead>
               <tbody>
-                {feedback.filter(item => item.type !== 'request').map(item => (
+                {feedback.map(item => (
                   <tr key={item.id}>
                     <td><span className={`ticker-badge ${item.type === 'bug' ? 'warning' : 'info'}`}>{item.type}</span></td>
                     <td>
@@ -817,64 +779,7 @@ function Admin() {
                     </td>
                   </tr>
                 ))}
-                {feedback.filter(item => item.type !== 'request').length === 0 && <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No feedback</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Usecase Requests */}
-        {activeTab === 'usecase-requests' && (
-          <div className="admin-table-container">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Subject</th>
-                  <th>Requester</th>
-                  <th>Description</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {feedback.filter(f => f.type === 'request').map(request => (
-                  <tr key={request.id}>
-                    <td style={{ fontWeight: 600 }}>{request.subject}</td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{request.name || 'Anonymous'}</div>
-                      {request.email && (
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{request.email}</div>
-                      )}
-                    </td>
-                    <td style={{ maxWidth: '300px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                      {request.message}
-                    </td>
-                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      {new Date(request.created_at).toLocaleDateString()}
-                    </td>
-                    <td>
-                      <span className={`status-badge status-${request.status === 'new' ? 'pending' : request.status === 'resolved' ? 'approved' : request.status === 'closed' ? 'rejected' : 'pending'}`}>
-                        {request.status === 'new' ? 'Pending' : request.status.charAt(0).toUpperCase() + request.status.slice(1).replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td>
-                      {request.status === 'new' ? (
-                        <div className="action-buttons">
-                          <button className="btn btn-success btn-sm" onClick={() => handleApproveUsecaseRequest(request)}>Approve</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleRejectUsecaseRequest(request)}>Reject</button>
-                        </div>
-                      ) : (
-                        <div className="action-buttons">
-                          <button className="btn btn-secondary btn-sm" onClick={() => handleUpdateFeedbackStatus(request.id, 'new')}>Reopen</button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {feedback.filter(f => f.type === 'request').length === 0 && (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No usecase requests</td></tr>
-                )}
+                {feedback.length === 0 && <tr><td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No feedback</td></tr>}
               </tbody>
             </table>
           </div>

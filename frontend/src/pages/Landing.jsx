@@ -1082,11 +1082,9 @@ function Landing() {
                   <select name="type" value={feedback.type} onChange={handleSupportChange} className="form-control">
                     <option value="suggestion">Suggestion</option>
                     <option value="bug">Bug Report</option>
-                    <option value="request">Usecase Request</option>
                     <option value="other">Other</option>
                   </select>
                 </div>
-                {feedback.type !== 'request' && (
                 <div className="form-group" style={{ flex: 1 }}>
                   <label>Related Project</label>
                   <div className="searchable-select">
@@ -1140,7 +1138,6 @@ function Landing() {
                     )}
                   </div>
                 </div>
-                )}
               </div>
 
               <div className="form-group">
