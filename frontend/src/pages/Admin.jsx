@@ -78,6 +78,7 @@ function Admin() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
   const [pageLoading, setPageLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const showToast = (message, type = 'error') => {
     setToast({ show: true, message, type });
@@ -137,6 +138,7 @@ function Admin() {
 
   const handleAdminSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editingAdmin) {
         await api.admin.updateAdminUser(editingAdmin.id, adminForm);
@@ -151,6 +153,8 @@ function Admin() {
       loadData();
     } catch (error) {
       showToast(error.response?.data?.error || 'Failed to save admin', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -203,6 +207,7 @@ function Admin() {
   };
 
   const saveProject = async () => {
+    setSaving(true);
     try {
       if (editingProject) {
         await api.admin.updateApp(editingProject.id, projectForm);
@@ -215,6 +220,8 @@ function Admin() {
       loadData();
     } catch (error) {
       console.error('Failed to save project', error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -233,6 +240,7 @@ function Admin() {
 
   const handleAnnouncementSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editingAnnouncement) {
         await api.admin.updateAnnouncement(editingAnnouncement.id, {
@@ -247,6 +255,8 @@ function Admin() {
       loadData();
     } catch (error) {
       console.error('Failed to save announcement', error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -299,6 +309,7 @@ function Admin() {
   const handleAddTeamMember = async (e) => {
     e.preventDefault();
     if (!selectedProjectForTeam) return;
+    setSaving(true);
     try {
       if (editingTeamMember) {
         await api.admin.updateTeamMember(editingTeamMember.id, teamForm);
@@ -316,6 +327,8 @@ function Admin() {
       } else {
         console.error('Failed to save team member', error);
       }
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -346,6 +359,7 @@ function Admin() {
 
   const handleWidgetSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editingWidget) {
         await api.admin.updateWidget(editingWidget.id, { ...widgetForm, is_active: editingWidget.is_active });
@@ -358,6 +372,8 @@ function Admin() {
       loadData();
     } catch (error) {
       console.error('Failed to save widget', error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -392,9 +408,25 @@ function Admin() {
 
   if (pageLoading) {
     return (
-      <div className="page-loader">
-        <div className="loader-spinner"></div>
-        <p>Loading...</p>
+      <div className="admin-layout">
+        <aside className="admin-sidebar">
+          <div className="skeleton-box" style={{ width: 120, height: 24, marginBottom: 24 }}></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="skeleton-box" style={{ width: '100%', height: 36, borderRadius: 6 }}></div>
+            ))}
+          </div>
+        </aside>
+        <main className="admin-content">
+          <div className="skeleton-box" style={{ width: 200, height: 32, marginBottom: 24 }}></div>
+          <div className="admin-table-container">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="skeleton-box" style={{ width: '100%', height: 48 }}></div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
@@ -695,8 +727,10 @@ function Admin() {
                         <input type="email" className="form-control" value={teamForm.email} onChange={e => setTeamForm({...teamForm, email: e.target.value})} />
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button type="submit" className="btn btn-primary">{editingTeamMember ? 'Update' : 'Add Member'}</button>
-                        {editingTeamMember && <button type="button" className="btn btn-outline" onClick={handleCancelEditTeamMember}>Cancel</button>}
+                        <button type="submit" className="btn btn-primary" disabled={saving}>
+                          {saving ? 'Saving...' : (editingTeamMember ? 'Update' : 'Add Member')}
+                        </button>
+                        {editingTeamMember && <button type="button" className="btn btn-outline" onClick={handleCancelEditTeamMember} disabled={saving}>Cancel</button>}
                       </div>
                     </form>
                   </div>
@@ -753,8 +787,10 @@ function Admin() {
                   <textarea className="form-control" value={announcementForm.content} onChange={e => setAnnouncementForm({...announcementForm, content: e.target.value})} required />
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button type="submit" className="btn btn-primary">{editingAnnouncement ? 'Update' : 'Post'}</button>
-                  {editingAnnouncement && <button type="button" className="btn btn-outline" onClick={handleCancelEditAnnouncement}>Cancel</button>}
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? 'Saving...' : (editingAnnouncement ? 'Update' : 'Post')}
+                  </button>
+                  {editingAnnouncement && <button type="button" className="btn btn-outline" onClick={handleCancelEditAnnouncement} disabled={saving}>Cancel</button>}
                 </div>
               </form>
             </div>
@@ -955,8 +991,10 @@ function Admin() {
                   />
                 </div>
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setShowAdminModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">{editingAdmin ? 'Update' : 'Create'} Admin</button>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowAdminModal(false)} disabled={saving}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? 'Saving...' : (editingAdmin ? 'Update' : 'Create') + ' Admin'}
+                  </button>
                 </div>
               </form>
             </div>
@@ -1041,8 +1079,10 @@ function Admin() {
                   <small style={{ color: 'var(--text-muted)' }}>Lower numbers appear first</small>
                 </div>
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => setShowWidgetModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">{editingWidget ? 'Update' : 'Create'} Widget</button>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowWidgetModal(false)} disabled={saving}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? 'Saving...' : (editingWidget ? 'Update' : 'Create') + ' Widget'}
+                  </button>
                 </div>
               </form>
             </div>
@@ -1197,8 +1237,10 @@ function Admin() {
                   </div>
                 </div>
                 <div className="modal-actions">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">{editingProject ? 'Update' : 'Create'} Project</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)} disabled={saving}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? 'Saving...' : (editingProject ? 'Update' : 'Create') + ' Project'}
+                  </button>
                 </div>
               </form>
             </div>

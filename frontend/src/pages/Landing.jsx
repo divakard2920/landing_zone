@@ -188,11 +188,15 @@ function Landing() {
     saveAs(blob, `KBase_Projects_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const [doiLoading, setDoiLoading] = useState(false);
+
   useEffect(() => {
     if (selectedApp) {
+      setDoiLoading(true);
       api.getDoiHistory(selectedApp.id)
         .then(res => setDoiHistory(res.data))
-        .catch(err => console.error('Failed to load DOI history:', err));
+        .catch(err => console.error('Failed to load DOI history:', err))
+        .finally(() => setDoiLoading(false));
     } else {
       setDoiHistory([]);
     }
@@ -298,9 +302,41 @@ function Landing() {
 
   if (pageLoading) {
     return (
-      <div className="page-loader">
-        <div className="loader-spinner"></div>
-        <p>Loading...</p>
+      <div className="app-container">
+        <header className="top-header">
+          <div className="brand-section">
+            <div className="skeleton-box" style={{ width: 140, height: 32 }}></div>
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div className="skeleton-box" style={{ width: 100, height: 36, borderRadius: 20 }}></div>
+            <div className="skeleton-box" style={{ width: 100, height: 36, borderRadius: 20 }}></div>
+          </div>
+        </header>
+        <main className="main-content-full">
+          <section className="projects-section">
+            <div className="projects-header">
+              <div className="skeleton-box" style={{ width: 200, height: 24 }}></div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div className="skeleton-box" style={{ width: 250, height: 44, borderRadius: 10 }}></div>
+                <div className="skeleton-box" style={{ width: 100, height: 44, borderRadius: 10 }}></div>
+              </div>
+            </div>
+            <div className="projects-grid">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <div key={i} className="skeleton-card">
+                  <div className="skeleton-box" style={{ width: 40, height: 40, borderRadius: 10 }}></div>
+                  <div className="skeleton-box" style={{ width: '60%', height: 12, marginTop: 16 }}></div>
+                  <div className="skeleton-box" style={{ width: '80%', height: 18, marginTop: 8 }}></div>
+                  <div className="skeleton-box" style={{ width: '100%', height: 8, marginTop: 16, borderRadius: 4 }}></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+                    <div className="skeleton-box" style={{ height: 40, borderRadius: 6 }}></div>
+                    <div className="skeleton-box" style={{ height: 40, borderRadius: 6 }}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
       </div>
     );
   }
@@ -1001,9 +1037,15 @@ function Landing() {
               )}
 
               {/* DOI Stage History */}
-              {(doiHistory.length > 0 || selectedApp.created_at) && (
+              {(doiLoading || doiHistory.length > 0 || selectedApp.created_at) && (
                 <div className="slider-section">
                   <h4>DOI Stage Journey</h4>
+                  {doiLoading ? (
+                    <div className="skeleton-timeline">
+                      <div className="skeleton-item"><div className="skeleton-dot"></div><div className="skeleton-text"></div></div>
+                      <div className="skeleton-item"><div className="skeleton-dot"></div><div className="skeleton-text"></div></div>
+                    </div>
+                  ) : (
                   <div className="doi-timeline">
                     {doiHistory.length === 0 || doiHistory[0].from_stage !== null ? (
                       <div className="doi-timeline-item">
@@ -1039,6 +1081,7 @@ function Landing() {
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
               )}
             </div>
