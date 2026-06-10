@@ -1,92 +1,123 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const db = require('../db/database');
+const { query, queryOne, queryAll } = require('../db/database');
 
 const router = express.Router();
 
-router.get('/apps', (req, res) => {
-  const apps = db.prepare('SELECT * FROM apps ORDER BY name').all();
+router.get('/apps', async (req, res) => {
+  try {
+    const apps = await queryAll('SELECT * FROM apps ORDER BY name');
 
-  // Include team members for each app
-  const appsWithTeam = apps.map(app => {
-    const team = db.prepare('SELECT * FROM team_members WHERE app_id = ? ORDER BY created_at ASC').all(app.id);
-    return { ...app, team };
-  });
+    const appsWithTeam = await Promise.all(apps.map(async (app) => {
+      const team = await queryAll('SELECT * FROM team_members WHERE app_id = $1 ORDER BY created_at ASC', [app.id]);
+      return { ...app, team };
+    }));
 
-  res.json(appsWithTeam);
-});
-
-router.get('/apps/:id', (req, res) => {
-  const { id } = req.params;
-  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
-
-  if (!app) {
-    return res.status(404).json({ error: 'App not found' });
+    res.json(appsWithTeam);
+  } catch (error) {
+    console.error('Error fetching apps:', error);
+    res.status(500).json({ error: 'Failed to fetch apps' });
   }
-
-  const team = db.prepare('SELECT * FROM team_members WHERE app_id = ? ORDER BY created_at ASC').all(id);
-  res.json({ ...app, team });
 });
 
-router.get('/announcements', (req, res) => {
-  const announcements = db
-    .prepare('SELECT * FROM announcements WHERE is_active = 1 ORDER BY created_at DESC')
-    .all();
-  res.json(announcements);
-});
+router.get('/apps/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const app = await queryOne('SELECT * FROM apps WHERE id = $1', [id]);
 
-router.post('/feedback', (req, res) => {
-  const { name, email, type, subject, message, app_id } = req.body;
+    if (!app) {
+      return res.status(404).json({ error: 'App not found' });
+    }
 
-  if (!subject || !message) {
-    return res.status(400).json({ error: 'Subject and message are required' });
+    const team = await queryAll('SELECT * FROM team_members WHERE app_id = $1 ORDER BY created_at ASC', [id]);
+    res.json({ ...app, team });
+  } catch (error) {
+    console.error('Error fetching app:', error);
+    res.status(500).json({ error: 'Failed to fetch app' });
   }
-
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO feedback (id, name, email, type, subject, message, app_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name || null, email || null, type || 'suggestion', subject, message, app_id || null);
-
-  res.status(201).json({ id, message: 'Feedback submitted successfully' });
 });
 
-router.get('/widgets', (req, res) => {
-  const widgets = db
-    .prepare('SELECT * FROM widgets WHERE is_active = 1 ORDER BY display_order ASC')
-    .all();
-  res.json(widgets);
-});
-
-router.get('/doi-stages', (req, res) => {
-  const stages = db
-    .prepare('SELECT * FROM doi_stages ORDER BY id ASC')
-    .all();
-  res.json(stages);
-});
-
-router.get('/apps/:appId/doi-history', (req, res) => {
-  const { appId } = req.params;
-  const history = db
-    .prepare('SELECT * FROM doi_history WHERE app_id = ? ORDER BY changed_at ASC')
-    .all(appId);
-  res.json(history);
-});
-
-router.post('/app-requests', (req, res) => {
-  const { name, description, requester_name, requester_email, business_division, business_function, priority, justification } = req.body;
-
-  if (!name || !requester_name) {
-    return res.status(400).json({ error: 'App name and requester name are required' });
+router.get('/announcements', async (req, res) => {
+  try {
+    const announcements = await queryAll('SELECT * FROM announcements WHERE is_active = TRUE ORDER BY created_at DESC');
+    res.json(announcements);
+  } catch (error) {
+    console.error('Error fetching announcements:', error);
+    res.status(500).json({ error: 'Failed to fetch announcements' });
   }
+});
 
-  const id = uuidv4();
-  db.prepare(`
-    INSERT INTO app_requests (id, name, description, requester_name, requester_email, business_division, business_function, priority, justification)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, description || null, requester_name, requester_email || null, business_division || null, business_function || null, priority || null, justification || null);
+router.post('/feedback', async (req, res) => {
+  try {
+    const { name, email, type, subject, message, app_id } = req.body;
 
-  res.status(201).json({ id, message: 'App request submitted successfully' });
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Subject and message are required' });
+    }
+
+    const id = uuidv4();
+    await query(
+      'INSERT INTO feedback (id, name, email, type, subject, message, app_id) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, name || null, email || null, type || 'suggestion', subject, message, app_id || null]
+    );
+
+    res.status(201).json({ id, message: 'Feedback submitted successfully' });
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    res.status(500).json({ error: 'Failed to submit feedback' });
+  }
+});
+
+router.get('/widgets', async (req, res) => {
+  try {
+    const widgets = await queryAll('SELECT * FROM widgets WHERE is_active = TRUE ORDER BY display_order ASC');
+    res.json(widgets);
+  } catch (error) {
+    console.error('Error fetching widgets:', error);
+    res.status(500).json({ error: 'Failed to fetch widgets' });
+  }
+});
+
+router.get('/doi-stages', async (req, res) => {
+  try {
+    const stages = await queryAll('SELECT * FROM doi_stages ORDER BY id ASC');
+    res.json(stages);
+  } catch (error) {
+    console.error('Error fetching DOI stages:', error);
+    res.status(500).json({ error: 'Failed to fetch DOI stages' });
+  }
+});
+
+router.get('/apps/:appId/doi-history', async (req, res) => {
+  try {
+    const { appId } = req.params;
+    const history = await queryAll('SELECT * FROM doi_history WHERE app_id = $1 ORDER BY changed_at ASC', [appId]);
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching DOI history:', error);
+    res.status(500).json({ error: 'Failed to fetch DOI history' });
+  }
+});
+
+router.post('/app-requests', async (req, res) => {
+  try {
+    const { name, description, requester_name, requester_email, business_division, business_function, priority, justification } = req.body;
+
+    if (!name || !requester_name) {
+      return res.status(400).json({ error: 'App name and requester name are required' });
+    }
+
+    const id = uuidv4();
+    await query(
+      'INSERT INTO app_requests (id, name, description, requester_name, requester_email, business_division, business_function, priority, justification) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [id, name, description || null, requester_name, requester_email || null, business_division || null, business_function || null, priority || null, justification || null]
+    );
+
+    res.status(201).json({ id, message: 'App request submitted successfully' });
+  } catch (error) {
+    console.error('Error submitting app request:', error);
+    res.status(500).json({ error: 'Failed to submit app request' });
+  }
 });
 
 module.exports = router;

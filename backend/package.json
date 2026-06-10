@@ -12,11 +12,12 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@azure/identity": "^4.2.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.9.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "multer": "^2.1.1",
+    "pg": "^8.11.3",
     "uuid": "^14.0.0"
   }
 }

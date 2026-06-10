@@ -402,7 +402,7 @@ function Admin() {
         )}
         <nav>
           <a href="#" className={activeTab === 'dashboard' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>Dashboard</a>
-          <a href="#" className={activeTab === 'projects' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('projects'); }}>Projects</a>
+          <a href="#" className={activeTab === 'projects' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('projects'); }}>AI Pipeline</a>
           <a href="#" className={activeTab === 'teams' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('teams'); }}>Teams</a>
           <a href="#" className={activeTab === 'widgets' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('widgets'); }}>Widgets</a>
           <a href="#" className={activeTab === 'announcements' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('announcements'); }}>Announcements</a>
