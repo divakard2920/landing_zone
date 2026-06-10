@@ -77,6 +77,7 @@ function Admin() {
   const [showWidgetModal, setShowWidgetModal] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
+  const [pageLoading, setPageLoading] = useState(true);
 
   const showToast = (message, type = 'error') => {
     setToast({ show: true, message, type });
@@ -118,6 +119,8 @@ function Admin() {
       setAdminUsers(usersRes.data);
     } catch (error) {
       console.error('Failed to load admin data:', error);
+    } finally {
+      setPageLoading(false);
     }
   };
 
@@ -386,6 +389,15 @@ function Admin() {
     const doi = doiStages.find(d => d.id === stage);
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
   };
+
+  if (pageLoading) {
+    return (
+      <div className="page-loader">
+        <div className="loader-spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-layout">

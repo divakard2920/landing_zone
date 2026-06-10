@@ -85,13 +85,16 @@ function Landing() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const handleRefresh = async () => {
+    setRefreshing(true);
     await loadData();
+    setRefreshing(false);
   };
 
   const handleExport = async () => {
@@ -418,7 +421,7 @@ function Landing() {
                 Filters
                 {activeFiltersCount > 0 && <span className="filter-count">{activeFiltersCount}</span>}
               </button>
-              <button className="action-btn" onClick={handleRefresh} data-tooltip-id="tooltip" data-tooltip-content="Refresh data">
+              <button className={`action-btn ${refreshing ? 'spinning' : ''}`} onClick={handleRefresh} disabled={refreshing} data-tooltip-id="tooltip" data-tooltip-content="Refresh data">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
                   <path d="M21 3v5h-5"/>

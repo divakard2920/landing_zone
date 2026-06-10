@@ -3352,6 +3352,15 @@ select.form-control {
   background-color: rgba(0, 69, 126, 0.05);
 }
 
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.action-btn.spinning svg {
+  animation: spin 0.8s linear infinite;
+}
+
 /* View Toggle */
 .view-toggle {
   display: flex;
