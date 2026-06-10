@@ -406,25 +406,76 @@ function Admin() {
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
   };
 
+  const renderSidebar = () => (
+    <aside className="admin-sidebar">
+      <h2>KBase Admin</h2>
+      {currentAdmin && (
+        <div className="admin-user-info">
+          <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
+          <div className="admin-user-details">
+            <span className="admin-user-name">{currentAdmin.name}</span>
+            <span className="admin-user-email">{currentAdmin.email}</span>
+          </div>
+        </div>
+      )}
+      <nav>
+        <a href="#" className={activeTab === 'dashboard' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>Dashboard</a>
+        <a href="#" className={activeTab === 'projects' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('projects'); }}>AI Pipeline</a>
+        <a href="#" className={activeTab === 'teams' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('teams'); }}>Teams</a>
+        <a href="#" className={activeTab === 'widgets' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('widgets'); }}>Widgets</a>
+        <a href="#" className={activeTab === 'announcements' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('announcements'); }}>Announcements</a>
+        <a href="#" className={activeTab === 'feedback' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('feedback'); }}>Feedback</a>
+        <a href="#" className={activeTab === 'admin-users' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('admin-users'); }}>Admin Users</a>
+      </nav>
+      <div style={{ marginTop: 'auto', padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <Link to="/" className="btn btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
+          Back to Portal
+        </Link>
+        <button onClick={handleLogout} className="btn btn-danger" style={{ width: '100%', justifyContent: 'center' }}>
+          Logout
+        </button>
+      </div>
+    </aside>
+  );
+
   if (pageLoading) {
     return (
       <div className="admin-layout">
-        <aside className="admin-sidebar">
-          <div className="skeleton-box" style={{ width: 120, height: 24, marginBottom: 24 }}></div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="skeleton-box" style={{ width: '100%', height: 36, borderRadius: 6 }}></div>
+        {renderSidebar()}
+        <main className="admin-content">
+          <div className="admin-header">
+            <div className="skeleton-box" style={{ width: 140, height: 32 }}></div>
+          </div>
+          <div className="admin-stats-grid">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="stat-card" style={{ background: 'var(--bg-muted)' }}>
+                <div className="skeleton-box" style={{ width: 60, height: 36, marginBottom: 8 }}></div>
+                <div className="skeleton-box" style={{ width: 100, height: 16 }}></div>
+              </div>
             ))}
           </div>
-        </aside>
-        <main className="admin-content">
-          <div className="skeleton-box" style={{ width: 200, height: 32, marginBottom: 24 }}></div>
+          <div className="skeleton-box" style={{ width: 160, height: 24, margin: '32px 0 16px' }}></div>
           <div className="admin-table-container">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="skeleton-box" style={{ width: '100%', height: 48 }}></div>
-              ))}
-            </div>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  {[120, 80, 100, 80, 80].map((w, i) => (
+                    <th key={i}><div className="skeleton-box" style={{ width: w, height: 14 }}></div></th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <tr key={i}>
+                    <td><div className="skeleton-box" style={{ width: '90%', height: 16 }}></div></td>
+                    <td><div className="skeleton-box" style={{ width: '70%', height: 16 }}></div></td>
+                    <td><div className="skeleton-box" style={{ width: 80, height: 24, borderRadius: 12 }}></div></td>
+                    <td><div className="skeleton-box" style={{ width: '60%', height: 16 }}></div></td>
+                    <td><div className="skeleton-box" style={{ width: '50%', height: 16 }}></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </main>
       </div>
@@ -433,35 +484,7 @@ function Admin() {
 
   return (
     <div className="admin-layout">
-      <aside className="admin-sidebar">
-        <h2>KBase Admin</h2>
-        {currentAdmin && (
-          <div className="admin-user-info">
-            <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
-            <div className="admin-user-details">
-              <span className="admin-user-name">{currentAdmin.name}</span>
-              <span className="admin-user-email">{currentAdmin.email}</span>
-            </div>
-          </div>
-        )}
-        <nav>
-          <a href="#" className={activeTab === 'dashboard' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('dashboard'); }}>Dashboard</a>
-          <a href="#" className={activeTab === 'projects' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('projects'); }}>AI Pipeline</a>
-          <a href="#" className={activeTab === 'teams' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('teams'); }}>Teams</a>
-          <a href="#" className={activeTab === 'widgets' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('widgets'); }}>Widgets</a>
-          <a href="#" className={activeTab === 'announcements' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('announcements'); }}>Announcements</a>
-          <a href="#" className={activeTab === 'feedback' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('feedback'); }}>Feedback</a>
-          <a href="#" className={activeTab === 'admin-users' ? 'active' : ''} onClick={(e) => { e.preventDefault(); setActiveTab('admin-users'); }}>Admin Users</a>
-        </nav>
-        <div style={{ marginTop: 'auto', padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Link to="/" className="btn btn-outline" style={{ width: '100%', justifyContent: 'center' }}>
-            Back to Portal
-          </Link>
-          <button onClick={handleLogout} className="btn btn-danger" style={{ width: '100%', justifyContent: 'center' }}>
-            Logout
-          </button>
-        </div>
-      </aside>
+      {renderSidebar()}
 
       <main className="admin-content">
         <div className="admin-header">
