@@ -84,6 +84,7 @@ function Landing() {
   const [showAppDropdown, setShowAppDropdown] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     loadData();
@@ -208,6 +209,8 @@ function Landing() {
       setDoiStages(doiRes.data);
     } catch (error) {
       console.error('Failed to load data:', error);
+    } finally {
+      setPageLoading(false);
     }
   };
 
@@ -289,6 +292,15 @@ function Landing() {
   const clearFilters = () => {
     setFilters({ doi_stage: '', priority: '', status: '', platform: '', division: '' });
   };
+
+  if (pageLoading) {
+    return (
+      <div className="page-loader">
+        <div className="loader-spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
