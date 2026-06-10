@@ -1,11 +1,25 @@
 const { Pool } = require('pg');
-const { DefaultAzureCredential } = require('@azure/identity');
 
 let pool;
 let credential;
 let tokenExpiry = 0;
+let useEntraAuth = false;
 
 const getPool = async () => {
+  // If using DATABASE_URL (password auth), create pool once
+  if (process.env.DATABASE_URL) {
+    if (!pool) {
+      pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: true
+      });
+      console.log('PostgreSQL pool created (password auth)');
+    }
+    return pool;
+  }
+
+  // Otherwise use Microsoft Entra authentication
+  useEntraAuth = true;
   const now = Date.now();
 
   // Refresh pool if token is expired or will expire in 5 minutes
@@ -15,6 +29,7 @@ const getPool = async () => {
     }
 
     if (!credential) {
+      const { DefaultAzureCredential } = require('@azure/identity');
       credential = new DefaultAzureCredential();
     }
 
@@ -28,10 +43,10 @@ const getPool = async () => {
       database: process.env.PGDATABASE,
       user: process.env.PGUSER,
       password: tokenResponse.token,
-      ssl: { rejectUnauthorized: false }
+      ssl: true
     });
 
-    console.log('PostgreSQL pool created/refreshed');
+    console.log('PostgreSQL pool created/refreshed (Entra auth)');
   }
 
   return pool;
