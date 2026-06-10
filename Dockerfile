@@ -16,6 +16,9 @@ RUN npm ci --omit=dev
 
 COPY backend/ ./
 
+# Create uploads directory
+RUN mkdir -p uploads
+
 # Copy built frontend to backend/public
 COPY --from=frontend-build /app/frontend/dist ./public
 
