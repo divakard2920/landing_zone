@@ -11,7 +11,7 @@ const getPool = async () => {
     if (!pool) {
       pool = new Pool({
         connectionString: process.env.DATABASE_URL,
-        ssl: true
+        ssl: { rejectUnauthorized: true }
       });
       console.log('PostgreSQL pool created (password auth)');
     }
@@ -43,7 +43,7 @@ const getPool = async () => {
       database: process.env.PGDATABASE,
       user: process.env.PGUSER,
       password: tokenResponse.token,
-      ssl: true
+      ssl: { rejectUnauthorized: true }
     });
 
     console.log('PostgreSQL pool created/refreshed (Entra auth)');

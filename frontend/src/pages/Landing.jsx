@@ -37,8 +37,9 @@ function Landing() {
   };
 
   const formatDate = (dateStr, includeTime = false) => {
-    // SQLite stores UTC time, append Z to parse as UTC then convert to local
-    const date = new Date(dateStr.replace(' ', 'T') + 'Z');
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
     const options = {
       year: 'numeric',
       month: 'short',
