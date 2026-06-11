@@ -29,3 +29,9 @@ build/
 
 # Vite
 frontend/.vite/
+
+# Generated frontend build
+backend/public/
+
+# Uploads
+backend/uploads/
