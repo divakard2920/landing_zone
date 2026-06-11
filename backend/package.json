@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "db:start": "docker compose -f ../docker-compose.dev.yml up -d",
+    "db:stop": "docker compose -f ../docker-compose.dev.yml down",
+    "db:reset": "docker compose -f ../docker-compose.dev.yml down -v && docker compose -f ../docker-compose.dev.yml up -d"
   },
   "keywords": [],
   "author": "",

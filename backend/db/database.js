@@ -6,6 +6,21 @@ let tokenExpiry = 0;
 let useEntraAuth = false;
 
 const getPool = async () => {
+  // If BRANCH is set, use local PostgreSQL (Docker)
+  if (process.env.BRANCH) {
+    if (!pool) {
+      pool = new Pool({
+        host: 'localhost',
+        port: 5432,
+        database: 'kbase',
+        user: 'postgres',
+        password: 'postgres'
+      });
+      console.log(`PostgreSQL pool created (local Docker - branch: ${process.env.BRANCH})`);
+    }
+    return pool;
+  }
+
   // If using DATABASE_URL (password auth), create pool once
   if (process.env.DATABASE_URL) {
     if (!pool) {
