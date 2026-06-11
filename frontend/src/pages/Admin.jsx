@@ -406,106 +406,84 @@ function Admin() {
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
   };
 
-  const renderSidebar = () => (
-    <aside className="admin-sidebar">
-      <div className="admin-brand">
-        <div className="admin-logo">KB</div>
-        <span>KBase Admin</span>
+  const renderHeader = () => (
+    <header className="top-header">
+      <div className="brand-section">
+        <img src="/knorr-bremse.svg" alt="Knorr-Bremse" className="brand-logo" />
+        <div className="brand-subtitle">KBase <span className="brand-tagline">| Admin Panel</span></div>
       </div>
-      {currentAdmin && (
-        <div className="admin-user-info">
-          <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
-          <div className="admin-user-details">
-            <span className="admin-user-name">{currentAdmin.name}</span>
-            <span className="admin-user-email">{currentAdmin.email}</span>
-          </div>
-        </div>
-      )}
-      <nav className="admin-nav">
-        <button className={`admin-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="9" rx="1"/>
-            <rect x="14" y="3" width="7" height="5" rx="1"/>
-            <rect x="14" y="12" width="7" height="9" rx="1"/>
-            <rect x="3" y="16" width="7" height="5" rx="1"/>
+
+      <div className="header-tabs">
+        <button className={`header-tab ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+            <rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
           </svg>
           Dashboard
         </button>
-        <button className={`admin-nav-item ${activeTab === 'projects' ? 'active' : ''}`} onClick={() => setActiveTab('projects')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className={`header-tab ${activeTab === 'projects' ? 'active' : ''}`} onClick={() => setActiveTab('projects')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
-            <path d="M12 12v10"/>
-            <path d="M8 22h8"/>
-            <path d="M7 12h10"/>
+            <path d="M12 12v10"/><path d="M8 22h8"/><path d="M7 12h10"/>
           </svg>
           AI Pipeline
         </button>
-        <button className={`admin-nav-item ${activeTab === 'teams' ? 'active' : ''}`} onClick={() => setActiveTab('teams')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className={`header-tab ${activeTab === 'teams' ? 'active' : ''}`} onClick={() => setActiveTab('teams')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            <circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
           </svg>
           Teams
         </button>
-        <button className={`admin-nav-item ${activeTab === 'widgets' ? 'active' : ''}`} onClick={() => setActiveTab('widgets')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3v18h18"/>
-            <path d="M18 17V9"/>
-            <path d="M13 17V5"/>
-            <path d="M8 17v-3"/>
+        <button className={`header-tab ${activeTab === 'widgets' ? 'active' : ''}`} onClick={() => setActiveTab('widgets')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
           </svg>
           Widgets
         </button>
-        <button className={`admin-nav-item ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => setActiveTab('announcements')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            <circle cx="12" cy="12" r="3"/>
+        <button className={`header-tab ${activeTab === 'announcements' ? 'active' : ''}`} onClick={() => setActiveTab('announcements')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="m22 2-7 20-4-9-9-4Z"/><path d="m22 2-11 11"/>
           </svg>
           Announcements
         </button>
-        <button className={`admin-nav-item ${activeTab === 'feedback' ? 'active' : ''}`} onClick={() => setActiveTab('feedback')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className={`header-tab ${activeTab === 'feedback' ? 'active' : ''}`} onClick={() => setActiveTab('feedback')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           Feedback
         </button>
-        <button className={`admin-nav-item ${activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => setActiveTab('admin-users')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className={`header-tab ${activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => setActiveTab('admin-users')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             <circle cx="12" cy="10" r="3"/>
           </svg>
           Admin Users
         </button>
-      </nav>
-      <div className="admin-sidebar-footer">
-        <Link to="/" className="admin-nav-item back-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m15 18-6-6 6-6"/>
-          </svg>
-          Back to Portal
+      </div>
+
+      <div className="header-actions">
+        {currentAdmin && (
+          <div className="admin-user-pill">
+            <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
+            <span>{currentAdmin.name}</span>
+          </div>
+        )}
+        <Link to="/" className="btn btn-outline btn-sm">
+          Portal
         </Link>
-        <button onClick={handleLogout} className="admin-nav-item logout-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
+        <button onClick={handleLogout} className="btn btn-danger btn-sm">
           Logout
         </button>
       </div>
-    </aside>
+    </header>
   );
 
   if (pageLoading) {
     return (
-      <div className="admin-layout">
-        {renderSidebar()}
-        <main className="admin-content">
-          <div className="admin-header">
-            <div className="skeleton-box" style={{ width: 140, height: 32 }}></div>
-          </div>
+      <div className="admin-page">
+        {renderHeader()}
+        <main className="admin-main">
           <div className="admin-stats-grid">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="stat-card" style={{ background: 'var(--bg-muted)' }}>
@@ -543,12 +521,12 @@ function Admin() {
   }
 
   return (
-    <div className="admin-layout">
-      {renderSidebar()}
+    <div className="admin-page">
+      {renderHeader()}
 
-      <main className="admin-content">
-        <div className="admin-header">
-          <h1>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h1>
+      <main className="admin-main">
+        <div className="admin-content-header">
+          <h1>{activeTab === 'admin-users' ? 'Admin Users' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')}</h1>
           {activeTab === 'projects' && (
             <button className="btn btn-primary" onClick={() => { setEditingProject(null); setProjectForm({ ...emptyProjectForm }); setShowProjectModal(true); }}>
               + Add Project

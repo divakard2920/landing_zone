@@ -9,11 +9,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.API_URL || 'http://localhost:3001',
+        target: process.env.API_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
       '/uploads': {
-        target: process.env.API_URL || 'http://localhost:3001',
+        target: process.env.API_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
     },
