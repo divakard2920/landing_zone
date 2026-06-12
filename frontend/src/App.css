@@ -2492,10 +2492,17 @@ body {
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.modal-content::-webkit-scrollbar,
+.modal::-webkit-scrollbar {
+  display: none;
 }
 
 .modal-large {
-  max-width: 720px;
+  max-width: 800px;
 }
 
 .modal-header {
@@ -4124,8 +4131,8 @@ select.form-control {
 
 /* Tooltip Styles */
 .react-tooltip {
-  background-color: var(--text-primary) !important;
-  color: white !important;
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
   font-size: 0.75rem !important;
   font-weight: 500 !important;
   padding: 6px 10px !important;
@@ -4135,5 +4142,15 @@ select.form-control {
 }
 
 .react-tooltip-arrow {
-  border-color: var(--text-primary) !important;
+  border-color: #1e293b !important;
+}
+
+[data-theme="dark"] .react-tooltip {
+  background-color: #f1f5f9 !important;
+  color: #1e293b !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .react-tooltip-arrow {
+  border-color: #f1f5f9 !important;
 }

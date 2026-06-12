@@ -381,7 +381,7 @@ function Landing() {
         </div>
 
         <div className="header-actions">
-          <button className={`theme-switch ${theme === 'dark' ? 'dark' : ''}`} onClick={toggleTheme} title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+          <button className={`theme-switch ${theme === 'dark' ? 'dark' : ''}`} onClick={toggleTheme} data-tooltip-id="tooltip" data-tooltip-content={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
             <span className="theme-switch-slider">
               <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="5"/>

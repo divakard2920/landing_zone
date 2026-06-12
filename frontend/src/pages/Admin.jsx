@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { Tooltip } from 'react-tooltip';
 
 const STATUS_OPTIONS = [
   'Active', 'On Hold', 'Completed', 'Cancelled', 'In Review',
@@ -561,7 +562,7 @@ function Admin() {
       </div>
 
       <div className="header-actions">
-        <button className={`theme-switch ${theme === 'dark' ? 'dark' : ''}`} onClick={toggleTheme} title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+        <button className={`theme-switch ${theme === 'dark' ? 'dark' : ''}`} onClick={toggleTheme} data-tooltip-id="admin-tooltip" data-tooltip-content={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
           <span className="theme-switch-slider">
             <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="5"/>
@@ -581,7 +582,7 @@ function Admin() {
         <Link to="/" className="btn btn-outline btn-sm">
           Portal
         </Link>
-        <button onClick={handleLogout} className="logout-btn" title="Logout">
+        <button onClick={handleLogout} className="logout-btn" data-tooltip-id="admin-tooltip" data-tooltip-content="Logout">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
@@ -1547,6 +1548,7 @@ function Admin() {
           </div>
         </div>
       )}
+      <Tooltip id="admin-tooltip" />
     </div>
   );
 }
