@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { Pie, Doughnut, Bar } from 'react-chartjs-2';
+import { useTheme } from '../context/ThemeContext';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, ChartDataLabels);
 
@@ -114,7 +115,9 @@ function getAppFieldValue(app, dataField, doiStages = []) {
 }
 
 function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, doiStages = [] }) {
+  const { theme } = useTheme();
   const colors = COLOR_SCHEMES[widget.color_scheme] || COLOR_SCHEMES.default;
+  const textColor = theme === 'dark' ? '#f1f5f9' : '#334155';
 
   const filteredApps = useMemo(() => {
     let result = apps;
@@ -167,6 +170,7 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
         labels: {
           padding: 16,
           usePointStyle: true,
+          color: textColor,
           font: { size: 12 },
           generateLabels: (chart) => {
             const data = chart.data;
@@ -177,6 +181,7 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
               return {
                 text: `${label} (${percent}%)`,
                 fillStyle: data.datasets[0].backgroundColor[i],
+                fontColor: textColor,
                 hidden: false,
                 index: i
               };
@@ -205,14 +210,14 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
       datalabels: {
         anchor: 'end',
         align: 'end',
-        color: '#64748b',
+        color: textColor,
         font: { weight: 'bold', size: 11 },
         formatter: (value) => value
       }
     },
     scales: {
-      x: { grid: { display: false } },
-      y: { grid: { display: false } }
+      x: { grid: { display: false }, ticks: { color: textColor } },
+      y: { grid: { display: false }, ticks: { color: textColor } }
     }
   };
 
@@ -224,7 +229,7 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
       datalabels: {
         anchor: 'end',
         align: 'top',
-        color: '#64748b',
+        color: textColor,
         font: { weight: 'bold', size: 11 },
         formatter: (value) => value
       }
@@ -234,11 +239,13 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
         grid: { display: false },
         ticks: {
           maxRotation: 45,
-          minRotation: 45
+          minRotation: 45,
+          color: textColor
         }
       },
       y: {
-        grid: { color: '#f1f5f9' },
+        grid: { color: theme === 'dark' ? '#334155' : '#f1f5f9' },
+        ticks: { color: textColor },
         beginAtZero: true
       }
     }

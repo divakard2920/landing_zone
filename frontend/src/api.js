@@ -87,5 +87,9 @@ export const api = {
     createAdminUser: (data) => axios.post(`${API_BASE}/admin/users`, data),
     updateAdminUser: (id, data) => axios.put(`${API_BASE}/admin/users/${id}`, data),
     deleteAdminUser: (id) => axios.delete(`${API_BASE}/admin/users/${id}`),
+
+    // Activity logs
+    getActivityLogs: (limit = 50) => axios.get(`${API_BASE}/admin/activity-logs?limit=${limit}`),
+    logActivity: (data) => axios.post(`${API_BASE}/admin/activity-logs`, data),
   },
 };

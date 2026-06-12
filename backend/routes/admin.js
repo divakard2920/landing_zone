@@ -614,4 +614,41 @@ router.delete('/users/:id', async (req, res) => {
   }
 });
 
+// Activity logs
+const logActivity = async (adminId, adminName, action, entityType, entityId, entityName, details) => {
+  try {
+    await query(
+      'INSERT INTO activity_logs (id, admin_id, admin_name, action, entity_type, entity_id, entity_name, details) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+      [uuidv4(), adminId, adminName, action, entityType, entityId, entityName, details]
+    );
+  } catch (error) {
+    console.error('Error logging activity:', error);
+  }
+};
+
+router.get('/activity-logs', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const logs = await queryAll(
+      'SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT $1',
+      [limit]
+    );
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching activity logs:', error);
+    res.status(500).json({ error: 'Failed to fetch activity logs' });
+  }
+});
+
+router.post('/activity-logs', async (req, res) => {
+  try {
+    const { admin_id, admin_name, action, entity_type, entity_id, entity_name, details } = req.body;
+    await logActivity(admin_id, admin_name, action, entity_type, entity_id, entity_name, details);
+    res.status(201).json({ message: 'Activity logged' });
+  } catch (error) {
+    console.error('Error logging activity:', error);
+    res.status(500).json({ error: 'Failed to log activity' });
+  }
+});
+
 module.exports = router;

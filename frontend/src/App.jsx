@@ -3,6 +3,7 @@ import Landing from './pages/Landing';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import CapybaraAvatar from './components/CapybaraAvatar';
+import { ThemeProvider } from './context/ThemeContext';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
@@ -15,6 +16,7 @@ const ProtectedRoute = ({ children }) => {
 
 function App() {
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <CapybaraAvatar />
       <Routes>
@@ -27,6 +29,7 @@ function App() {
         } />
       </Routes>
     </BrowserRouter>
+    </ThemeProvider>
   );
 }
 

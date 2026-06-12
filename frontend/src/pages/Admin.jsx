@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 
 const STATUS_OPTIONS = [
   'Active', 'On Hold', 'Completed', 'Cancelled', 'In Review',
@@ -79,6 +80,54 @@ function Admin() {
   const [confirmDialog, setConfirmDialog] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
   const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [activityLogLimit, setActivityLogLimit] = useState(10);
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
+  const [expandedLogId, setExpandedLogId] = useState(null);
+  const { theme, toggleTheme } = useTheme();
+
+  const logActivity = async (action, entityType, entityId, entityName, details = null) => {
+    try {
+      await api.admin.logActivity({
+        admin_id: currentAdmin?.id,
+        admin_name: currentAdmin?.name,
+        action,
+        entity_type: entityType,
+        entity_id: entityId,
+        entity_name: entityName,
+        details
+      });
+      loadActivityLogs(activityLogLimit);
+    } catch (error) {
+      console.error('Failed to log activity:', error);
+    }
+  };
+
+  const loadActivityLogs = async (limit = 10) => {
+    try {
+      const res = await api.admin.getActivityLogs(limit);
+      setActivityLogs(res.data);
+      setHasMoreLogs(res.data.length >= limit);
+    } catch (error) {
+      console.error('Failed to load activity logs:', error);
+    }
+  };
+
+  const handleLoadMoreLogs = async () => {
+    setLoadingMoreLogs(true);
+    const newLimit = activityLogLimit + 20;
+    try {
+      const res = await api.admin.getActivityLogs(newLimit);
+      setActivityLogs(res.data);
+      setActivityLogLimit(newLimit);
+      setHasMoreLogs(res.data.length >= newLimit);
+    } catch (error) {
+      console.error('Failed to load more logs:', error);
+    } finally {
+      setLoadingMoreLogs(false);
+    }
+  };
 
   const showToast = (message, type = 'error') => {
     setToast({ show: true, message, type });
@@ -104,13 +153,14 @@ function Admin() {
 
   const loadData = async () => {
     try {
-      const [appsRes, annRes, fbRes, widgetsRes, doiRes, usersRes] = await Promise.all([
+      const [appsRes, annRes, fbRes, widgetsRes, doiRes, usersRes, logsRes] = await Promise.all([
         api.admin.getApps(),
         api.admin.getAnnouncements(),
         api.admin.getFeedback(),
         api.admin.getWidgets(),
         api.admin.getDoiStages(),
-        api.admin.getAdminUsers()
+        api.admin.getAdminUsers(),
+        api.admin.getActivityLogs(10)
       ]);
       setProjects(appsRes.data);
       setAnnouncements(annRes.data);
@@ -118,6 +168,8 @@ function Admin() {
       setWidgets(widgetsRes.data);
       setDoiStages(doiRes.data);
       setAdminUsers(usersRes.data);
+      setActivityLogs(logsRes.data);
+      setHasMoreLogs(logsRes.data.length >= 10);
     } catch (error) {
       console.error('Failed to load admin data:', error);
     } finally {
@@ -142,9 +194,15 @@ function Admin() {
     try {
       if (editingAdmin) {
         await api.admin.updateAdminUser(editingAdmin.id, adminForm);
+        const changes = [];
+        if (editingAdmin.name !== adminForm.name) changes.push(`name: ${editingAdmin.name} → ${adminForm.name}`);
+        if (editingAdmin.email !== adminForm.email) changes.push(`email changed`);
+        if (adminForm.password) changes.push(`password updated`);
+        logActivity('updated', 'admin user', editingAdmin.id, adminForm.name, changes.length > 0 ? changes.join(', ') : null);
         showToast('Admin updated successfully', 'success');
       } else {
-        await api.admin.createAdminUser(adminForm);
+        const res = await api.admin.createAdminUser(adminForm);
+        logActivity('created', 'admin user', res.data.id, adminForm.name, `Email: ${adminForm.email}`);
         showToast('Admin created successfully', 'success');
       }
       setAdminForm({ name: '', email: '', password: '' });
@@ -168,6 +226,7 @@ function Admin() {
     showConfirm('Delete Admin', `Are you sure you want to delete ${admin.name}? They will no longer be able to access the admin panel.`, async () => {
       try {
         await api.admin.deleteAdminUser(admin.id);
+        logActivity('deleted', 'admin user', admin.id, admin.name);
         showToast('Admin deleted', 'success');
         loadData();
       } catch (error) {
@@ -179,6 +238,7 @@ function Admin() {
   const handleToggleAdminStatus = async (admin) => {
     try {
       await api.admin.updateAdminUser(admin.id, { ...admin, is_active: !admin.is_active });
+      logActivity('updated', 'admin user', admin.id, admin.name, `Status: ${admin.is_active ? 'Active → Inactive' : 'Inactive → Active'}`);
       showToast(`Admin ${admin.is_active ? 'deactivated' : 'activated'}`, 'success');
       loadData();
     } catch (error) {
@@ -211,8 +271,31 @@ function Admin() {
     try {
       if (editingProject) {
         await api.admin.updateApp(editingProject.id, projectForm);
+
+        // Build change details
+        const changes = [];
+        if (editingProject.doi_stage !== projectForm.doi_stage) {
+          const fromDoi = doiStages.find(d => d.id === editingProject.doi_stage);
+          const toDoi = doiStages.find(d => d.id === projectForm.doi_stage);
+          changes.push(`DOI stage from "${fromDoi?.label || 'DOI ' + editingProject.doi_stage}" to "${toDoi?.label || 'DOI ' + projectForm.doi_stage}"`);
+        }
+        if (editingProject.current_status !== projectForm.current_status) {
+          changes.push(`status from "${editingProject.current_status || 'none'}" to "${projectForm.current_status || 'none'}"`);
+        }
+        if (editingProject.priority !== projectForm.priority) {
+          changes.push(`priority from "${editingProject.priority || 'none'}" to "${projectForm.priority || 'none'}"`);
+        }
+        if (editingProject.name !== projectForm.name) {
+          changes.push(`name from "${editingProject.name}" to "${projectForm.name}"`);
+        }
+
+        const details = changes.length > 0 ? `Changed: ${changes.join(', ')}` : null;
+        logActivity('updated', 'project', editingProject.id, projectForm.name, details);
       } else {
-        await api.admin.createApp(projectForm);
+        const res = await api.admin.createApp(projectForm);
+        const doi = doiStages.find(d => d.id === projectForm.doi_stage);
+        const details = `Initial DOI: ${doi?.label || 'DOI ' + projectForm.doi_stage}${projectForm.priority ? ', Priority: ' + projectForm.priority : ''}`;
+        logActivity('created', 'project', res.data.id, projectForm.name, details);
       }
       setProjectForm({ ...emptyProjectForm });
       setEditingProject(null);
@@ -231,9 +314,10 @@ function Admin() {
     setShowProjectModal(true);
   };
 
-  const handleDeleteProject = (id) => {
+  const handleDeleteProject = (id, name) => {
     showConfirm('Delete Project', 'Are you sure you want to delete this project? This action cannot be undone.', async () => {
       await api.admin.deleteApp(id);
+      logActivity('deleted', 'project', id, name);
       loadData();
     });
   };
@@ -247,9 +331,15 @@ function Admin() {
           ...announcementForm,
           is_active: editingAnnouncement.is_active
         });
+        const changes = [];
+        if (editingAnnouncement.title !== announcementForm.title) changes.push(`title changed`);
+        if (editingAnnouncement.content !== announcementForm.content) changes.push(`content updated`);
+        if (editingAnnouncement.type !== announcementForm.type) changes.push(`type: ${editingAnnouncement.type} → ${announcementForm.type}`);
+        logActivity('updated', 'announcement', editingAnnouncement.id, announcementForm.title, changes.length > 0 ? changes.join(', ') : null);
         setEditingAnnouncement(null);
       } else {
-        await api.admin.createAnnouncement(announcementForm);
+        const res = await api.admin.createAnnouncement(announcementForm);
+        logActivity('created', 'announcement', res.data.id, announcementForm.title, `Type: ${announcementForm.type}`);
       }
       setAnnouncementForm({ title: '', content: '', type: 'info' });
       loadData();
@@ -270,9 +360,10 @@ function Admin() {
     setAnnouncementForm({ title: '', content: '', type: 'info' });
   };
 
-  const handleDeleteAnnouncement = (id) => {
+  const handleDeleteAnnouncement = (id, title) => {
     showConfirm('Delete Announcement', 'Are you sure you want to delete this announcement?', async () => {
       await api.admin.deleteAnnouncement(id);
+      logActivity('deleted', 'announcement', id, title);
       loadData();
     });
   };
@@ -363,8 +454,13 @@ function Admin() {
     try {
       if (editingWidget) {
         await api.admin.updateWidget(editingWidget.id, { ...widgetForm, is_active: editingWidget.is_active });
+        const changes = [];
+        if (editingWidget.chart_type !== widgetForm.chart_type) changes.push(`chart type: ${editingWidget.chart_type} → ${widgetForm.chart_type}`);
+        if (editingWidget.data_field !== widgetForm.data_field) changes.push(`data field: ${editingWidget.data_field} → ${widgetForm.data_field}`);
+        logActivity('updated', 'widget', editingWidget.id, widgetForm.title, changes.length > 0 ? changes.join(', ') : null);
       } else {
-        await api.admin.createWidget(widgetForm);
+        const res = await api.admin.createWidget(widgetForm);
+        logActivity('created', 'widget', res.data.id, widgetForm.title, `Chart: ${widgetForm.chart_type}, Field: ${widgetForm.data_field}`);
       }
       setWidgetForm({ title: '', chart_type: 'donut', data_field: 'doi_stage', color_scheme: 'default', display_order: 0 });
       setEditingWidget(null);
@@ -391,12 +487,14 @@ function Admin() {
 
   const handleToggleWidget = async (widget) => {
     await api.admin.updateWidget(widget.id, { ...widget, is_active: !widget.is_active });
+    logActivity('updated', 'widget', widget.id, widget.title, `Status: ${widget.is_active ? 'Active → Inactive' : 'Inactive → Active'}`);
     loadData();
   };
 
-  const handleDeleteWidget = (id) => {
+  const handleDeleteWidget = (id, title) => {
     showConfirm('Delete Widget', 'Are you sure you want to delete this widget?', async () => {
       await api.admin.deleteWidget(id);
+      logActivity('deleted', 'widget', id, title);
       loadData();
     });
   };
@@ -463,6 +561,17 @@ function Admin() {
       </div>
 
       <div className="header-actions">
+        <button className={`theme-switch ${theme === 'dark' ? 'dark' : ''}`} onClick={toggleTheme} title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
+          <span className="theme-switch-slider">
+            <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5"/>
+              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+            </svg>
+            <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </span>
+        </button>
         {currentAdmin && (
           <div className="admin-user-pill">
             <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
@@ -472,8 +581,12 @@ function Admin() {
         <Link to="/" className="btn btn-outline btn-sm">
           Portal
         </Link>
-        <button onClick={handleLogout} className="btn btn-danger btn-sm">
-          Logout
+        <button onClick={handleLogout} className="logout-btn" title="Logout">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
         </button>
       </div>
     </header>
@@ -589,6 +702,77 @@ function Admin() {
                 </tbody>
               </table>
             </div>
+
+            <h3 style={{ margin: '32px 0 16px' }}>Activity Log</h3>
+            <div className="activity-log-container">
+              {activityLogs.length === 0 ? (
+                <p className="activity-empty">No activity recorded yet.</p>
+              ) : (
+                <div className="activity-list">
+                  {activityLogs.map(log => (
+                    <div
+                      key={log.id}
+                      className={`activity-item ${log.details ? 'has-details' : ''} ${expandedLogId === log.id ? 'expanded' : ''}`}
+                      onClick={() => log.details && setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                    >
+                      <div className="activity-icon">
+                        {log.action === 'created' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/>
+                          </svg>
+                        )}
+                        {log.action === 'updated' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                          </svg>
+                        )}
+                        {log.action === 'deleted' && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                          </svg>
+                        )}
+                        {!['created', 'updated', 'deleted'].includes(log.action) && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+                          </svg>
+                        )}
+                      </div>
+                      <div className="activity-content">
+                        <div className="activity-summary">
+                          <span className="activity-admin">{log.admin_name || 'System'}</span>
+                          <span className="activity-action">{log.action}</span>
+                          <span className="activity-entity-type">{log.entity_type}</span>
+                          {log.entity_name && <span className="activity-entity-name">"{log.entity_name}"</span>}
+                          {log.details && (
+                            <svg className="expand-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="m6 9 6 6 6-6"/>
+                            </svg>
+                          )}
+                        </div>
+                        {log.details && expandedLogId === log.id && (
+                          <div className="activity-details">{log.details}</div>
+                        )}
+                      </div>
+                      <div className="activity-time">
+                        {new Date(log.created_at).toLocaleString('en-US', {
+                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  {hasMoreLogs && (
+                    <button
+                      className="show-more-btn"
+                      onClick={handleLoadMoreLogs}
+                      disabled={loadingMoreLogs}
+                    >
+                      {loadingMoreLogs ? 'Loading...' : 'Show More'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -659,7 +843,7 @@ function Admin() {
                     <td>
                       <div className="action-buttons">
                         <button className="btn btn-secondary btn-sm" onClick={() => handleEditProject(project)}>Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(project.id)}>Delete</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(project.id, project.name)}>Delete</button>
                       </div>
                     </td>
                   </tr>
@@ -818,7 +1002,7 @@ function Admin() {
                       <td>
                         <div className="action-buttons">
                           <button className="btn btn-sm" onClick={() => handleEditAnnouncement(item)}>Edit</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAnnouncement(item.id)}>Delete</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAnnouncement(item.id, item.title)}>Delete</button>
                         </div>
                       </td>
                     </tr>
@@ -932,7 +1116,7 @@ function Admin() {
                       <td>
                         <div className="action-buttons">
                           <button className="btn btn-sm" onClick={() => handleEditWidget(widget)}>Edit</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteWidget(widget.id)}>Delete</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteWidget(widget.id, widget.title)}>Delete</button>
                         </div>
                       </td>
                     </tr>
