@@ -84,10 +84,18 @@ router.post('/apps', async (req, res) => {
     ]);
 
     // Record initial DOI stage in history
-    await query(
-      'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-      [uuidv4(), id, null, initialDoiStage, 'Project created']
-    );
+    const { doi_changed_at } = req.body;
+    if (doi_changed_at) {
+      await query(
+        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+        [uuidv4(), id, null, initialDoiStage, doi_changed_at, 'Project created (manual date)']
+      );
+    } else {
+      await query(
+        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
+        [uuidv4(), id, null, initialDoiStage, 'Project created']
+      );
+    }
 
     res.status(201).json({ id, message: 'Project added successfully' });
   } catch (error) {
@@ -133,10 +141,18 @@ router.put('/apps/:id', async (req, res) => {
 
     // Record DOI stage change if it changed
     if (oldDoiStage !== null && oldDoiStage !== doi_stage) {
-      await query(
-        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-        [uuidv4(), id, oldDoiStage, doi_stage, 'Stage updated']
-      );
+      const { doi_changed_at } = req.body;
+      if (doi_changed_at) {
+        await query(
+          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+          [uuidv4(), id, oldDoiStage, doi_stage, doi_changed_at, 'Stage updated (manual date)']
+        );
+      } else {
+        await query(
+          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
+          [uuidv4(), id, oldDoiStage, doi_stage, 'Stage updated']
+        );
+      }
     }
 
     res.json({ message: 'Project updated successfully' });

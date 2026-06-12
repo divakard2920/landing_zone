@@ -21,7 +21,7 @@ const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
 const emptyProjectForm = {
   name: '', description: '', url: '', icon: '', category: '',
   business_division: '', business_function: '', requester_name: '', ai_spoc: '',
-  priority: '', strategic_focus: '', doi_stage: 0, project_id: '',
+  priority: '', strategic_focus: '', doi_stage: 0, doi_changed_at: '', project_id: '',
   current_status: '', last_status: '', demand_type: '', platform: '',
   estimated_costs: '', start_date: '', end_date: '', ai_skills: '',
   risks: '', dependencies: ''
@@ -227,7 +227,7 @@ function Admin() {
 
   const handleEditProject = (project) => {
     setEditingProject(project);
-    setProjectForm({ ...emptyProjectForm, ...project });
+    setProjectForm({ ...emptyProjectForm, ...project, doi_changed_at: '' });
     setShowProjectModal(true);
   };
 
@@ -1193,9 +1193,20 @@ function Admin() {
                   </div>
                   <div className="form-group">
                     <label>DOI Stage</label>
-                    <select className="form-control" value={projectForm.doi_stage} onChange={e => setProjectForm({...projectForm, doi_stage: parseInt(e.target.value)})}>
+                    <select className="form-control" value={projectForm.doi_stage} onChange={e => setProjectForm({...projectForm, doi_stage: parseInt(e.target.value), doi_changed_at: ''})}>
                       {doiStages.map(d => <option key={d.id} value={d.id}>DOI {d.id} - {d.label}</option>)}
                     </select>
+                  </div>
+                  <div className="form-group">
+                    <label>DOI Stage Date <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={projectForm.doi_changed_at}
+                      onChange={e => setProjectForm({...projectForm, doi_changed_at: e.target.value})}
+                      max={new Date().toISOString().split('T')[0]}
+                    />
+                    <small style={{ color: 'var(--text-muted)' }}>Set a custom date for this DOI stage change</small>
                   </div>
                   <div className="form-group">
                     <label>Current Status</label>
