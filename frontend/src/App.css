@@ -470,6 +470,40 @@ body {
   line-height: 1.5;
 }
 
+/* Global Scrollbar Styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-dark) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-dark);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
+}
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  background-color: #475569;
+}
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b;
+}
+
 /* ==================== LANDING PAGE ==================== */
 
 .app-container {
@@ -676,25 +710,6 @@ body {
   overflow-y: auto;
   background: linear-gradient(135deg, #f1f5f9 0%, #e8eef5 100%);
   padding: 20px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-light) transparent;
-}
-
-.main-content-full::-webkit-scrollbar {
-  width: 6px;
-}
-
-.main-content-full::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.main-content-full::-webkit-scrollbar-thumb {
-  background-color: var(--border-light);
-  border-radius: 3px;
-}
-
-.main-content-full::-webkit-scrollbar-thumb:hover {
-  background-color: var(--border-dark);
 }
 
 .center-panel-full {
@@ -752,23 +767,6 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-}
-
-.app-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.app-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.app-list::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
-
-.app-list::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
 }
 
 .app-list-item {
@@ -2693,7 +2691,6 @@ select.form-control {
   max-height: 220px;
   overflow-y: auto;
   margin-top: 4px;
-  scrollbar-width: thin;
 }
 
 .searchable-option {
