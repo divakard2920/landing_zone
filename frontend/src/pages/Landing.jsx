@@ -71,6 +71,41 @@ function Landing() {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('card');
+  const [showColumnSettings, setShowColumnSettings] = useState(false);
+
+  // Available table columns configuration (only fields with admin inputs)
+  const allColumns = [
+    { key: 'project', label: 'Project', required: true },
+    { key: 'doi_stage', label: 'DOI Stage' },
+    { key: 'status', label: 'Status' },
+    { key: 'priority', label: 'Priority' },
+    { key: 'division', label: 'Division' },
+    { key: 'function', label: 'Function' },
+    { key: 'platform', label: 'Platform' },
+    { key: 'timeline', label: 'Timeline' },
+    { key: 'requester', label: 'Requester' },
+    { key: 'ai_spoc', label: 'AI SPOC' },
+    { key: 'demand_type', label: 'Demand Type' },
+    { key: 'estimated_costs', label: 'Estimated Costs' },
+  ];
+
+  const defaultColumns = ['project', 'doi_stage', 'status', 'priority', 'division', 'platform', 'timeline'];
+
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('tableColumns');
+    return saved ? JSON.parse(saved) : defaultColumns;
+  });
+
+  const toggleColumn = (key) => {
+    const column = allColumns.find(c => c.key === key);
+    if (column?.required) return;
+
+    const updated = visibleColumns.includes(key)
+      ? visibleColumns.filter(k => k !== key)
+      : [...visibleColumns, key];
+    setVisibleColumns(updated);
+    localStorage.setItem('tableColumns', JSON.stringify(updated));
+  };
 
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [feedback, setFeedback] = useState({
@@ -83,15 +118,31 @@ function Landing() {
   });
   const [appSearchQuery, setAppSearchQuery] = useState('');
   const [showAppDropdown, setShowAppDropdown] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const { theme, toggleTheme } = useTheme();
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
+  };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!showColumnSettings) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.column-settings-wrapper')) {
+        setShowColumnSettings(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showColumnSettings]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -228,15 +279,13 @@ function Landing() {
     setLoading(true);
     try {
       await api.submitFeedback(feedback);
-      setSubmitted(true);
       setFeedback({ name: '', email: '', type: 'suggestion', subject: '', message: '', app_id: '' });
       setAppSearchQuery('');
-      setTimeout(() => {
-        setSubmitted(false);
-        setShowSupportModal(false);
-      }, 3000);
+      setShowSupportModal(false);
+      showToast('Thank you! Your feedback has been submitted.', 'success');
     } catch (error) {
       console.error('Failed to submit feedback:', error);
+      showToast('Failed to submit feedback. Please try again.', 'error');
     } finally {
       setLoading(false);
     }
@@ -510,6 +559,48 @@ function Landing() {
                   </svg>
                 </button>
               </div>
+              {viewMode === 'table' && (
+                <div className="column-settings-wrapper">
+                  <button
+                    className="column-settings-btn"
+                    onClick={() => setShowColumnSettings(!showColumnSettings)}
+                    data-tooltip-id="tooltip"
+                    data-tooltip-content="Customize Columns"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  </button>
+                  {showColumnSettings && (
+                    <div className="column-settings-dropdown">
+                      <div className="column-settings-header">
+                        <span>Customize Columns</span>
+                        <button className="column-settings-close" onClick={() => setShowColumnSettings(false)}>×</button>
+                      </div>
+                      <div className="column-settings-list">
+                        {allColumns.map(col => (
+                          <label key={col.key} className={`column-option ${col.required ? 'disabled' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={visibleColumns.includes(col.key)}
+                              onChange={() => toggleColumn(col.key)}
+                              disabled={col.required}
+                            />
+                            <span>{col.label}</span>
+                            {col.required && <span className="required-badge">Required</span>}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="column-settings-footer">
+                        <button className="btn btn-sm btn-outline" onClick={() => { setVisibleColumns(defaultColumns); localStorage.setItem('tableColumns', JSON.stringify(defaultColumns)); }}>
+                          Reset to Default
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Filter Panel */}
@@ -630,10 +721,11 @@ function Landing() {
               {viewMode === 'card' ? (
                 <div className="projects-grid">
                   {filteredApps.length > 0 ? (
-                    filteredApps.map(app => (
+                    filteredApps.map((app, index) => (
                     <div key={app.id} className="project-card" onClick={() => setSelectedApp(app)} style={{
                         '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
                       }}>
+                      <span className="card-serial-no">{index + 1}</span>
                       <div className="project-card-header">
                         <div className="project-card-icon">
                           <AppIcon icon={app.icon} />
@@ -723,49 +815,76 @@ function Landing() {
                     <table className="projects-table">
                       <thead>
                         <tr>
-                          <th>Project</th>
-                          <th>DOI Stage</th>
-                          <th>Status</th>
-                          <th>Priority</th>
-                          <th>Division</th>
-                          <th>Platform</th>
-                          <th>Timeline</th>
+                          <th className="sno-column">#</th>
+                          {allColumns.filter(col => visibleColumns.includes(col.key)).map(col => (
+                            <th key={col.key}>{col.label}</th>
+                          ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredApps.map(app => (
+                        {filteredApps.map((app, index) => (
                           <tr key={app.id} onClick={() => setSelectedApp(app)} className="projects-table-row">
-                            <td>
-                              <div className="table-project-cell">
-                                <div className="table-project-icon">
-                                  <AppIcon icon={app.icon} />
+                            <td className="sno-column">{index + 1}</td>
+                            {visibleColumns.includes('project') && (
+                              <td>
+                                <div className="table-project-cell">
+                                  <div className="table-project-icon">
+                                    <AppIcon icon={app.icon} />
+                                  </div>
+                                  <div className="table-project-info">
+                                    <span className="table-project-name">{app.name}</span>
+                                    {app.project_id && <span className="table-project-id">#{app.project_id}</span>}
+                                  </div>
                                 </div>
-                                <div className="table-project-info">
-                                  <span className="table-project-name">{app.name}</span>
-                                  {app.project_id && <span className="table-project-id">#{app.project_id}</span>}
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="doi-badge" style={{
-                                '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
-                              }}>
-                                DOI {app.doi_stage || 0}
-                              </span>
-                            </td>
-                            <td><span className="status-text">{app.current_status || '-'}</span></td>
-                            <td>
-                              {app.priority ? (
-                                <span className={`priority-badge-sm priority-${app.priority.toLowerCase()}`}>{app.priority}</span>
-                              ) : '-'}
-                            </td>
-                            <td>{app.business_division || '-'}</td>
-                            <td>{app.platform || '-'}</td>
-                            <td className="timeline-cell">
-                              {app.start_date || app.end_date ? (
-                                <span>{app.start_date || 'TBD'} → {app.end_date || 'TBD'}</span>
-                              ) : '-'}
-                            </td>
+                              </td>
+                            )}
+                            {visibleColumns.includes('doi_stage') && (
+                              <td>
+                                <span className="doi-badge" style={{
+                                  '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0]
+                                }}>
+                                  DOI {app.doi_stage || 0}
+                                </span>
+                              </td>
+                            )}
+                            {visibleColumns.includes('status') && (
+                              <td><span className="status-text">{app.current_status || '-'}</span></td>
+                            )}
+                            {visibleColumns.includes('priority') && (
+                              <td>
+                                {app.priority ? (
+                                  <span className={`priority-badge-sm priority-${app.priority.toLowerCase()}`}>{app.priority}</span>
+                                ) : '-'}
+                              </td>
+                            )}
+                            {visibleColumns.includes('division') && (
+                              <td>{app.business_division || '-'}</td>
+                            )}
+                            {visibleColumns.includes('function') && (
+                              <td>{app.business_function || '-'}</td>
+                            )}
+                            {visibleColumns.includes('platform') && (
+                              <td>{app.platform || '-'}</td>
+                            )}
+                            {visibleColumns.includes('timeline') && (
+                              <td className="timeline-cell">
+                                {app.start_date || app.end_date ? (
+                                  <span>{app.start_date || 'TBD'} → {app.end_date || 'TBD'}</span>
+                                ) : '-'}
+                              </td>
+                            )}
+                            {visibleColumns.includes('requester') && (
+                              <td>{app.requester_name || '-'}</td>
+                            )}
+                            {visibleColumns.includes('ai_spoc') && (
+                              <td>{app.ai_spoc || '-'}</td>
+                            )}
+                            {visibleColumns.includes('demand_type') && (
+                              <td>{app.demand_type || '-'}</td>
+                            )}
+                            {visibleColumns.includes('estimated_costs') && (
+                              <td>{app.estimated_costs || '-'}</td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1131,12 +1250,6 @@ function Landing() {
             </div>
             
             <form onSubmit={handleSupportSubmit}>
-              {submitted && (
-                <div className="success-message">
-                  Thank you! Your submission has been received.
-                </div>
-              )}
-              
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div className="form-group" style={{ flex: 1 }}>
                   <label>Name</label>
@@ -1230,6 +1343,30 @@ function Landing() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`toast-notification ${toast.type}`}>
+          <div className="toast-content">
+            <div className="toast-icon">
+              {toast.type === 'error' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              )}
+              {toast.type === 'success' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="m5 12 5 5L20 7"/>
+                </svg>
+              )}
+            </div>
+            <span>{toast.message}</span>
+          </div>
+          <button className="toast-close" onClick={() => setToast({ ...toast, show: false })}>&times;</button>
         </div>
       )}
 

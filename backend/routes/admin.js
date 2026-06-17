@@ -64,7 +64,8 @@ router.post('/apps', async (req, res) => {
     }
 
     const id = uuidv4();
-    const initialDoiStage = doi_stage || 0;
+    // Always start new projects at DOI Stage 0
+    const initialDoiStage = 0;
 
     await query(`
       INSERT INTO apps (
@@ -117,7 +118,36 @@ router.put('/apps/:id', async (req, res) => {
 
     // Get current DOI stage before update
     const currentApp = await queryOne('SELECT doi_stage FROM apps WHERE id = $1', [id]);
-    const oldDoiStage = currentApp ? currentApp.doi_stage : null;
+    const oldDoiStage = currentApp ? parseInt(currentApp.doi_stage) : null;
+    const newDoiStage = parseInt(doi_stage);
+
+    // Validate DOI stage progression
+    if (oldDoiStage !== null && newDoiStage < oldDoiStage) {
+      return res.status(400).json({
+        error: `Cannot downgrade DOI stage. Current stage is DOI ${oldDoiStage}.`
+      });
+    }
+    if (oldDoiStage !== null && newDoiStage > oldDoiStage && newDoiStage - oldDoiStage > 1) {
+      return res.status(400).json({
+        error: `Cannot skip DOI stages. Current stage is DOI ${oldDoiStage}, can only advance to DOI ${oldDoiStage + 1}.`
+      });
+    }
+
+    const { doi_changed_at } = req.body;
+
+    // Validate DOI stage date is chronological when advancing
+    if (newDoiStage > oldDoiStage && doi_changed_at) {
+      const previousStageHistory = await queryOne(
+        'SELECT changed_at FROM doi_history WHERE app_id = $1 AND to_stage = $2 ORDER BY changed_at DESC LIMIT 1',
+        [id, oldDoiStage]
+      );
+      if (previousStageHistory && new Date(doi_changed_at) < new Date(previousStageHistory.changed_at)) {
+        const prevDate = new Date(previousStageHistory.changed_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+        return res.status(400).json({
+          error: `DOI ${newDoiStage} date cannot be earlier than DOI ${oldDoiStage} date (${prevDate}).`
+        });
+      }
+    }
 
     await query(`
       UPDATE apps SET
@@ -139,18 +169,30 @@ router.put('/apps/:id', async (req, res) => {
       id
     ]);
 
-    // Record DOI stage change if it changed
-    if (oldDoiStage !== null && oldDoiStage !== doi_stage) {
-      const { doi_changed_at } = req.body;
+    // Handle DOI stage changes
+    if (oldDoiStage !== null && oldDoiStage !== newDoiStage) {
+      // Stage changed - create new history entry
       if (doi_changed_at) {
         await query(
           'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
-          [uuidv4(), id, oldDoiStage, doi_stage, doi_changed_at, 'Stage updated (manual date)']
+          [uuidv4(), id, oldDoiStage, newDoiStage, doi_changed_at, 'Stage updated (manual date)']
         );
       } else {
         await query(
           'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-          [uuidv4(), id, oldDoiStage, doi_stage, 'Stage updated']
+          [uuidv4(), id, oldDoiStage, newDoiStage, 'Stage updated']
+        );
+      }
+    } else if (doi_changed_at) {
+      // Stage didn't change but date provided - update existing history entry for current stage
+      const existingEntry = await queryOne(
+        'SELECT id FROM doi_history WHERE app_id = $1 AND to_stage = $2 ORDER BY changed_at DESC LIMIT 1',
+        [id, newDoiStage]
+      );
+      if (existingEntry) {
+        await query(
+          'UPDATE doi_history SET changed_at = $1, notes = $2 WHERE id = $3',
+          [doi_changed_at, 'Date updated', existingEntry.id]
         );
       }
     }

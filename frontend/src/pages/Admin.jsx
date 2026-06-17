@@ -79,6 +79,7 @@ function Admin() {
   const [showWidgetModal, setShowWidgetModal] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'error' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
+  const [alertDialog, setAlertDialog] = useState({ show: false, title: '', message: '', type: 'error' });
   const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activityLogs, setActivityLogs] = useState([]);
@@ -146,6 +147,10 @@ function Admin() {
 
   const handleCancelConfirm = () => {
     setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Delete', type: 'danger' });
+  };
+
+  const showAlert = (title, message, type = 'error') => {
+    setAlertDialog({ show: true, title, message, type });
   };
 
   useEffect(() => {
@@ -249,21 +254,6 @@ function Admin() {
 
   const handleProjectSubmit = async (e) => {
     e.preventDefault();
-
-    // Check if DOI stage is being lowered
-    if (editingProject && projectForm.doi_stage < editingProject.doi_stage) {
-      showConfirm(
-        'Lower DOI Stage?',
-        `You are about to lower the DOI stage from DOI ${editingProject.doi_stage} to DOI ${projectForm.doi_stage}. This is an unusual action. Are you sure you want to proceed?`,
-        async () => {
-          await saveProject();
-        },
-        'Proceed',
-        'warning'
-      );
-      return;
-    }
-
     await saveProject();
   };
 
@@ -292,11 +282,13 @@ function Admin() {
 
         const details = changes.length > 0 ? `Changed: ${changes.join(', ')}` : null;
         logActivity('updated', 'project', editingProject.id, projectForm.name, details);
+        showToast('Project updated successfully', 'success');
       } else {
         const res = await api.admin.createApp(projectForm);
         const doi = doiStages.find(d => d.id === projectForm.doi_stage);
         const details = `Initial DOI: ${doi?.label || 'DOI ' + projectForm.doi_stage}${projectForm.priority ? ', Priority: ' + projectForm.priority : ''}`;
         logActivity('created', 'project', res.data.id, projectForm.name, details);
+        showToast('Project created successfully', 'success');
       }
       setProjectForm({ ...emptyProjectForm });
       setEditingProject(null);
@@ -304,6 +296,8 @@ function Admin() {
       loadData();
     } catch (error) {
       console.error('Failed to save project', error);
+      const errorMsg = error.response?.data?.error || 'Failed to save project';
+      showAlert('Error', errorMsg, 'error');
     } finally {
       setSaving(false);
     }
@@ -319,6 +313,7 @@ function Admin() {
     showConfirm('Delete Project', 'Are you sure you want to delete this project? This action cannot be undone.', async () => {
       await api.admin.deleteApp(id);
       logActivity('deleted', 'project', id, name);
+      showToast('Project deleted', 'success');
       loadData();
     });
   };
@@ -338,14 +333,17 @@ function Admin() {
         if (editingAnnouncement.type !== announcementForm.type) changes.push(`type: ${editingAnnouncement.type} → ${announcementForm.type}`);
         logActivity('updated', 'announcement', editingAnnouncement.id, announcementForm.title, changes.length > 0 ? changes.join(', ') : null);
         setEditingAnnouncement(null);
+        showToast('Announcement updated successfully', 'success');
       } else {
         const res = await api.admin.createAnnouncement(announcementForm);
         logActivity('created', 'announcement', res.data.id, announcementForm.title, `Type: ${announcementForm.type}`);
+        showToast('Announcement created successfully', 'success');
       }
       setAnnouncementForm({ title: '', content: '', type: 'info' });
       loadData();
     } catch (error) {
       console.error('Failed to save announcement', error);
+      showToast('Failed to save announcement', 'error');
     } finally {
       setSaving(false);
     }
@@ -365,12 +363,14 @@ function Admin() {
     showConfirm('Delete Announcement', 'Are you sure you want to delete this announcement?', async () => {
       await api.admin.deleteAnnouncement(id);
       logActivity('deleted', 'announcement', id, title);
+      showToast('Announcement deleted', 'success');
       loadData();
     });
   };
 
   const handleUpdateFeedbackStatus = async (id, status) => {
     await api.admin.updateFeedbackStatus(id, status);
+    showToast(`Feedback marked as ${status}`, 'success');
     loadData();
   };
 
@@ -406,8 +406,10 @@ function Admin() {
       if (editingTeamMember) {
         await api.admin.updateTeamMember(editingTeamMember.id, teamForm);
         setEditingTeamMember(null);
+        showToast('Team member updated', 'success');
       } else {
         await api.admin.addTeamMember(selectedProjectForTeam.id, teamForm);
+        showToast('Team member added', 'success');
       }
       setTeamForm({ name: '', role: '', email: '' });
       setTeamSearchQuery('');
@@ -418,6 +420,7 @@ function Admin() {
         showToast(error.response.data.error, 'error');
       } else {
         console.error('Failed to save team member', error);
+        showToast('Failed to save team member', 'error');
       }
     } finally {
       setSaving(false);
@@ -445,6 +448,7 @@ function Admin() {
   const handleDeleteTeamMember = (id) => {
     showConfirm('Remove Team Member', 'Are you sure you want to remove this team member from the project?', async () => {
       await api.admin.deleteTeamMember(id);
+      showToast('Team member removed', 'success');
       loadTeamMembers(selectedProjectForTeam.id);
     });
   };
@@ -459,9 +463,11 @@ function Admin() {
         if (editingWidget.chart_type !== widgetForm.chart_type) changes.push(`chart type: ${editingWidget.chart_type} → ${widgetForm.chart_type}`);
         if (editingWidget.data_field !== widgetForm.data_field) changes.push(`data field: ${editingWidget.data_field} → ${widgetForm.data_field}`);
         logActivity('updated', 'widget', editingWidget.id, widgetForm.title, changes.length > 0 ? changes.join(', ') : null);
+        showToast('Widget updated successfully', 'success');
       } else {
         const res = await api.admin.createWidget(widgetForm);
         logActivity('created', 'widget', res.data.id, widgetForm.title, `Chart: ${widgetForm.chart_type}, Field: ${widgetForm.data_field}`);
+        showToast('Widget created successfully', 'success');
       }
       setWidgetForm({ title: '', chart_type: 'donut', data_field: 'doi_stage', color_scheme: 'default', display_order: 0 });
       setEditingWidget(null);
@@ -469,6 +475,7 @@ function Admin() {
       loadData();
     } catch (error) {
       console.error('Failed to save widget', error);
+      showToast('Failed to save widget', 'error');
     } finally {
       setSaving(false);
     }
@@ -489,6 +496,7 @@ function Admin() {
   const handleToggleWidget = async (widget) => {
     await api.admin.updateWidget(widget.id, { ...widget, is_active: !widget.is_active });
     logActivity('updated', 'widget', widget.id, widget.title, `Status: ${widget.is_active ? 'Active → Inactive' : 'Inactive → Active'}`);
+    showToast(`Widget ${widget.is_active ? 'deactivated' : 'activated'}`, 'success');
     loadData();
   };
 
@@ -496,6 +504,7 @@ function Admin() {
     showConfirm('Delete Widget', 'Are you sure you want to delete this widget?', async () => {
       await api.admin.deleteWidget(id);
       logActivity('deleted', 'widget', id, title);
+      showToast('Widget deleted', 'success');
       loadData();
     });
   };
@@ -662,11 +671,11 @@ function Admin() {
                 <div className="stat-label">Total Projects</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{projects.filter(p => p.doi_stage >= 3).length}</div>
+                <div className="stat-number">{projects.filter(p => p.doi_stage >= 4).length}</div>
                 <div className="stat-label">In Production</div>
               </div>
               <div className="stat-card">
-                <div className="stat-number">{projects.filter(p => p.doi_stage < 3).length}</div>
+                <div className="stat-number">{projects.filter(p => p.doi_stage < 4).length}</div>
                 <div className="stat-label">In Development</div>
               </div>
               <div className="stat-card">
@@ -1378,12 +1387,19 @@ function Admin() {
                   </div>
                   <div className="form-group">
                     <label>DOI Stage</label>
-                    <select className="form-control" value={projectForm.doi_stage} onChange={e => setProjectForm({...projectForm, doi_stage: parseInt(e.target.value), doi_changed_at: ''})}>
-                      {doiStages.map(d => <option key={d.id} value={d.id}>DOI {d.id} - {d.label}</option>)}
-                    </select>
+                    {editingProject ? (
+                      <select className="form-control" value={projectForm.doi_stage} onChange={e => setProjectForm({...projectForm, doi_stage: parseInt(e.target.value), doi_changed_at: ''})}>
+                        {doiStages.map(d => <option key={d.id} value={d.id}>DOI {d.id} - {d.label}</option>)}
+                      </select>
+                    ) : (
+                      <>
+                        <input type="text" className="form-control" value={`DOI 0 - ${doiStages.find(d => d.id === 0)?.label || 'Ideation'}`} disabled style={{ backgroundColor: 'var(--bg-muted)', cursor: 'not-allowed' }} />
+                        <small style={{ color: 'var(--text-muted)' }}>New projects always start at DOI 0</small>
+                      </>
+                    )}
                   </div>
                   <div className="form-group">
-                    <label>DOI Stage Date <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
+                    <label>{editingProject ? 'DOI Stage Date' : 'Project Start Date'} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></label>
                     <input
                       type="date"
                       className="form-control"
@@ -1391,7 +1407,7 @@ function Admin() {
                       onChange={e => setProjectForm({...projectForm, doi_changed_at: e.target.value})}
                       max={new Date().toISOString().split('T')[0]}
                     />
-                    <small style={{ color: 'var(--text-muted)' }}>Set a custom date for this DOI stage change</small>
+                    <small style={{ color: 'var(--text-muted)' }}>{editingProject ? 'Update the date for the current DOI stage' : 'Set the project creation date'}</small>
                   </div>
                   <div className="form-group">
                     <label>Current Status</label>
@@ -1509,19 +1525,20 @@ function Admin() {
       {toast.show && (
         <div className={`toast-notification ${toast.type}`}>
           <div className="toast-content">
-            {toast.type === 'error' && (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
-            )}
-            {toast.type === 'success' && (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="m9 12 2 2 4-4"/>
-              </svg>
-            )}
+            <div className="toast-icon">
+              {toast.type === 'error' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="15" y1="9" x2="9" y2="15"/>
+                  <line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+              )}
+              {toast.type === 'success' && (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="m5 12 5 5L20 7"/>
+                </svg>
+              )}
+            </div>
             <span>{toast.message}</span>
           </div>
           <button className="toast-close" onClick={() => setToast({ ...toast, show: false })}>&times;</button>
@@ -1544,6 +1561,26 @@ function Admin() {
             <div className="confirm-actions">
               <button className="btn btn-outline" onClick={handleCancelConfirm}>Cancel</button>
               <button className={`btn btn-${confirmDialog.type === 'warning' ? 'warning' : 'danger'}`} onClick={handleConfirm}>{confirmDialog.confirmText}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Dialog */}
+      {alertDialog.show && (
+        <div className="confirm-overlay" onClick={() => setAlertDialog({ ...alertDialog, show: false })}>
+          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
+            <div className={`confirm-icon ${alertDialog.type === 'error' ? 'error' : ''}`}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <h3 className="confirm-title">{alertDialog.title}</h3>
+            <p className="confirm-message">{alertDialog.message}</p>
+            <div className="confirm-actions">
+              <button className="btn btn-primary" onClick={() => setAlertDialog({ ...alertDialog, show: false })}>OK</button>
             </div>
           </div>
         </div>
