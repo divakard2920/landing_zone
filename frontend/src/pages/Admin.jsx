@@ -87,6 +87,7 @@ function Admin() {
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState(null);
+  const [activityLogExpanded, setActivityLogExpanded] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
   const logActivity = async (action, entityType, entityId, entityName, details = null) => {
@@ -383,7 +384,8 @@ function Admin() {
 
   const handleUpdateFeedbackStatus = async (id, status) => {
     await api.admin.updateFeedbackStatus(id, status);
-    showToast(`Feedback marked as ${status}`, 'success');
+    const statusLabel = status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    showToast(`Feedback marked as ${statusLabel}`, 'success');
     loadData();
   };
 
@@ -573,6 +575,9 @@ function Admin() {
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           Feedback
+          {feedback.filter(f => f.status === 'new').length > 0 && (
+            <span className="tab-badge">{feedback.filter(f => f.status === 'new').length}</span>
+          )}
         </button>
         <button className={`header-tab ${activeTab === 'admin-users' ? 'active' : ''}`} onClick={() => setActiveTab('admin-users')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -726,8 +731,27 @@ function Admin() {
               </table>
             </div>
 
-            <h3 style={{ margin: '32px 0 16px' }}>Activity Log</h3>
-            <div className="activity-log-container">
+            <div
+              className="activity-log-header"
+              onClick={() => setActivityLogExpanded(!activityLogExpanded)}
+            >
+              <h3>Activity Log</h3>
+              <div className="activity-log-toggle">
+                <span className="activity-log-count">{activityLogs.length} entries</span>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ transform: activityLogExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                >
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              </div>
+            </div>
+            {activityLogExpanded && <div className="activity-log-container">
               {activityLogs.length === 0 ? (
                 <p className="activity-empty">No activity recorded yet.</p>
               ) : (
@@ -795,7 +819,7 @@ function Admin() {
                   )}
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         )}
 
