@@ -16,7 +16,7 @@ const DEMAND_TYPES = [
   'L3 - Fully Managed'
 ];
 
-const PLATFORMS = ['Microsoft', 'AWS', 'GCP', 'Azure', 'Other'];
+const PLATFORMS = ['MS Azure', 'AWS', 'GCP', 'Other'];
 
 const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
 
@@ -316,6 +316,19 @@ function Admin() {
       showToast('Project deleted', 'success');
       loadData();
     });
+  };
+
+  const handleInlineUpdate = async (project, field, value) => {
+    try {
+      const updateData = { ...project, [field]: value };
+      await api.admin.updateApp(project.id, updateData);
+      const fieldLabel = field === 'current_status' ? 'Status' : 'Platform';
+      logActivity('updated', 'project', project.id, project.name, `${fieldLabel}: ${project[field] || 'none'} → ${value || 'none'}`);
+      showToast(`${fieldLabel} updated`, 'success');
+      loadData();
+    } catch (error) {
+      showToast(error.response?.data?.error || 'Failed to update', 'error');
+    }
   };
 
   const handleAnnouncementSubmit = async (e) => {
@@ -848,8 +861,26 @@ function Admin() {
                     <td>{project.business_division || '-'}</td>
                     <td>{project.business_function || '-'}</td>
                     <td><span className={`doi-badge doi-${project.doi_stage || 0}`}>DOI {project.doi_stage || 0}</span></td>
-                    <td>{project.current_status || '-'}</td>
-                    <td>{project.platform || '-'}</td>
+                    <td>
+                      <select
+                        className="inline-select"
+                        value={project.current_status || ''}
+                        onChange={(e) => handleInlineUpdate(project, 'current_status', e.target.value)}
+                      >
+                        <option value="">-</option>
+                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        className="inline-select"
+                        value={project.platform || ''}
+                        onChange={(e) => handleInlineUpdate(project, 'platform', e.target.value)}
+                      >
+                        <option value="">-</option>
+                        {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </td>
                     <td>
                       <div className="action-buttons">
                         <button className="btn btn-secondary btn-sm" onClick={() => handleEditProject(project)}>Edit</button>
