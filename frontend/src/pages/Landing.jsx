@@ -67,15 +67,19 @@ function Landing() {
     priority: '',
     status: '',
     platform: '',
-    division: ''
+    division: '',
+    usecase_type: ''
   });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('card');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
+  const USECASE_TYPES = ['AI Usecase', 'Foundation'];
+
   // Available table columns configuration (only fields with admin inputs)
   const allColumns = [
     { key: 'project', label: 'Project', required: true },
+    { key: 'usecase_type', label: 'Use Case Type' },
     { key: 'doi_stage', label: 'DOI Stage' },
     { key: 'status', label: 'Status' },
     { key: 'priority', label: 'Priority' },
@@ -122,7 +126,36 @@ function Landing() {
   const [pageLoading, setPageLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { theme, toggleTheme } = useTheme();
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const getSortValue = (app, key) => {
+    switch (key) {
+      case 'project': return app.name?.toLowerCase() || '';
+      case 'usecase_type': return app.usecase_type?.toLowerCase() || '';
+      case 'doi_stage': return app.doi_stage || 0;
+      case 'status': return app.current_status?.toLowerCase() || '';
+      case 'priority':
+        const priorityOrder = { 'high': 1, 'medium': 2, 'low': 3 };
+        return priorityOrder[app.priority?.toLowerCase()] || 999;
+      case 'division': return app.business_division?.toLowerCase() || '';
+      case 'function': return app.business_function?.toLowerCase() || '';
+      case 'platform': return app.platform?.toLowerCase() || '';
+      case 'timeline': return app.start_date || '';
+      case 'requester': return app.requester_name?.toLowerCase() || '';
+      case 'ai_spoc': return app.ai_spoc?.toLowerCase() || '';
+      case 'demand_type': return app.demand_type?.toLowerCase() || '';
+      case 'estimated_costs': return parseFloat(app.estimated_costs) || 0;
+      default: return '';
+    }
+  };
 
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
@@ -324,6 +357,7 @@ function Landing() {
       app.platform,
       app.ai_skills,
       app.project_id,
+      app.usecase_identifier,
     ];
     const teamNames = app.team?.map(t => t.name).join(' ') || '';
     const matchesSearch = !searchQuery || searchFields.some(field =>
@@ -336,19 +370,39 @@ function Landing() {
     const matchesStatus = !filters.status || app.current_status === filters.status;
     const matchesPlatform = !filters.platform || (app.platform || '').split(',').map(v => v.trim()).includes(filters.platform);
     const matchesDivision = !filters.division || (app.business_division || '').split(',').map(v => v.trim()).includes(filters.division);
+    const matchesUsecaseType = !filters.usecase_type || app.usecase_type === filters.usecase_type;
 
-    return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision;
+    return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision && matchesUsecaseType;
   }).sort((a, b) => {
-    if (a.created_at && b.created_at) {
-      return new Date(a.created_at) - new Date(b.created_at);
+    // If user selected a sort column, use that
+    if (sortConfig.key) {
+      const aVal = getSortValue(a, sortConfig.key);
+      const bVal = getSortValue(b, sortConfig.key);
+      let comparison = 0;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        comparison = aVal - bVal;
+      } else {
+        comparison = String(aVal).localeCompare(String(bVal));
+      }
+      return sortConfig.direction === 'desc' ? -comparison : comparison;
     }
-    return a.id - b.id;
+    // Default sort: by usecase_identifier first (nulls last)
+    if (a.usecase_identifier && !b.usecase_identifier) return -1;
+    if (!a.usecase_identifier && b.usecase_identifier) return 1;
+    if (a.usecase_identifier && b.usecase_identifier) {
+      return a.usecase_identifier.localeCompare(b.usecase_identifier);
+    }
+    // Then by created_at
+    if (a.created_at && b.created_at) {
+      return new Date(b.created_at) - new Date(a.created_at);
+    }
+    return 0;
   });
 
   const activeFiltersCount = Object.values(filters).filter(v => v !== '').length;
 
   const clearFilters = () => {
-    setFilters({ doi_stage: '', priority: '', status: '', platform: '', division: '' });
+    setFilters({ doi_stage: '', priority: '', status: '', platform: '', division: '', usecase_type: '' });
   };
 
   if (pageLoading) {
@@ -498,7 +552,7 @@ function Landing() {
                 <input
                   type="text"
                   className="main-search-input"
-                  placeholder="Search applications..."
+                  placeholder="Search by name, ID (AI_001, F_001), division..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
@@ -662,6 +716,17 @@ function Landing() {
                     ))}
                   </select>
 
+                  <select
+                    value={filters.usecase_type}
+                    onChange={(e) => setFilters({...filters, usecase_type: e.target.value})}
+                    className="filter-select"
+                  >
+                    <option value="">All Use Case Types</option>
+                    {USECASE_TYPES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+
                   {activeFiltersCount > 0 && (
                     <button className="clear-filters" onClick={clearFilters}>× Clear</button>
                   )}
@@ -753,7 +818,10 @@ function Landing() {
                         <span className="doi-progress-label">DOI {app.doi_stage || 0} - {doiStages.find(d => d.id === (app.doi_stage || 0))?.label || ''}</span>
                       </div>
                       <h4 className="project-card-title">{app.name}</h4>
-                      {app.project_id && <span className="project-card-id">#{app.project_id}</span>}
+                      <div className="project-card-ids">
+                        {app.usecase_identifier && <span className="project-card-usecase-id">{app.usecase_identifier}</span>}
+                        {app.project_id && <span className="project-card-id">#{app.project_id}</span>}
+                      </div>
 
                       <div className="project-card-info">
                         {app.current_status && (
@@ -817,7 +885,14 @@ function Landing() {
                         <tr>
                           <th className="sno-column">#</th>
                           {allColumns.filter(col => visibleColumns.includes(col.key)).map(col => (
-                            <th key={col.key}>{col.label}</th>
+                            <th key={col.key} className="sortable-th" onClick={() => handleSort(col.key)}>
+                              <span className="th-content">
+                                {col.label}
+                                <span className={`sort-icon ${sortConfig.key === col.key ? 'active' : ''}`}>
+                                  {sortConfig.key === col.key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
+                                </span>
+                              </span>
+                            </th>
                           ))}
                         </tr>
                       </thead>
@@ -833,9 +908,21 @@ function Landing() {
                                   </div>
                                   <div className="table-project-info">
                                     <span className="table-project-name">{app.name}</span>
-                                    {app.project_id && <span className="table-project-id">#{app.project_id}</span>}
+                                    <div className="table-project-ids">
+                                      {app.usecase_identifier && <span className="table-usecase-id">{app.usecase_identifier}</span>}
+                                      {app.project_id && <span className="table-project-id">#{app.project_id}</span>}
+                                    </div>
                                   </div>
                                 </div>
+                              </td>
+                            )}
+                            {visibleColumns.includes('usecase_type') && (
+                              <td>
+                                {app.usecase_type ? (
+                                  <span className={`usecase-type-badge ${app.usecase_type === 'AI Usecase' ? 'ai' : 'foundation'}`}>
+                                    {app.usecase_type === 'AI Usecase' ? 'AI' : 'Foundation'}
+                                  </span>
+                                ) : '-'}
                               </td>
                             )}
                             {visibleColumns.includes('doi_stage') && (
@@ -927,7 +1014,10 @@ function Landing() {
                 </div>
                 <div className="slider-title-block">
                   <h2>{selectedApp.name}</h2>
-                  {selectedApp.project_id && <span className="project-id-label">#{selectedApp.project_id}</span>}
+                  <div className="slider-ids">
+                    {selectedApp.usecase_identifier && <span className="usecase-id-label">{selectedApp.usecase_identifier}</span>}
+                    {selectedApp.project_id && <span className="project-id-label">#{selectedApp.project_id}</span>}
+                  </div>
                 </div>
               </div>
               <button className="slider-close" onClick={() => setSelectedApp(null)}>

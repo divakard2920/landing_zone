@@ -41,11 +41,22 @@ router.post('/upload-icon', upload.single('icon'), (req, res) => {
 // Apps management
 router.get('/apps', async (req, res) => {
   try {
-    const apps = await queryAll('SELECT * FROM apps ORDER BY created_at DESC');
+    const apps = await queryAll('SELECT * FROM apps WHERE deleted_at IS NULL ORDER BY usecase_identifier ASC NULLS LAST, created_at DESC');
     res.json(apps);
   } catch (error) {
     console.error('Error fetching apps:', error);
     res.status(500).json({ error: 'Failed to fetch apps' });
+  }
+});
+
+// Get deleted projects - must be before /apps/:id routes
+router.get('/apps/deleted', async (req, res) => {
+  try {
+    const apps = await queryAll('SELECT * FROM apps WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC');
+    res.json(apps);
+  } catch (error) {
+    console.error('Error fetching deleted apps:', error);
+    res.status(500).json({ error: 'Failed to fetch deleted projects' });
   }
 });
 
@@ -56,16 +67,88 @@ router.post('/apps', async (req, res) => {
       business_division, business_function, requester_name, ai_spoc,
       priority, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
-      estimated_costs, start_date, end_date, ai_skills, risks, dependencies
+      estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
+      usecase_type
     } = req.body;
 
     if (!name) {
       return res.status(400).json({ error: 'Project name is required' });
     }
 
+    if (!usecase_type) {
+      return res.status(400).json({ error: 'Use Case Type is required' });
+    }
+
+    // Check for duplicate project name
+    const existingProject = await queryOne(
+      'SELECT id, name FROM apps WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL',
+      [name]
+    );
+    if (existingProject) {
+      return res.status(400).json({ error: `A project with the name "${name}" already exists` });
+    }
+
     const id = uuidv4();
     // Always start new projects at DOI Stage 0
     const initialDoiStage = 0;
+
+    // Generate or reuse usecase_identifier based on usecase_type
+    let usecase_identifier = null;
+    if (usecase_type) {
+      // First check if this project name already has an identifier in the registry
+      const existingRegistry = await queryOne(
+        `SELECT usecase_identifier FROM usecase_identifier_registry
+         WHERE LOWER(project_name) = LOWER($1) AND usecase_type = $2`,
+        [name, usecase_type]
+      );
+
+      if (existingRegistry) {
+        // Reuse existing identifier
+        usecase_identifier = existingRegistry.usecase_identifier;
+      } else {
+        // Generate new identifier
+        const prefixMap = {
+          'AI Usecase': 'AI',
+          'Foundation': 'F'
+        };
+        const prefix = prefixMap[usecase_type];
+        if (prefix) {
+          // Check both apps table and registry for the highest number
+          const lastFromApps = await queryOne(
+            `SELECT usecase_identifier FROM apps
+             WHERE usecase_type = $1 AND usecase_identifier IS NOT NULL
+             ORDER BY usecase_identifier DESC LIMIT 1`,
+            [usecase_type]
+          );
+          const lastFromRegistry = await queryOne(
+            `SELECT usecase_identifier FROM usecase_identifier_registry
+             WHERE usecase_type = $1
+             ORDER BY usecase_identifier DESC LIMIT 1`,
+            [usecase_type]
+          );
+
+          let nextNumber = 1;
+          const extractNumber = (identifier) => {
+            if (!identifier) return 0;
+            const match = identifier.match(/_(\d+)$/);
+            return match ? parseInt(match[1]) : 0;
+          };
+
+          const numFromApps = extractNumber(lastFromApps?.usecase_identifier);
+          const numFromRegistry = extractNumber(lastFromRegistry?.usecase_identifier);
+          nextNumber = Math.max(numFromApps, numFromRegistry) + 1;
+
+          usecase_identifier = `${prefix}_${String(nextNumber).padStart(3, '0')}`;
+
+          // Register the new identifier
+          await query(
+            `INSERT INTO usecase_identifier_registry (id, project_name, usecase_type, usecase_identifier)
+             VALUES ($1, $2, $3, $4)`,
+            [uuidv4(), name, usecase_type, usecase_identifier]
+          );
+        }
+      }
+    }
 
     await query(`
       INSERT INTO apps (
@@ -73,15 +156,17 @@ router.post('/apps', async (req, res) => {
         business_division, business_function, requester_name, ai_spoc,
         priority, strategic_focus, doi_stage, project_id,
         current_status, last_status, demand_type, platform,
-        estimated_costs, start_date, end_date, ai_skills, risks, dependencies
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
+        usecase_type, usecase_identifier
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
     `, [
       id, name, description || null, url || null, icon || null, category || null,
       business_division || null, business_function || null, requester_name || null, ai_spoc || null,
       priority || null, strategic_focus || null, initialDoiStage, project_id || null,
       current_status || null, last_status || null, demand_type || null, platform || null,
       estimated_costs || null, start_date || null, end_date || null, ai_skills || null,
-      risks || null, dependencies || null
+      risks || null, dependencies || null,
+      usecase_type || null, usecase_identifier
     ]);
 
     // Record initial DOI stage in history
@@ -113,13 +198,80 @@ router.put('/apps/:id', async (req, res) => {
       business_division, business_function, requester_name, ai_spoc,
       priority, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
-      estimated_costs, start_date, end_date, ai_skills, risks, dependencies
+      estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
+      usecase_type
     } = req.body;
 
-    // Get current DOI stage before update
-    const currentApp = await queryOne('SELECT doi_stage FROM apps WHERE id = $1', [id]);
+    // Check for duplicate project name (excluding current project)
+    const existingProject = await queryOne(
+      'SELECT id, name FROM apps WHERE LOWER(name) = LOWER($1) AND id != $2 AND deleted_at IS NULL',
+      [name, id]
+    );
+    if (existingProject) {
+      return res.status(400).json({ error: `A project with the name "${name}" already exists` });
+    }
+
+    // Get current app data before update
+    const currentApp = await queryOne('SELECT doi_stage, usecase_identifier FROM apps WHERE id = $1', [id]);
     const oldDoiStage = currentApp ? parseInt(currentApp.doi_stage) : null;
     const newDoiStage = parseInt(doi_stage);
+
+    // Generate or reuse usecase_identifier if usecase_type is set and no identifier exists
+    let usecase_identifier = currentApp?.usecase_identifier || null;
+    if (usecase_type && !usecase_identifier) {
+      // First check if this project name already has an identifier in the registry
+      const existingRegistry = await queryOne(
+        `SELECT usecase_identifier FROM usecase_identifier_registry
+         WHERE LOWER(project_name) = LOWER($1) AND usecase_type = $2`,
+        [name, usecase_type]
+      );
+
+      if (existingRegistry) {
+        // Reuse existing identifier
+        usecase_identifier = existingRegistry.usecase_identifier;
+      } else {
+        // Generate new identifier
+        const prefixMap = {
+          'AI Usecase': 'AI',
+          'Foundation': 'F'
+        };
+        const prefix = prefixMap[usecase_type];
+        if (prefix) {
+          const lastFromApps = await queryOne(
+            `SELECT usecase_identifier FROM apps
+             WHERE usecase_type = $1 AND usecase_identifier IS NOT NULL
+             ORDER BY usecase_identifier DESC LIMIT 1`,
+            [usecase_type]
+          );
+          const lastFromRegistry = await queryOne(
+            `SELECT usecase_identifier FROM usecase_identifier_registry
+             WHERE usecase_type = $1
+             ORDER BY usecase_identifier DESC LIMIT 1`,
+            [usecase_type]
+          );
+
+          let nextNumber = 1;
+          const extractNumber = (identifier) => {
+            if (!identifier) return 0;
+            const match = identifier.match(/_(\d+)$/);
+            return match ? parseInt(match[1]) : 0;
+          };
+
+          const numFromApps = extractNumber(lastFromApps?.usecase_identifier);
+          const numFromRegistry = extractNumber(lastFromRegistry?.usecase_identifier);
+          nextNumber = Math.max(numFromApps, numFromRegistry) + 1;
+
+          usecase_identifier = `${prefix}_${String(nextNumber).padStart(3, '0')}`;
+
+          // Register the new identifier
+          await query(
+            `INSERT INTO usecase_identifier_registry (id, project_name, usecase_type, usecase_identifier)
+             VALUES ($1, $2, $3, $4)`,
+            [uuidv4(), name, usecase_type, usecase_identifier]
+          );
+        }
+      }
+    }
 
     // Validate DOI stage progression
     if (oldDoiStage !== null && newDoiStage < oldDoiStage) {
@@ -156,16 +308,16 @@ router.put('/apps/:id', async (req, res) => {
         priority = $10, strategic_focus = $11, doi_stage = $12, project_id = $13,
         current_status = $14, last_status = $15, demand_type = $16, platform = $17,
         estimated_costs = $18, start_date = $19, end_date = $20, ai_skills = $21,
-        risks = $22, dependencies = $23,
+        risks = $22, dependencies = $23, usecase_type = $24, usecase_identifier = $25,
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $24
+      WHERE id = $26
     `, [
       name, description, url, icon, category,
       business_division, business_function, requester_name, ai_spoc,
       priority, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
       estimated_costs, start_date, end_date, ai_skills,
-      risks, dependencies,
+      risks, dependencies, usecase_type, usecase_identifier,
       id
     ]);
 
@@ -207,11 +359,36 @@ router.put('/apps/:id', async (req, res) => {
 router.delete('/apps/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await query('DELETE FROM apps WHERE id = $1', [id]);
-    res.json({ message: 'App deleted successfully' });
+    // Soft delete - set deleted_at timestamp
+    await query('UPDATE apps SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [id]);
+    res.json({ message: 'Project deleted successfully' });
   } catch (error) {
     console.error('Error deleting app:', error);
-    res.status(500).json({ error: 'Failed to delete app' });
+    res.status(500).json({ error: 'Failed to delete project' });
+  }
+});
+
+// Restore deleted project
+router.post('/apps/:id/restore', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await query('UPDATE apps SET deleted_at = NULL WHERE id = $1', [id]);
+    res.json({ message: 'Project restored successfully' });
+  } catch (error) {
+    console.error('Error restoring app:', error);
+    res.status(500).json({ error: 'Failed to restore project' });
+  }
+});
+
+// Permanently delete project
+router.delete('/apps/:id/permanent', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await query('DELETE FROM apps WHERE id = $1', [id]);
+    res.json({ message: 'Project permanently deleted' });
+  } catch (error) {
+    console.error('Error permanently deleting app:', error);
+    res.status(500).json({ error: 'Failed to permanently delete project' });
   }
 });
 

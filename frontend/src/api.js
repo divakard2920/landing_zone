@@ -42,9 +42,12 @@ export const api = {
 
   admin: {
     getApps: () => axios.get(`${API_BASE}/admin/apps`),
+    getDeletedApps: () => axios.get(`${API_BASE}/admin/apps/deleted`),
     createApp: (data) => axios.post(`${API_BASE}/admin/apps`, data),
     updateApp: (id, data) => axios.put(`${API_BASE}/admin/apps/${id}`, data),
     deleteApp: (id) => axios.delete(`${API_BASE}/admin/apps/${id}`),
+    restoreApp: (id) => axios.post(`${API_BASE}/admin/apps/${id}/restore`),
+    permanentDeleteApp: (id) => axios.delete(`${API_BASE}/admin/apps/${id}/permanent`),
 
     getAnnouncements: () => axios.get(`${API_BASE}/admin/announcements`),
     createAnnouncement: (data) => axios.post(`${API_BASE}/admin/announcements`, data),

@@ -97,6 +97,8 @@ const initDb = async () => {
         ai_skills TEXT,
         risks TEXT,
         dependencies TEXT,
+        usecase_type TEXT,
+        usecase_identifier TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -209,6 +211,14 @@ const initDb = async () => {
         details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS usecase_identifier_registry (
+        id TEXT PRIMARY KEY,
+        project_name TEXT NOT NULL,
+        usecase_type TEXT NOT NULL,
+        usecase_identifier TEXT NOT NULL UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Seed DOI stages if empty
@@ -237,6 +247,27 @@ const initDb = async () => {
         [uuidv4(), 'Divakar Doreiswamy', 'Divakar.Doreiswamy@knorr-bremse.com', defaultPassword]
       );
       console.log('Default admin created: Divakar.Doreiswamy@knorr-bremse.com / admin123');
+    }
+
+    // Migration: Add usecase_type and usecase_identifier columns if they don't exist
+    const columnCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'apps' AND column_name = 'usecase_type'
+    `);
+    if (columnCheck.rows.length === 0) {
+      await client.query('ALTER TABLE apps ADD COLUMN usecase_type TEXT');
+      await client.query('ALTER TABLE apps ADD COLUMN usecase_identifier TEXT');
+      console.log('Migration: Added usecase_type and usecase_identifier columns to apps table');
+    }
+
+    // Migration: Add deleted_at column for soft delete
+    const deletedAtCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'apps' AND column_name = 'deleted_at'
+    `);
+    if (deletedAtCheck.rows.length === 0) {
+      await client.query('ALTER TABLE apps ADD COLUMN deleted_at TIMESTAMP');
+      console.log('Migration: Added deleted_at column to apps table for soft delete');
     }
 
     console.log('Database initialized successfully');

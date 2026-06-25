@@ -20,13 +20,15 @@ const PLATFORMS = ['MS Azure', 'AWS', 'GCP', 'Other'];
 
 const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
 
+const USECASE_TYPES = ['AI Usecase', 'Foundation'];
+
 const emptyProjectForm = {
   name: '', description: '', url: '', icon: '', category: '',
   business_division: '', business_function: '', requester_name: '', ai_spoc: '',
   priority: '', strategic_focus: '', doi_stage: 0, doi_changed_at: '', project_id: '',
   current_status: '', last_status: '', demand_type: '', platform: '',
   estimated_costs: '', start_date: '', end_date: '', ai_skills: '',
-  risks: '', dependencies: ''
+  risks: '', dependencies: '', usecase_type: ''
 };
 
 function Admin() {
@@ -58,7 +60,12 @@ function Admin() {
   const [projectForm, setProjectForm] = useState({ ...emptyProjectForm });
   const [editingProject, setEditingProject] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
+  const [showProjectPreview, setShowProjectPreview] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [showDeletedProjects, setShowDeletedProjects] = useState(false);
+  const [deletedProjects, setDeletedProjects] = useState([]);
+  const [projectDoiHistory, setProjectDoiHistory] = useState([]);
+  const [requesterInput, setRequesterInput] = useState('');
 
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
@@ -88,7 +95,30 @@ function Admin() {
   const [loadingMoreLogs, setLoadingMoreLogs] = useState(false);
   const [expandedLogId, setExpandedLogId] = useState(null);
   const [activityLogExpanded, setActivityLogExpanded] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { theme, toggleTheme } = useTheme();
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const sortData = (data, getSortValue) => {
+    if (!sortConfig.key) return data;
+    return [...data].sort((a, b) => {
+      const aVal = getSortValue(a, sortConfig.key);
+      const bVal = getSortValue(b, sortConfig.key);
+      let comparison = 0;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        comparison = aVal - bVal;
+      } else {
+        comparison = String(aVal || '').localeCompare(String(bVal || ''));
+      }
+      return sortConfig.direction === 'desc' ? -comparison : comparison;
+    });
+  };
 
   const logActivity = async (action, entityType, entityId, entityName, details = null) => {
     try {
@@ -154,8 +184,29 @@ function Admin() {
     setAlertDialog({ show: true, title, message, type });
   };
 
+  const getRequesters = () => {
+    if (!projectForm.requester_name) return [];
+    return projectForm.requester_name.split(',').map(r => r.trim()).filter(r => r);
+  };
+
+  const addRequester = (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const current = getRequesters();
+    if (current.some(r => r.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...current, trimmed].join(', ');
+    setProjectForm({ ...projectForm, requester_name: updated });
+    setRequesterInput('');
+  };
+
+  const removeRequester = (name) => {
+    const current = getRequesters().filter(r => r !== name);
+    setProjectForm({ ...projectForm, requester_name: current.join(', ') });
+  };
+
   useEffect(() => {
     loadData();
+    loadDeletedProjects();
   }, []);
 
   const loadData = async () => {
@@ -182,6 +233,44 @@ function Admin() {
     } finally {
       setPageLoading(false);
     }
+  };
+
+  const loadDeletedProjects = async () => {
+    try {
+      const res = await api.admin.getDeletedApps();
+      setDeletedProjects(res.data);
+    } catch (error) {
+      console.error('Failed to load deleted projects:', error);
+    }
+  };
+
+  const handleRestoreProject = async (project) => {
+    try {
+      await api.admin.restoreApp(project.id);
+      logActivity('restored', 'project', project.id, project.name);
+      showToast('Project restored successfully', 'success');
+      loadData();
+      loadDeletedProjects();
+    } catch (error) {
+      showToast('Failed to restore project', 'error');
+    }
+  };
+
+  const handlePermanentDelete = (project) => {
+    showConfirm(
+      'Permanently Delete',
+      `Are you sure you want to permanently delete "${project.name}"? This action cannot be undone.`,
+      async () => {
+        try {
+          await api.admin.permanentDeleteApp(project.id);
+          logActivity('permanently deleted', 'project', project.id, project.name);
+          showToast('Project permanently deleted', 'success');
+          loadDeletedProjects();
+        } catch (error) {
+          showToast('Failed to delete project', 'error');
+        }
+      }
+    );
   };
 
   const handleLogout = async () => {
@@ -255,6 +344,15 @@ function Admin() {
 
   const handleProjectSubmit = async (e) => {
     e.preventDefault();
+    if (editingProject) {
+      await saveProject();
+    } else {
+      setShowProjectPreview(true);
+    }
+  };
+
+  const confirmCreateProject = async () => {
+    setShowProjectPreview(false);
     await saveProject();
   };
 
@@ -298,16 +396,25 @@ function Admin() {
     } catch (error) {
       console.error('Failed to save project', error);
       const errorMsg = error.response?.data?.error || 'Failed to save project';
-      showAlert('Error', errorMsg, 'error');
+      const isDuplicate = errorMsg.toLowerCase().includes('already exists');
+      showAlert(isDuplicate ? 'Duplicate Project Name' : 'Error', errorMsg, isDuplicate ? 'warning' : 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEditProject = (project) => {
+  const handleEditProject = async (project) => {
     setEditingProject(project);
     setProjectForm({ ...emptyProjectForm, ...project, doi_changed_at: '' });
+    setRequesterInput('');
     setShowProjectModal(true);
+    try {
+      const res = await api.getDoiHistory(project.id);
+      setProjectDoiHistory(res.data);
+    } catch (error) {
+      console.error('Failed to load DOI history:', error);
+      setProjectDoiHistory([]);
+    }
   };
 
   const handleDeleteProject = (id, name) => {
@@ -316,6 +423,7 @@ function Admin() {
       logActivity('deleted', 'project', id, name);
       showToast('Project deleted', 'success');
       loadData();
+      loadDeletedProjects();
     });
   };
 
@@ -669,7 +777,7 @@ function Admin() {
         <div className="admin-content-header">
           <h1>{activeTab === 'admin-users' ? 'Admin Users' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')}</h1>
           {activeTab === 'projects' && (
-            <button className="btn btn-primary" onClick={() => { setEditingProject(null); setProjectForm({ ...emptyProjectForm }); setShowProjectModal(true); }}>
+            <button className="btn btn-primary" onClick={() => { setEditingProject(null); setProjectForm({ ...emptyProjectForm }); setProjectDoiHistory([]); setRequesterInput(''); setShowProjectModal(true); }}>
               + Add Project
             </button>
           )}
@@ -826,40 +934,56 @@ function Admin() {
         {/* Projects */}
         {activeTab === 'projects' && (
           <div className="admin-table-container">
-            <div className="admin-search-bar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/>
-                <path d="m21 21-4.35-4.35"/>
-              </svg>
-              <input
-                type="text"
-                placeholder="Search projects by name, ID, division, status..."
-                value={projectSearchQuery}
-                onChange={(e) => setProjectSearchQuery(e.target.value)}
-              />
-              {projectSearchQuery && (
-                <button className="search-clear" onClick={() => setProjectSearchQuery('')}>×</button>
-              )}
+            <div className="projects-toolbar">
+              <div className="admin-search-bar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search by name, ID (AI_001, F_001), division, status..."
+                  value={projectSearchQuery}
+                  onChange={(e) => setProjectSearchQuery(e.target.value)}
+                />
+                {projectSearchQuery && (
+                  <button className="search-clear" onClick={() => setProjectSearchQuery('')}>×</button>
+                )}
+              </div>
+              <button
+                className={`btn btn-sm ${showDeletedProjects ? 'btn-warning' : 'btn-outline'}`}
+                onClick={() => {
+                  setShowDeletedProjects(!showDeletedProjects);
+                  if (!showDeletedProjects) loadDeletedProjects();
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                </svg>
+                {showDeletedProjects ? 'Show Active' : `Deleted (${deletedProjects.length})`}
+              </button>
             </div>
             <table className="admin-table">
               <thead>
                 <tr>
-                  <th>Project Name</th>
-                  <th>Division</th>
-                  <th>Function</th>
-                  <th>DOI</th>
-                  <th>Status</th>
-                  <th>Platform</th>
+                  <th className="sortable-th" onClick={() => handleSort('name')}><span className="th-content">Project Name<span className={`sort-icon ${sortConfig.key === 'name' ? 'active' : ''}`}>{sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
+                  <th className="sortable-th" onClick={() => handleSort('division')}><span className="th-content">Division<span className={`sort-icon ${sortConfig.key === 'division' ? 'active' : ''}`}>{sortConfig.key === 'division' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
+                  <th className="sortable-th" onClick={() => handleSort('function')}><span className="th-content">Function<span className={`sort-icon ${sortConfig.key === 'function' ? 'active' : ''}`}>{sortConfig.key === 'function' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
+                  <th className="sortable-th" onClick={() => handleSort('doi')}><span className="th-content">DOI<span className={`sort-icon ${sortConfig.key === 'doi' ? 'active' : ''}`}>{sortConfig.key === 'doi' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
+                  <th className="sortable-th" onClick={() => handleSort('status')}><span className="th-content">Status<span className={`sort-icon ${sortConfig.key === 'status' ? 'active' : ''}`}>{sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
+                  <th className="sortable-th" onClick={() => handleSort('platform')}><span className="th-content">Platform<span className={`sort-icon ${sortConfig.key === 'platform' ? 'active' : ''}`}>{sortConfig.key === 'platform' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {projects.filter(project => {
+                {sortData((showDeletedProjects ? deletedProjects : projects).filter(project => {
                   if (!projectSearchQuery) return true;
                   const query = projectSearchQuery.toLowerCase();
                   return (
                     project.name?.toLowerCase().includes(query) ||
                     project.project_id?.toLowerCase().includes(query) ||
+                    project.usecase_identifier?.toLowerCase().includes(query) ||
                     project.business_division?.toLowerCase().includes(query) ||
                     project.business_function?.toLowerCase().includes(query) ||
                     project.current_status?.toLowerCase().includes(query) ||
@@ -867,6 +991,16 @@ function Admin() {
                     project.requester_name?.toLowerCase().includes(query) ||
                     project.ai_spoc?.toLowerCase().includes(query)
                   );
+                }), (p, key) => {
+                  switch(key) {
+                    case 'name': return p.name?.toLowerCase() || '';
+                    case 'division': return p.business_division?.toLowerCase() || '';
+                    case 'function': return p.business_function?.toLowerCase() || '';
+                    case 'doi': return p.doi_stage || 0;
+                    case 'status': return p.current_status?.toLowerCase() || '';
+                    case 'platform': return p.platform?.toLowerCase() || '';
+                    default: return '';
+                  }
                 }).map(project => (
                   <tr key={project.id}>
                     <td>
@@ -878,7 +1012,8 @@ function Admin() {
                         )}
                         <div>
                           <div style={{ fontWeight: 600 }}>{project.name}</div>
-                          {project.project_id && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>ID: {project.project_id}</div>}
+                          {project.usecase_identifier && <div style={{ fontSize: '0.8rem', color: 'var(--brand-primary)', fontWeight: 500 }}>{project.usecase_identifier}</div>}
+                          {project.project_id && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {project.project_id}</div>}
                         </div>
                       </div>
                     </td>
@@ -886,35 +1021,55 @@ function Admin() {
                     <td>{project.business_function || '-'}</td>
                     <td><span className={`doi-badge doi-${project.doi_stage || 0}`}>DOI {project.doi_stage || 0}</span></td>
                     <td>
-                      <select
-                        className="inline-select"
-                        value={project.current_status || ''}
-                        onChange={(e) => handleInlineUpdate(project, 'current_status', e.target.value)}
-                      >
-                        <option value="">-</option>
-                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                      {showDeletedProjects ? (
+                        <span>{project.current_status || '-'}</span>
+                      ) : (
+                        <select
+                          className="inline-select"
+                          value={project.current_status || ''}
+                          onChange={(e) => handleInlineUpdate(project, 'current_status', e.target.value)}
+                        >
+                          <option value="">-</option>
+                          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      )}
                     </td>
                     <td>
-                      <select
-                        className="inline-select"
-                        value={project.platform || ''}
-                        onChange={(e) => handleInlineUpdate(project, 'platform', e.target.value)}
-                      >
-                        <option value="">-</option>
-                        {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
+                      {showDeletedProjects ? (
+                        <span>{project.platform || '-'}</span>
+                      ) : (
+                        <select
+                          className="inline-select"
+                          value={project.platform || ''}
+                          onChange={(e) => handleInlineUpdate(project, 'platform', e.target.value)}
+                        >
+                          <option value="">-</option>
+                          {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      )}
                     </td>
                     <td>
                       <div className="action-buttons">
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleEditProject(project)}>Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(project.id, project.name)}>Delete</button>
+                        {showDeletedProjects ? (
+                          <>
+                            <button className="btn btn-success btn-sm" onClick={() => handleRestoreProject(project)}>Restore</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handlePermanentDelete(project)}>Delete Forever</button>
+                          </>
+                        ) : (
+                          <>
+                            <button className="btn btn-secondary btn-sm" onClick={() => handleEditProject(project)}>Edit</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(project.id, project.name)}>Delete</button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))}
-                {projects.length === 0 && (
+                {!showDeletedProjects && projects.length === 0 && (
                   <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No projects. Click "Add Project" to create one.</td></tr>
+                )}
+                {showDeletedProjects && deletedProjects.length === 0 && (
+                  <tr><td colSpan="7" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No deleted projects.</td></tr>
                 )}
                 {projects.length > 0 && projectSearchQuery && projects.filter(p => {
                   const query = projectSearchQuery.toLowerCase();
@@ -1414,6 +1569,22 @@ function Admin() {
                     <input type="text" className="form-control" value={projectForm.name} onChange={e => setProjectForm({...projectForm, name: e.target.value})} required />
                   </div>
                   <div className="form-group">
+                    <label>Use Case Type *</label>
+                    <select
+                      className="form-control"
+                      value={projectForm.usecase_type}
+                      onChange={e => setProjectForm({...projectForm, usecase_type: e.target.value})}
+                      disabled={editingProject && editingProject.usecase_identifier}
+                      required
+                    >
+                      <option value="" disabled>Select...</option>
+                      {USECASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    {editingProject && editingProject.usecase_identifier && (
+                      <small style={{ color: 'var(--text-muted)' }}>ID: {editingProject.usecase_identifier}</small>
+                    )}
+                  </div>
+                  <div className="form-group">
                     <label>Project ID</label>
                     <input type="text" className="form-control" value={projectForm.project_id} onChange={e => setProjectForm({...projectForm, project_id: e.target.value})} />
                   </div>
@@ -1426,8 +1597,31 @@ function Admin() {
                     <input type="text" className="form-control" value={projectForm.business_function} onChange={e => setProjectForm({...projectForm, business_function: e.target.value})} placeholder="e.g. HR, Engineering, Finance" />
                   </div>
                   <div className="form-group">
-                    <label>Requester Name</label>
-                    <input type="text" className="form-control" value={projectForm.requester_name} onChange={e => setProjectForm({...projectForm, requester_name: e.target.value})} />
+                    <label>Requester Name(s)</label>
+                    <div className="tag-input-container">
+                      {getRequesters().map((name, idx) => (
+                        <span key={idx} className="tag-item">
+                          {name}
+                          <button type="button" className="tag-remove" onClick={() => removeRequester(name)}>&times;</button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        className="tag-input"
+                        value={requesterInput}
+                        onChange={e => setRequesterInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ',') {
+                            e.preventDefault();
+                            addRequester(requesterInput);
+                          } else if (e.key === 'Backspace' && !requesterInput && getRequesters().length > 0) {
+                            removeRequester(getRequesters()[getRequesters().length - 1]);
+                          }
+                        }}
+                        onBlur={() => addRequester(requesterInput)}
+                        placeholder={getRequesters().length === 0 ? "Type name and press Enter" : "Add another..."}
+                      />
+                    </div>
                   </div>
                   <div className="form-group">
                     <label>AI SPOC</label>
@@ -1441,7 +1635,17 @@ function Admin() {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>DOI Stage</label>
+                    <label>
+                      DOI Stage
+                      {editingProject && (() => {
+                        const currentStageHistory = projectDoiHistory.find(h => h.to_stage === projectForm.doi_stage);
+                        if (currentStageHistory?.changed_at) {
+                          const date = new Date(currentStageHistory.changed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                          return <span className="doi-stage-date">Set on {date}</span>;
+                        }
+                        return null;
+                      })()}
+                    </label>
                     {editingProject ? (
                       <select className="form-control" value={projectForm.doi_stage} onChange={e => setProjectForm({...projectForm, doi_stage: parseInt(e.target.value), doi_changed_at: ''})}>
                         {doiStages.map(d => <option key={d.id} value={d.id}>DOI {d.id} - {d.label}</option>)}
@@ -1624,18 +1828,163 @@ function Admin() {
       {/* Alert Dialog */}
       {alertDialog.show && (
         <div className="confirm-overlay" onClick={() => setAlertDialog({ ...alertDialog, show: false })}>
-          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-            <div className={`confirm-icon ${alertDialog.type === 'error' ? 'error' : ''}`}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
+          <div className="alert-dialog" onClick={e => e.stopPropagation()}>
+            <div className={`alert-header ${alertDialog.type}`}>
+              <div className={`alert-icon-wrapper ${alertDialog.type}`}>
+                {alertDialog.type === 'error' ? (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="15" y1="9" x2="9" y2="15"/>
+                    <line x1="9" y1="9" x2="15" y2="15"/>
+                  </svg>
+                ) : alertDialog.type === 'warning' ? (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                ) : alertDialog.type === 'success' ? (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                ) : (
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                )}
+              </div>
+              <div className="alert-header-text">
+                <h3 className="alert-title">{alertDialog.title}</h3>
+                <p className="alert-subtitle">
+                  {alertDialog.type === 'error' ? 'Action could not be completed' :
+                   alertDialog.type === 'warning' ? 'Please review before continuing' :
+                   alertDialog.type === 'success' ? 'Operation successful' : 'Information'}
+                </p>
+              </div>
             </div>
-            <h3 className="confirm-title">{alertDialog.title}</h3>
-            <p className="confirm-message">{alertDialog.message}</p>
-            <div className="confirm-actions">
-              <button className="btn btn-primary" onClick={() => setAlertDialog({ ...alertDialog, show: false })}>OK</button>
+            <div className="alert-body">
+              <p className="alert-message">{alertDialog.message}</p>
+            </div>
+            <div className="alert-footer">
+              <button className="alert-btn alert-btn-primary" onClick={() => setAlertDialog({ ...alertDialog, show: false })}>
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Preview Modal */}
+      {showProjectPreview && (
+        <div className="modal-overlay" onClick={() => setShowProjectPreview(false)}>
+          <div className="modal modal-preview" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Review Project Details</h2>
+              <button className="modal-close" onClick={() => setShowProjectPreview(false)}>&times;</button>
+            </div>
+            <div className="preview-content">
+              <div className="preview-section">
+                <h4>Basic Information</h4>
+                <div className="preview-grid">
+                  <div className="preview-item">
+                    <span className="preview-label">Project Name</span>
+                    <span className="preview-value">{projectForm.name || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Use Case Type</span>
+                    <span className="preview-value">{projectForm.usecase_type || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Project ID</span>
+                    <span className="preview-value">{projectForm.project_id || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">DOI Stage</span>
+                    <span className="preview-value">DOI 0 - {doiStages.find(d => d.id === 0)?.label || 'Ideation'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="preview-section">
+                <h4>Organization</h4>
+                <div className="preview-grid">
+                  <div className="preview-item">
+                    <span className="preview-label">Business Division</span>
+                    <span className="preview-value">{projectForm.business_division || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Business Function</span>
+                    <span className="preview-value">{projectForm.business_function || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Requester(s)</span>
+                    <span className="preview-value">
+                      {getRequesters().length > 0 ? (
+                        <span className="preview-tags">
+                          {getRequesters().map((r, i) => <span key={i} className="preview-tag">{r}</span>)}
+                        </span>
+                      ) : '-'}
+                    </span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">AI SPOC</span>
+                    <span className="preview-value">{projectForm.ai_spoc || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="preview-section">
+                <h4>Project Details</h4>
+                <div className="preview-grid">
+                  <div className="preview-item">
+                    <span className="preview-label">Priority</span>
+                    <span className="preview-value">{projectForm.priority || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Status</span>
+                    <span className="preview-value">{projectForm.current_status || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Platform</span>
+                    <span className="preview-value">{projectForm.platform || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Demand Type</span>
+                    <span className="preview-value">{projectForm.demand_type || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Estimated Costs</span>
+                    <span className="preview-value">{projectForm.estimated_costs || '-'}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="preview-label">Timeline</span>
+                    <span className="preview-value">{projectForm.start_date || 'TBD'} → {projectForm.end_date || 'TBD'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {projectForm.description && (
+                <div className="preview-section">
+                  <h4>Description</h4>
+                  <p className="preview-text">{projectForm.description}</p>
+                </div>
+              )}
+
+              {projectForm.ai_skills && (
+                <div className="preview-section">
+                  <h4>AI Skills</h4>
+                  <p className="preview-text">{projectForm.ai_skills}</p>
+                </div>
+              )}
+            </div>
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => setShowProjectPreview(false)}>Go Back & Edit</button>
+              <button className="btn btn-primary" onClick={confirmCreateProject} disabled={saving}>
+                {saving ? 'Creating...' : 'Confirm & Create'}
+              </button>
             </div>
           </div>
         </div>

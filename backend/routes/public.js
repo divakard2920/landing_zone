@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.get('/apps', async (req, res) => {
   try {
-    const apps = await queryAll('SELECT * FROM apps ORDER BY name');
+    const apps = await queryAll('SELECT * FROM apps WHERE deleted_at IS NULL ORDER BY usecase_identifier ASC NULLS LAST, created_at DESC');
 
     const appsWithTeam = await Promise.all(apps.map(async (app) => {
       const team = await queryAll('SELECT * FROM team_members WHERE app_id = $1 ORDER BY created_at ASC', [app.id]);
