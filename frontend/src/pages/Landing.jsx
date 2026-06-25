@@ -7,22 +7,42 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import WidgetRenderer from '../components/WidgetRenderer';
 
-const DefaultAppIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
-    <path d="M12 12v10"/>
-    <path d="M8 22h8"/>
-    <path d="M7 12h10"/>
-    <circle cx="12" cy="6" r="1"/>
+const AIUsecaseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+    <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+    <path d="M15 13a4.5 4.5 0 0 1-3 4 4.5 4.5 0 0 1-3-4"/>
+    <path d="M12 18v4"/>
+    <path d="M8 18h8"/>
   </svg>
 );
 
-const AppIcon = ({ icon }) => {
-  if (!icon) return <DefaultAppIcon />;
-  if (icon.startsWith('/uploads')) {
+const FoundationIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="14" width="7" height="7" rx="1"/>
+    <rect x="14" y="14" width="7" height="7" rx="1"/>
+    <rect x="8.5" y="3" width="7" height="7" rx="1"/>
+    <path d="M12 10v4"/>
+    <path d="M6.5 14v-2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2"/>
+  </svg>
+);
+
+const DefaultAppIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <path d="M12 8v8"/>
+    <path d="M8 12h8"/>
+  </svg>
+);
+
+const AppIcon = ({ icon, usecaseType }) => {
+  if (icon && icon.startsWith('/uploads')) {
     return <img src={icon} alt="app icon" className="app-icon-img" />;
   }
-  return icon;
+  if (icon) return icon;
+  if (usecaseType === 'AI Usecase') return <AIUsecaseIcon />;
+  if (usecaseType === 'Foundation') return <FoundationIcon />;
+  return <DefaultAppIcon />;
 };
 
 function Landing() {
@@ -109,6 +129,38 @@ function Landing() {
       : [...visibleColumns, key];
     setVisibleColumns(updated);
     localStorage.setItem('tableColumns', JSON.stringify(updated));
+  };
+
+  const [columnWidths, setColumnWidths] = useState(() => {
+    const saved = localStorage.getItem('tableColumnWidths');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const handleColumnResize = (key, width) => {
+    const updated = { ...columnWidths, [key]: width };
+    setColumnWidths(updated);
+    localStorage.setItem('tableColumnWidths', JSON.stringify(updated));
+  };
+
+  const startResize = (e, key) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const th = e.target.closest('th');
+    const startWidth = th.offsetWidth;
+
+    const onMouseMove = (moveEvent) => {
+      const newWidth = Math.max(80, startWidth + (moveEvent.clientX - startX));
+      handleColumnResize(key, newWidth);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   };
 
   const [showSupportModal, setShowSupportModal] = useState(false);
@@ -657,82 +709,6 @@ function Landing() {
               )}
             </div>
 
-            {/* Filter Panel */}
-            {showFilters && (
-              <div className="filter-panel">
-                <div className="filter-row">
-                  <select
-                    value={filters.doi_stage}
-                    onChange={(e) => setFilters({...filters, doi_stage: e.target.value})}
-                    className="filter-select"
-                  >
-                    <option value="">All DOI Stages</option>
-                    {doiStages.map(stage => (
-                      <option key={stage.id} value={stage.id}>DOI {stage.id} - {stage.label}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={filters.priority}
-                    onChange={(e) => setFilters({...filters, priority: e.target.value})}
-                    className="filter-select"
-                  >
-                    <option value="">All Priorities</option>
-                    {filterOptions.priorities.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={filters.status}
-                    onChange={(e) => setFilters({...filters, status: e.target.value})}
-                    className="filter-select"
-                  >
-                    <option value="">All Statuses</option>
-                    {filterOptions.statuses.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={filters.platform}
-                    onChange={(e) => setFilters({...filters, platform: e.target.value})}
-                    className="filter-select"
-                  >
-                    <option value="">All Platforms</option>
-                    {filterOptions.platforms.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={filters.division}
-                    onChange={(e) => setFilters({...filters, division: e.target.value})}
-                    className="filter-select"
-                  >
-                    <option value="">All Divisions</option>
-                    {filterOptions.divisions.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={filters.usecase_type}
-                    onChange={(e) => setFilters({...filters, usecase_type: e.target.value})}
-                    className="filter-select"
-                  >
-                    <option value="">All Use Case Types</option>
-                    {USECASE_TYPES.map(t => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-
-                  {activeFiltersCount > 0 && (
-                    <button className="clear-filters" onClick={clearFilters}>× Clear</button>
-                  )}
-                </div>
-              </div>
-            )}
             </div>
 
             <div className="quick-stats right">
@@ -746,6 +722,83 @@ function Landing() {
               </div>
             </div>
           </div>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="filter-panel">
+              <div className="filter-row">
+                <select
+                  value={filters.doi_stage}
+                  onChange={(e) => setFilters({...filters, doi_stage: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All DOI Stages</option>
+                  {doiStages.map(stage => (
+                    <option key={stage.id} value={stage.id}>DOI {stage.id} - {stage.label}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.priority}
+                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All Priorities</option>
+                  {filterOptions.priorities.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.status}
+                  onChange={(e) => setFilters({...filters, status: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All Statuses</option>
+                  {filterOptions.statuses.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.platform}
+                  onChange={(e) => setFilters({...filters, platform: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All Platforms</option>
+                  {filterOptions.platforms.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.division}
+                  onChange={(e) => setFilters({...filters, division: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All Divisions</option>
+                  {filterOptions.divisions.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.usecase_type}
+                  onChange={(e) => setFilters({...filters, usecase_type: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All Use Case Types</option>
+                  {USECASE_TYPES.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+
+                {activeFiltersCount > 0 && (
+                  <button className="clear-filters" onClick={clearFilters}>× Clear</button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Content Display */}
           {activeTab === 'analytics' ? (
@@ -793,7 +846,7 @@ function Landing() {
                       <span className="card-serial-no">{index + 1}</span>
                       <div className="project-card-header">
                         <div className="project-card-icon">
-                          <AppIcon icon={app.icon} />
+                          <AppIcon icon={app.icon} usecaseType={app.usecase_type} />
                         </div>
                         <div className="project-card-header-right">
                           {(app.start_date || app.end_date) && (
@@ -885,26 +938,32 @@ function Landing() {
                         <tr>
                           <th className="sno-column">#</th>
                           {allColumns.filter(col => visibleColumns.includes(col.key)).map(col => (
-                            <th key={col.key} className="sortable-th" onClick={() => handleSort(col.key)}>
+                            <th
+                              key={col.key}
+                              className="sortable-th resizable-th"
+                              onClick={() => handleSort(col.key)}
+                              style={columnWidths[col.key] ? { width: columnWidths[col.key] + 'px' } : {}}
+                            >
                               <span className="th-content">
                                 {col.label}
                                 <span className={`sort-icon ${sortConfig.key === col.key ? 'active' : ''}`}>
                                   {sortConfig.key === col.key ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}
                                 </span>
                               </span>
+                              <span className="resize-handle" onMouseDown={(e) => startResize(e, col.key)} onClick={(e) => e.stopPropagation()}></span>
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
                         {filteredApps.map((app, index) => (
-                          <tr key={app.id} onClick={() => setSelectedApp(app)} className="projects-table-row">
+                          <tr key={app.id} onClick={() => setSelectedApp(app)} className="projects-table-row" style={{ '--doi-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0] }}>
                             <td className="sno-column">{index + 1}</td>
                             {visibleColumns.includes('project') && (
                               <td>
                                 <div className="table-project-cell">
                                   <div className="table-project-icon">
-                                    <AppIcon icon={app.icon} />
+                                    <AppIcon icon={app.icon} usecaseType={app.usecase_type} />
                                   </div>
                                   <div className="table-project-info">
                                     <span className="table-project-name">{app.name}</span>
@@ -1010,7 +1069,7 @@ function Landing() {
             <div className="slider-header">
               <div className="slider-header-left">
                 <div className="detail-icon">
-                  <AppIcon icon={selectedApp.icon} />
+                  <AppIcon icon={selectedApp.icon} usecaseType={selectedApp.usecase_type} />
                 </div>
                 <div className="slider-title-block">
                   <h2>{selectedApp.name}</h2>

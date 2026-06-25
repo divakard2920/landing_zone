@@ -4,6 +4,44 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Tooltip } from 'react-tooltip';
 
+const AIUsecaseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+    <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+    <path d="M15 13a4.5 4.5 0 0 1-3 4 4.5 4.5 0 0 1-3-4"/>
+    <path d="M12 18v4"/>
+    <path d="M8 18h8"/>
+  </svg>
+);
+
+const FoundationIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="14" width="7" height="7" rx="1"/>
+    <rect x="14" y="14" width="7" height="7" rx="1"/>
+    <rect x="8.5" y="3" width="7" height="7" rx="1"/>
+    <path d="M12 10v4"/>
+    <path d="M6.5 14v-2a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2"/>
+  </svg>
+);
+
+const DefaultAppIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <path d="M12 8v8"/>
+    <path d="M8 12h8"/>
+  </svg>
+);
+
+const AppIcon = ({ icon, usecaseType }) => {
+  if (icon && icon.startsWith('/uploads')) {
+    return <img src={icon} alt="app icon" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />;
+  }
+  if (icon) return <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{icon}</span>;
+  if (usecaseType === 'AI Usecase') return <AIUsecaseIcon />;
+  if (usecaseType === 'Foundation') return <FoundationIcon />;
+  return <DefaultAppIcon />;
+};
+
 const STATUS_OPTIONS = [
   'Active', 'On Hold', 'Completed', 'Cancelled', 'In Review',
   'Ongoing Project', 'POC active', 'POC completed', 'Use case defined',
@@ -1005,14 +1043,12 @@ function Admin() {
                   <tr key={project.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {project.icon && (
-                          project.icon.startsWith('/uploads')
-                            ? <img src={project.icon} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />
-                            : <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{project.icon}</span>
-                        )}
+                        <div className="admin-project-icon">
+                          <AppIcon icon={project.icon} usecaseType={project.usecase_type} />
+                        </div>
                         <div>
+                          {project.usecase_identifier && <div style={{ fontSize: '0.75rem', color: '#5f6f65', background: '#e8ede9', padding: '2px 8px', borderRadius: '4px', display: 'inline-block', fontWeight: 500, marginBottom: '2px' }}>{project.usecase_identifier}</div>}
                           <div style={{ fontWeight: 600 }}>{project.name}</div>
-                          {project.usecase_identifier && <div style={{ fontSize: '0.8rem', color: 'var(--brand-primary)', fontWeight: 500 }}>{project.usecase_identifier}</div>}
                           {project.project_id && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {project.project_id}</div>}
                         </div>
                       </div>
@@ -1093,115 +1129,183 @@ function Admin() {
 
         {/* Teams */}
         {activeTab === 'teams' && (
-          <div style={{ display: 'flex', gap: '24px' }}>
-            <div className="admin-table-container" style={{ width: '280px', flexShrink: 0 }}>
-              <div style={{ padding: '16px', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>Select Project</div>
-              <div style={{ padding: '8px' }}>
+          <div className="teams-layout">
+            {/* Left Sidebar - Project List */}
+            <div className="teams-sidebar">
+              <div className="teams-sidebar-header">
+                <h3>Projects</h3>
+                <p>{projects.length} total projects</p>
+              </div>
+              <div className="teams-sidebar-search">
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  onChange={(e) => {
+                    const search = e.target.value.toLowerCase();
+                    if (!search) return;
+                  }}
+                />
+              </div>
+              <div className="teams-sidebar-list">
                 {projects.map(project => (
                   <div
                     key={project.id}
                     onClick={() => handleSelectProjectForTeam(project)}
                     className={`team-project-item ${selectedProjectForTeam?.id === project.id ? 'selected' : ''}`}
                   >
-                    {project.icon?.startsWith('/uploads')
-                      ? <img src={project.icon} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'cover' }} />
-                      : <span style={{ fontSize: '0.7rem', fontWeight: 600 }}>{project.icon || 'AI'}</span>
-                    }
-                    <span>{project.name}</span>
+                    <span className="team-project-icon"><AppIcon icon={project.icon} usecaseType={project.usecase_type} /></span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div className="project-name">{project.name}</div>
+                      <div className="project-meta">{project.team?.length || 0} members</div>
+                    </div>
                   </div>
                 ))}
-                {projects.length === 0 && <div style={{ padding: '16px', color: 'var(--text-muted)', textAlign: 'center' }}>No projects</div>}
+                {projects.length === 0 && (
+                  <div style={{ padding: '24px', color: 'var(--text-muted)', textAlign: 'center' }}>No projects available</div>
+                )}
               </div>
             </div>
 
-            <div style={{ flex: 1 }}>
+            {/* Right Main Content */}
+            <div className="teams-main">
               {selectedProjectForTeam ? (
                 <>
-                  <div className="admin-table-container" style={{ marginBottom: '24px' }}>
-                    <div style={{ padding: '16px', fontWeight: 600, borderBottom: '1px solid var(--border-light)' }}>
-                      Team Members - {selectedProjectForTeam.name}
+                  {/* Project Header */}
+                  <div className="teams-project-header">
+                    <div className="teams-project-header-icon">
+                      <AppIcon icon={selectedProjectForTeam.icon} usecaseType={selectedProjectForTeam.usecase_type} />
                     </div>
-                    <table className="admin-table">
-                      <thead>
-                        <tr><th>Name</th><th>Role</th><th>Email</th><th>Actions</th></tr>
-                      </thead>
-                      <tbody>
-                        {teamMembers.map(m => (
-                          <tr key={m.id}>
-                            <td style={{ fontWeight: 600 }}>{m.name}</td>
-                            <td>{m.role || '-'}</td>
-                            <td>{m.email || '-'}</td>
-                            <td>
-                              <div className="action-buttons">
-                                <button className="btn btn-sm" onClick={() => handleEditTeamMember(m)}>Edit</button>
-                                <button className="btn btn-danger btn-sm" onClick={() => handleDeleteTeamMember(m.id)}>Remove</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {teamMembers.length === 0 && <tr><td colSpan="4" style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No team members</td></tr>}
-                      </tbody>
-                    </table>
+                    <div className="teams-project-header-info">
+                      <h2>{selectedProjectForTeam.name}</h2>
+                      <p>{selectedProjectForTeam.usecase_identifier || 'No identifier'}</p>
+                    </div>
+                    <div className="teams-project-stats">
+                      <div className="teams-stat">
+                        <div className="teams-stat-value">{teamMembers.length}</div>
+                        <div className="teams-stat-label">Members</div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="admin-table-container" style={{ padding: '24px', maxWidth: '400px' }}>
-                    <h3 style={{ marginBottom: '16px' }}>{editingTeamMember ? 'Edit Team Member' : 'Add Team Member'}</h3>
-                    <form onSubmit={handleAddTeamMember}>
-                      <div className="form-group">
-                        <label>Name *</label>
-                        <div className="searchable-select">
+                  {/* Two Column Layout: Add Form + Members List */}
+                  <div className="teams-content-row">
+                    {/* Add/Edit Member Form */}
+                    <div className="teams-add-member">
+                      <div className="teams-add-member-header">
+                        <h3>{editingTeamMember ? 'Edit Member' : 'Add Member'}</h3>
+                      </div>
+                      <form className="teams-add-member-form" onSubmit={handleAddTeamMember}>
+                        <div className="teams-form-group">
+                          <label>Name *</label>
+                          <div className="searchable-select">
+                            <input
+                              type="text"
+                              placeholder="Search or type name..."
+                              value={teamSearchQuery}
+                              onChange={(e) => {
+                                setTeamSearchQuery(e.target.value);
+                                setTeamForm({...teamForm, name: e.target.value});
+                                setShowTeamDropdown(true);
+                              }}
+                              onFocus={() => setShowTeamDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowTeamDropdown(false), 150)}
+                              required
+                            />
+                            {showTeamDropdown && allTeamMembers.length > 0 && (
+                              <div className="searchable-dropdown">
+                                {allTeamMembers
+                                  .filter(m => m.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
+                                  .map((m, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="searchable-option"
+                                      onClick={() => handleSelectExistingMember(m)}
+                                    >
+                                      <div style={{ fontWeight: 500 }}>{m.name}</div>
+                                      {m.role && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{m.role}</div>}
+                                    </div>
+                                  ))
+                                }
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="teams-form-group">
+                          <label>Role</label>
                           <input
                             type="text"
-                            className="form-control"
-                            placeholder="Search or type new name..."
-                            value={teamSearchQuery}
-                            onChange={(e) => {
-                              setTeamSearchQuery(e.target.value);
-                              setTeamForm({...teamForm, name: e.target.value});
-                              setShowTeamDropdown(true);
-                            }}
-                            onFocus={() => setShowTeamDropdown(true)}
-                            onBlur={() => setTimeout(() => setShowTeamDropdown(false), 150)}
-                            required
+                            value={teamForm.role}
+                            onChange={e => setTeamForm({...teamForm, role: e.target.value})}
+                            placeholder="e.g. Developer"
                           />
-                          {showTeamDropdown && allTeamMembers.length > 0 && (
-                            <div className="searchable-dropdown">
-                              {allTeamMembers
-                                .filter(m => m.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
-                                .map((m, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="searchable-option"
-                                    onClick={() => handleSelectExistingMember(m)}
-                                  >
-                                    <div style={{ fontWeight: 500 }}>{m.name}</div>
-                                    {m.role && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{m.role}</div>}
-                                  </div>
-                                ))
-                              }
-                            </div>
+                        </div>
+                        <div className="teams-form-group">
+                          <label>Email</label>
+                          <input
+                            type="email"
+                            value={teamForm.email}
+                            onChange={e => setTeamForm({...teamForm, email: e.target.value})}
+                            placeholder="email@company.com"
+                          />
+                        </div>
+                        <div className="teams-form-actions">
+                          <button type="submit" className="btn-primary" disabled={saving}>
+                            {saving ? 'Saving...' : (editingTeamMember ? 'Update' : 'Add')}
+                          </button>
+                          {editingTeamMember && (
+                            <button type="button" className="btn-secondary" onClick={handleCancelEditTeamMember} disabled={saving}>
+                              Cancel
+                            </button>
                           )}
                         </div>
+                      </form>
+                    </div>
+
+                    {/* Team Members List */}
+                    <div className="teams-members-section">
+                      <div className="teams-members-header">
+                        <h3>Team Members</h3>
                       </div>
-                      <div className="form-group">
-                        <label>Role</label>
-                        <input type="text" className="form-control" value={teamForm.role} onChange={e => setTeamForm({...teamForm, role: e.target.value})} placeholder="e.g. Developer, AI SPOC" />
-                      </div>
-                      <div className="form-group">
-                        <label>Email</label>
-                        <input type="email" className="form-control" value={teamForm.email} onChange={e => setTeamForm({...teamForm, email: e.target.value})} />
-                      </div>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button type="submit" className="btn btn-primary" disabled={saving}>
-                          {saving ? 'Saving...' : (editingTeamMember ? 'Update' : 'Add Member')}
-                        </button>
-                        {editingTeamMember && <button type="button" className="btn btn-outline" onClick={handleCancelEditTeamMember} disabled={saving}>Cancel</button>}
-                      </div>
-                    </form>
+                      {teamMembers.length > 0 ? (
+                        <div className="teams-members-list">
+                          {teamMembers.map(m => (
+                            <div key={m.id} className="team-member-row">
+                              <div className="team-member-avatar">
+                                {m.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                              </div>
+                              <div className="team-member-info">
+                                <h4>{m.name}</h4>
+                                <span className="role">{m.role || '-'}</span>
+                              </div>
+                              <div className="team-member-email-inline">{m.email || '-'}</div>
+                              <div className="team-member-actions">
+                                <button className="edit" onClick={() => handleEditTeamMember(m)}>Edit</button>
+                                <button className="remove" onClick={() => handleDeleteTeamMember(m.id)}>Remove</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="teams-empty-members">
+                          <p>No team members yet</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               ) : (
-                <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>Select a project to manage its team</div>
+                <div className="teams-empty-state">
+                  <div className="teams-empty-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </div>
+                  <h3>Select a Project</h3>
+                  <p>Choose a project from the sidebar to manage its team</p>
+                </div>
               )}
             </div>
           </div>
