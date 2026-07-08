@@ -1106,9 +1106,10 @@ router.put('/use-case-intake/:id', async (req, res) => {
     else if (totalScore <= 42) tshirtSize = 'L';
     else tshirtSize = 'XL';
 
-    // Get current use case to check status change and get app_id
-    const currentUseCase = await queryOne('SELECT status, app_id FROM use_case_intake WHERE id = $1', [id]);
+    // Get current use case to check status change, priority cluster change, and get app_id
+    const currentUseCase = await queryOne('SELECT status, priority_cluster, app_id FROM use_case_intake WHERE id = $1', [id]);
     const oldStatus = currentUseCase?.status;
+    const oldPriorityCluster = currentUseCase?.priority_cluster;
     const appId = currentUseCase?.app_id;
 
     await query(
@@ -1149,6 +1150,24 @@ router.put('/use-case-intake/:id', async (req, res) => {
       await query(
         'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
         [uuidv4(), appId, 0, 1, status === 'In Progress' ? 'Started DOI1' : 'Use case approved']
+      );
+    }
+
+    // If status changed to Parked, Declined, or Rework Required, soft-delete the linked project
+    if (appId && (status === 'Parked' || status === 'Declined' || status === 'Rework Required') && oldStatus !== status) {
+      await query(
+        `UPDATE apps SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`,
+        [appId]
+      );
+    }
+
+    // If priority cluster changed from project-creating to non-project cluster, soft-delete the linked project
+    const projectCreatingClusters = ['High Priority / Quick Win', 'Medium Priority'];
+    const nonProjectClusters = ['Low Priority', 'Rework'];
+    if (appId && projectCreatingClusters.includes(oldPriorityCluster) && nonProjectClusters.includes(priorityCluster)) {
+      await query(
+        `UPDATE apps SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`,
+        [appId]
       );
     }
 
