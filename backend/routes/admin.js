@@ -1139,18 +1139,75 @@ router.put('/use-case-intake/:id', async (req, res) => {
       ]
     );
 
-    // If status changed to Approved or In Progress, move the linked project to DOI 1
-    if (appId && (status === 'Approved' || status === 'In Progress') && oldStatus !== status) {
-      // Update project to DOI 1
-      await query(
-        `UPDATE apps SET doi_stage = 1, current_status = 'Idea Generated', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [appId]
-      );
-      // Record DOI 1 in history
-      await query(
-        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-        [uuidv4(), appId, 0, 1, status === 'In Progress' ? 'Started DOI1' : 'Use case approved']
-      );
+    // If status changed to Approved or In Progress
+    if ((status === 'Approved' || status === 'In Progress') && oldStatus !== status) {
+      if (appId) {
+        // Restore if soft-deleted, then move to DOI 1
+        await query(
+          `UPDATE apps SET deleted_at = NULL, doi_stage = 1, current_status = 'Idea Generated', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [appId]
+        );
+        // Record DOI 1 in history
+        await query(
+          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
+          [uuidv4(), appId, 0, 1, status === 'In Progress' ? 'Started DOI1' : 'Use case approved']
+        );
+      } else {
+        // No project exists - create one at DOI 1
+        const newAppId = uuidv4();
+        const effectiveStartDate = submission_date || new Date().toISOString().split('T')[0];
+
+        // Generate usecase_identifier
+        let newUsecaseIdentifier = null;
+        if (usecase_type) {
+          const prefixMap = { 'AI Usecase': 'AI', 'Foundation': 'F' };
+          const prefix = prefixMap[usecase_type];
+          if (prefix) {
+            const lastFromApps = await queryOne(
+              `SELECT usecase_identifier FROM apps WHERE usecase_type = $1 AND usecase_identifier IS NOT NULL ORDER BY usecase_identifier DESC LIMIT 1`,
+              [usecase_type]
+            );
+            const lastFromRegistry = await queryOne(
+              `SELECT usecase_identifier FROM usecase_identifier_registry WHERE usecase_type = $1 ORDER BY usecase_identifier DESC LIMIT 1`,
+              [usecase_type]
+            );
+            const extractNumber = (identifier) => {
+              if (!identifier) return 0;
+              const match = identifier.match(/_(\d+)$/);
+              return match ? parseInt(match[1]) : 0;
+            };
+            const nextNumber = Math.max(extractNumber(lastFromApps?.usecase_identifier), extractNumber(lastFromRegistry?.usecase_identifier)) + 1;
+            newUsecaseIdentifier = `${prefix}_${String(nextNumber).padStart(3, '0')}`;
+
+            await query(
+              `INSERT INTO usecase_identifier_registry (id, project_name, usecase_type, usecase_identifier) VALUES ($1, $2, $3, $4)`,
+              [uuidv4(), idea_name, usecase_type, newUsecaseIdentifier]
+            );
+          }
+        }
+
+        // Create the project at DOI 1 (approved means skip DOI 0)
+        await query(`
+          INSERT INTO apps (
+            id, name, description, business_division, business_function, requester_name, ai_spoc,
+            priority, doi_stage, current_status, start_date, risks, usecase_type, usecase_identifier
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        `, [
+          newAppId, idea_name, description_target || motivation || null, division || null,
+          line_of_business || null, idea_owner || null, product_owner || null,
+          priorityCluster === 'High Priority / Quick Win' ? 'High' : 'Medium',
+          1, 'Idea Generated', effectiveStartDate, dependencies_risks || null, usecase_type || null, newUsecaseIdentifier
+        ]);
+
+        // Record DOI 1 in history (starting directly at DOI 1 since approved)
+        await query(
+          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+          [uuidv4(), newAppId, null, 1, effectiveStartDate, 'Project created from approved use case']
+        );
+
+        // Link the project to the use case
+        await query('UPDATE use_case_intake SET app_id = $1 WHERE id = $2', [newAppId, id]);
+      }
     }
 
     // If status changed to Parked, Declined, or Rework Required, soft-delete the linked project
@@ -1169,6 +1226,73 @@ router.put('/use-case-intake/:id', async (req, res) => {
         `UPDATE apps SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1 AND deleted_at IS NULL`,
         [appId]
       );
+    }
+
+    // If priority cluster changed from non-project (or null) to project-creating cluster, create or restore the project
+    const wasNonProjectCluster = oldPriorityCluster === null || nonProjectClusters.includes(oldPriorityCluster);
+    if (wasNonProjectCluster && projectCreatingClusters.includes(priorityCluster) && oldPriorityCluster !== priorityCluster) {
+      if (appId) {
+        // Restore the soft-deleted project
+        await query(
+          `UPDATE apps SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [appId]
+        );
+      } else {
+        // Create a new project
+        const newAppId = uuidv4();
+        const effectiveStartDate = submission_date || new Date().toISOString().split('T')[0];
+
+        // Generate usecase_identifier
+        let usecase_identifier = null;
+        if (usecase_type) {
+          const prefixMap = { 'AI Usecase': 'AI', 'Foundation': 'F' };
+          const prefix = prefixMap[usecase_type];
+          if (prefix) {
+            const lastFromApps = await queryOne(
+              `SELECT usecase_identifier FROM apps WHERE usecase_type = $1 AND usecase_identifier IS NOT NULL ORDER BY usecase_identifier DESC LIMIT 1`,
+              [usecase_type]
+            );
+            const lastFromRegistry = await queryOne(
+              `SELECT usecase_identifier FROM usecase_identifier_registry WHERE usecase_type = $1 ORDER BY usecase_identifier DESC LIMIT 1`,
+              [usecase_type]
+            );
+            const extractNumber = (identifier) => {
+              if (!identifier) return 0;
+              const match = identifier.match(/_(\d+)$/);
+              return match ? parseInt(match[1]) : 0;
+            };
+            const nextNumber = Math.max(extractNumber(lastFromApps?.usecase_identifier), extractNumber(lastFromRegistry?.usecase_identifier)) + 1;
+            usecase_identifier = `${prefix}_${String(nextNumber).padStart(3, '0')}`;
+
+            await query(
+              `INSERT INTO usecase_identifier_registry (id, project_name, usecase_type, usecase_identifier) VALUES ($1, $2, $3, $4)`,
+              [uuidv4(), idea_name, usecase_type, usecase_identifier]
+            );
+          }
+        }
+
+        // Create the project at DOI 0
+        await query(`
+          INSERT INTO apps (
+            id, name, description, business_division, business_function, requester_name, ai_spoc,
+            priority, doi_stage, current_status, start_date, risks, usecase_type, usecase_identifier
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        `, [
+          newAppId, idea_name, description_target || motivation || null, division || null,
+          line_of_business || null, idea_owner || null, product_owner || null,
+          priorityCluster === 'High Priority / Quick Win' ? 'High' : 'Medium',
+          0, 'Use case defined', effectiveStartDate, dependencies_risks || null, usecase_type || null, usecase_identifier
+        ]);
+
+        // Record DOI 0 in history
+        await query(
+          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+          [uuidv4(), newAppId, null, 0, effectiveStartDate, 'Project created from use case update']
+        );
+
+        // Link the project to the use case
+        await query('UPDATE use_case_intake SET app_id = $1 WHERE id = $2', [newAppId, id]);
+      }
     }
 
     res.json({
