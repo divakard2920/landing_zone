@@ -575,8 +575,10 @@ function Admin() {
     try {
       const res = await api.admin.getTeam(appId);
       setTeamMembers(res.data);
+      return res.data;
     } catch (error) {
       console.error('Failed to load team members', error);
+      return [];
     }
   };
 
@@ -610,8 +612,14 @@ function Admin() {
       }
       setTeamForm({ name: '', role: '', email: '' });
       setTeamSearchQuery('');
-      loadTeamMembers(selectedProjectForTeam.id);
+      const updatedMembers = await loadTeamMembers(selectedProjectForTeam.id);
       loadAllTeamMembers();
+      // Update the project's team count in the sidebar
+      setProjects(prev => prev.map(p =>
+        p.id === selectedProjectForTeam.id
+          ? { ...p, team: updatedMembers || [] }
+          : p
+      ));
     } catch (error) {
       if (error.response?.data?.error) {
         showToast(error.response.data.error, 'error');
@@ -646,7 +654,13 @@ function Admin() {
     showConfirm('Remove Team Member', 'Are you sure you want to remove this team member from the project?', async () => {
       await api.admin.deleteTeamMember(id);
       showToast('Team member removed', 'success');
-      loadTeamMembers(selectedProjectForTeam.id);
+      const updatedMembers = await loadTeamMembers(selectedProjectForTeam.id);
+      // Update the project's team count in the sidebar
+      setProjects(prev => prev.map(p =>
+        p.id === selectedProjectForTeam.id
+          ? { ...p, team: updatedMembers || [] }
+          : p
+      ));
     });
   };
 

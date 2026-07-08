@@ -42,7 +42,13 @@ router.post('/upload-icon', upload.single('icon'), (req, res) => {
 router.get('/apps', async (req, res) => {
   try {
     const apps = await queryAll('SELECT * FROM apps WHERE deleted_at IS NULL ORDER BY usecase_identifier ASC NULLS LAST, created_at DESC');
-    res.json(apps);
+
+    const appsWithTeam = await Promise.all(apps.map(async (app) => {
+      const team = await queryAll('SELECT * FROM team_members WHERE app_id = $1 ORDER BY created_at ASC', [app.id]);
+      return { ...app, team };
+    }));
+
+    res.json(appsWithTeam);
   } catch (error) {
     console.error('Error fetching apps:', error);
     res.status(500).json({ error: 'Failed to fetch apps' });
