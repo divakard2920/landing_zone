@@ -1943,7 +1943,7 @@ function Admin() {
                         color: uc.priority_cluster === 'High Priority / Quick Win' ? '#166534' :
                                uc.priority_cluster === 'Rework' ? '#991b1b' : 'var(--text-primary)'
                       }}>
-                        {uc.recommended_action}
+                        {uc.recommended_action?.replace('; Benefit not sufficient', '')}
                       </span>
                     </td>
                     <td>
