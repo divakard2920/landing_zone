@@ -798,10 +798,17 @@ function Admin() {
 
   const handleEditUseCase = (useCase) => {
     setEditingUseCase(useCase);
+    // Format submission_date for date input (YYYY-MM-DD)
+    let formattedDate = '';
+    if (useCase.submission_date) {
+      const date = new Date(useCase.submission_date);
+      formattedDate = date.toISOString().split('T')[0];
+    }
     setUseCaseForm({
       idea_name: useCase.idea_name || '',
+      usecase_type: useCase.usecase_type || '',
       idea_owner: useCase.idea_owner || '',
-      submission_date: useCase.submission_date || '',
+      submission_date: formattedDate,
       sponsor: useCase.sponsor || '',
       division: useCase.division || '',
       product_owner: useCase.product_owner || '',
@@ -1808,7 +1815,7 @@ function Admin() {
                   <option value="Low Priority">Low Priority</option>
                   <option value="Rework">Rework</option>
                 </select>
-                <button className="btn btn-primary" onClick={() => { setEditingUseCase(null); setUseCaseForm({ ...emptyUseCaseForm }); setUseCaseStep(1); setShowUseCaseModal(true); }}>
+                <button className="btn btn-primary" onClick={() => { setEditingUseCase(null); setUseCaseForm({ ...emptyUseCaseForm, submission_date: new Date().toISOString().split('T')[0] }); setUseCaseStep(1); setShowUseCaseModal(true); }}>
                   + New Use Case
                 </button>
               </div>
