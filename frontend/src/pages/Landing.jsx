@@ -73,6 +73,9 @@ function Landing() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedApp, setSelectedApp] = useState(null);
   const [doiHistory, setDoiHistory] = useState([]);
+  const [allDoiHistory, setAllDoiHistory] = useState([]);
+  const [hoveredTimelineProject, setHoveredTimelineProject] = useState(null);
+  const [timelineDoiFilter, setTimelineDoiFilter] = useState('all');
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'projects';
@@ -342,16 +345,18 @@ function Landing() {
 
   const loadData = async () => {
     try {
-      const [appsRes, announcementsRes, widgetsRes, doiRes] = await Promise.all([
+      const [appsRes, announcementsRes, widgetsRes, doiRes, allDoiHistoryRes] = await Promise.all([
         api.getApps(),
         api.getAnnouncements(),
         api.getWidgets(),
         api.getDoiStages(),
+        api.getAllDoiHistory(),
       ]);
       setApps(appsRes.data);
       setAnnouncements(announcementsRes.data);
       setWidgets(widgetsRes.data);
       setDoiStages(doiRes.data);
+      setAllDoiHistory(allDoiHistoryRes.data);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -808,6 +813,479 @@ function Landing() {
                   <span className="results-count">Showing analytics for {filteredApps.length} of {apps.length} projects</span>
                 </div>
               )}
+
+              {/* Project Timeline Chart */}
+              {(() => {
+                const projectsWithHistory = filteredApps.filter(app => app.doi_stage >= 0).map(app => {
+                  const history = allDoiHistory.filter(h => h.app_id === app.id);
+                  const startDate = history.length > 0 ? new Date(history[0].changed_at) : (app.start_date ? new Date(app.start_date) : null);
+                  const endDate = app.end_date ? new Date(app.end_date) : null;
+                  const progress = ((app.doi_stage || 0) / 5) * 100;
+                  return { ...app, history, startDate, endDate, progress };
+                }).filter(app => app.startDate);
+
+                if (projectsWithHistory.length === 0) return null;
+
+                const allDates = projectsWithHistory.flatMap(p => [p.startDate, p.endDate || new Date()]).filter(Boolean);
+                const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+                const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+                const today = new Date();
+
+                minDate.setMonth(minDate.getMonth() - 1);
+                maxDate.setMonth(maxDate.getMonth() + 3);
+                if (maxDate < today) maxDate.setTime(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+                const totalDays = (maxDate - minDate) / (1000 * 60 * 60 * 24);
+                const getPosition = (date) => ((date - minDate) / (1000 * 60 * 60 * 24) / totalDays) * 100;
+
+                const months = [];
+                const current = new Date(minDate);
+                current.setDate(1);
+                while (current <= maxDate) {
+                  months.push(new Date(current));
+                  current.setMonth(current.getMonth() + 1);
+                }
+
+                const doiColors = ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'];
+                const doiLabels = ['DOI 0', 'DOI 1', 'DOI 2', 'DOI 3', 'DOI 4', 'DOI 5'];
+
+                // Apply DOI filter
+                const filteredProjects = timelineDoiFilter === 'all'
+                  ? projectsWithHistory
+                  : projectsWithHistory.filter(p => p.doi_stage === parseInt(timelineDoiFilter));
+
+                return (
+                  <div className="timeline-chart-container" style={{ background: 'var(--bg-panel)', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>Project Timeline</h3>
+
+                      {/* DOI Stage Filter */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginRight: '4px' }}>Filter:</span>
+                        <button
+                          onClick={() => setTimelineDoiFilter('all')}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            border: 'none',
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            background: timelineDoiFilter === 'all' ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                            color: timelineDoiFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          All ({projectsWithHistory.length})
+                        </button>
+                        {[0, 1, 2, 3, 4, 5].map(stage => {
+                          const count = projectsWithHistory.filter(p => p.doi_stage === stage).length;
+                          return (
+                            <button
+                              key={stage}
+                              onClick={() => setTimelineDoiFilter(stage.toString())}
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: 'pointer',
+                                background: timelineDoiFilter === stage.toString() ? doiColors[stage] : 'var(--bg-muted)',
+                                color: timelineDoiFilter === stage.toString() ? '#fff' : 'var(--text-secondary)',
+                                opacity: count === 0 ? 0.5 : 1,
+                                transition: 'all 0.15s'
+                              }}
+                              disabled={count === 0}
+                            >
+                              DOI {stage} ({count})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Info panel - shows legend & stats when not hovering, project details when hovering */}
+                    <div style={{ minHeight: '36px', marginBottom: '4px' }}>
+                      {hoveredTimelineProject ? (() => {
+                        const hoveredProject = filteredProjects.find(p => p.id === hoveredTimelineProject);
+                        if (!hoveredProject) return null;
+                        const sortedHistory = [...hoveredProject.history].sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+                        const firstDate = sortedHistory.length > 0 ? new Date(sortedHistory[0].changed_at).toDateString() : null;
+                        const lastDate = sortedHistory.length > 0 ? new Date(sortedHistory[sortedHistory.length - 1].changed_at).toDateString() : null;
+                        const isSameDayProgression = firstDate === lastDate && sortedHistory.length > 1;
+
+                        return (
+                          <div style={{
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border-light)',
+                            borderRadius: '6px',
+                            padding: '6px 12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '16px',
+                            fontSize: '0.75rem'
+                          }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                              {hoveredProject.name}
+                              <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '6px' }}>
+                                ({hoveredProject.business_division || 'No Division'})
+                              </span>
+                              {isSameDayProgression && (
+                                <span style={{ fontSize: '0.65rem', color: '#f59e0b', marginLeft: '6px' }}>• rapid</span>
+                              )}
+                            </div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', whiteSpace: 'nowrap' }}>
+                              {hoveredProject.startDate ? new Date(hoveredProject.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No start'}
+                              {' → '}
+                              {hoveredProject.endDate ? new Date(hoveredProject.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Ongoing'}
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {sortedHistory.map((h, hIdx) => (
+                                <span key={hIdx} style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <span style={{
+                                    width: '6px',
+                                    height: '6px',
+                                    borderRadius: '50%',
+                                    background: doiColors[h.to_stage || 0],
+                                    display: 'inline-block'
+                                  }} />
+                                  <span style={{ color: 'var(--text-muted)' }}>
+                                    D{h.to_stage} {new Date(h.changed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })() : (
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '16px',
+                          fontSize: '0.7rem'
+                        }}>
+                          {/* DOI Stage Legend */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            {doiStages.map(stage => (
+                              <span key={stage.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{
+                                  width: '8px',
+                                  height: '8px',
+                                  borderRadius: '50%',
+                                  background: doiColors[stage.id],
+                                  display: 'inline-block'
+                                }} />
+                                <span style={{ color: 'var(--text-muted)' }}>DOI {stage.id}</span>
+                              </span>
+                            ))}
+                          </div>
+                          {/* Quick Stats */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontWeight: 600, color: '#10b981' }}>{filteredProjects.filter(p => p.doi_stage === 5).length}</span> Completed
+                            </span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontWeight: 600, color: '#3b82f6' }}>{filteredProjects.filter(p => p.doi_stage >= 2 && p.doi_stage < 5).length}</span> In Progress
+                            </span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontWeight: 600, color: '#f59e0b' }}>{filteredProjects.filter(p => p.doi_stage < 2).length}</span> Early Stage
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                      {/* Month headers - fixed */}
+                      <div style={{ display: 'flex', marginBottom: '8px', minWidth: '900px', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)', overflowX: 'auto' }}>
+                        <div style={{ width: '150px', flexShrink: 0, fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Project</div>
+                        <div style={{ flex: 1, position: 'relative', height: '16px' }}>
+                          {(() => {
+                            let firstVisible = true;
+                            return months.map((month, idx) => {
+                              const pos = getPosition(month);
+                              if (pos < 2) return null;
+                              const showYear = firstVisible || month.getMonth() === 0;
+                              firstVisible = false;
+                              return (
+                                <div key={idx} style={{
+                                  position: 'absolute',
+                                  left: `${pos}%`,
+                                  fontSize: '0.65rem',
+                                  fontWeight: 500,
+                                  color: 'var(--text-muted)',
+                                  borderLeft: '1px solid var(--border-light)',
+                                  paddingLeft: '4px',
+                                  height: '100%'
+                                }}>
+                                  {month.toLocaleDateString('en-US', { month: 'short', year: showYear ? 'numeric' : undefined })}
+                                </div>
+                              );
+                            });
+                          })()}
+                          {/* Today marker label */}
+                          <div style={{
+                            position: 'absolute',
+                            left: `${getPosition(today)}%`,
+                            transform: 'translateX(-50%)',
+                            fontSize: '0.6rem',
+                            fontWeight: 600,
+                            color: '#ef4444',
+                            background: 'var(--bg-primary)',
+                            padding: '0 4px',
+                            borderRadius: '3px',
+                            whiteSpace: 'nowrap',
+                            top: '-2px'
+                          }}>
+                            Today
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Scrollable project rows */}
+                      <div className="timeline-scroll-container" style={{ maxHeight: '180px', overflowY: 'auto', overflowX: 'auto', paddingRight: '8px' }}>
+
+                      {/* Project rows */}
+                      {filteredProjects.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          No projects found for this DOI stage
+                        </div>
+                      )}
+                      {filteredProjects.map((project, idx) => {
+                        const barStart = getPosition(project.startDate);
+                        const projectEnd = project.endDate || today;
+                        const barEnd = getPosition(projectEnd);
+                        const barWidth = Math.max(barEnd - barStart, 1);
+                        const todayPos = getPosition(today);
+                        const isHovered = hoveredTimelineProject === project.id;
+
+                        return (
+                          <div
+                            key={project.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              marginBottom: '2px',
+                              minWidth: '900px',
+                              padding: '2px 0',
+                              borderRadius: '4px',
+                              background: isHovered ? 'var(--bg-hover)' : 'transparent',
+                              cursor: 'pointer',
+                              transition: 'background 0.15s'
+                            }}
+                            onMouseEnter={() => setHoveredTimelineProject(project.id)}
+                            onMouseLeave={() => setHoveredTimelineProject(null)}
+                          >
+                            <div style={{ width: '150px', flexShrink: 0, paddingRight: '8px', paddingLeft: '4px' }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={project.name}>
+                                {project.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({Math.round(project.progress)}%)</span>
+                              </div>
+                            </div>
+                            <div style={{ flex: 1, height: '18px', position: 'relative' }}>
+                              {/* Grid lines for months */}
+                              {months.map((month, mIdx) => (
+                                <div key={mIdx} style={{
+                                  position: 'absolute',
+                                  left: `${getPosition(month)}%`,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: '1px',
+                                  background: 'var(--border-light)',
+                                  opacity: 0.5
+                                }} />
+                              ))}
+
+                              {/* Today marker */}
+                              <div style={{
+                                position: 'absolute',
+                                left: `${todayPos}%`,
+                                top: 0,
+                                bottom: 0,
+                                width: '2px',
+                                background: '#ef4444',
+                                zIndex: 3,
+                                opacity: 0.7
+                              }} />
+
+                              {/* Project bar - solid when not hovered, segmented when hovered */}
+                              {!isHovered ? (
+                                <div style={{
+                                  position: 'absolute',
+                                  left: `${barStart}%`,
+                                  width: `${barWidth}%`,
+                                  height: '14px',
+                                  top: '2px',
+                                  borderRadius: '7px',
+                                  background: `linear-gradient(90deg, ${doiColors[project.doi_stage || 0]} ${project.progress}%, rgba(148, 163, 184, 0.25) ${project.progress}%)`,
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                                  zIndex: 2
+                                }} />
+                              ) : (
+                                <>
+                                  {/* Segmented bar on hover */}
+                                  {(() => {
+                                    const segments = [];
+                                    const sortedHistory = [...project.history].sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+
+                                    // Check if all transitions happened on the same day (rapid progression)
+                                    const firstDate = sortedHistory.length > 0 ? new Date(sortedHistory[0].changed_at).toDateString() : null;
+                                    const lastDate = sortedHistory.length > 0 ? new Date(sortedHistory[sortedHistory.length - 1].changed_at).toDateString() : null;
+                                    const isSameDayProgression = firstDate === lastDate && sortedHistory.length > 1;
+
+                                    if (isSameDayProgression) {
+                                      // Same-day progression: show small clustered segments at the actual date,
+                                      // then extend the final stage to project end
+                                      const transitionPos = getPosition(new Date(sortedHistory[0].changed_at));
+                                      const minSegWidth = 1.5; // Minimum width for each segment to be visible
+                                      const clusterWidth = minSegWidth * sortedHistory.length;
+                                      const lastEntry = sortedHistory[sortedHistory.length - 1];
+
+                                      // Show small segments clustered at the transition date
+                                      for (let i = 0; i < sortedHistory.length; i++) {
+                                        const entry = sortedHistory[i];
+                                        const segStart = transitionPos + (i * minSegWidth);
+                                        const isLast = i === sortedHistory.length - 1;
+                                        // Last segment extends to project end
+                                        const segWidth = isLast ? Math.max(getPosition(projectEnd) - segStart, minSegWidth) : minSegWidth;
+
+                                        segments.push(
+                                          <div key={i} style={{
+                                            position: 'absolute',
+                                            left: `${segStart}%`,
+                                            width: `${segWidth}%`,
+                                            height: '18px',
+                                            top: '0px',
+                                            background: doiColors[entry.to_stage || 0],
+                                            borderRadius: i === 0 ? '6px 0 0 6px' : isLast ? '0 6px 6px 0' : '0',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                            zIndex: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderRight: !isLast ? '2px solid rgba(255,255,255,0.5)' : 'none',
+                                            transition: 'all 0.2s'
+                                          }}>
+                                            <span style={{
+                                              fontSize: '0.65rem',
+                                              fontWeight: 700,
+                                              color: '#fff',
+                                              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                                            }}>
+                                              {segWidth > 3 ? `DOI ${entry.to_stage}` : entry.to_stage}
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+                                    } else {
+                                      // Normal time-based segmentation
+                                      for (let i = 0; i < sortedHistory.length; i++) {
+                                        const entry = sortedHistory[i];
+                                        const segStart = getPosition(new Date(entry.changed_at));
+                                        const nextEntry = sortedHistory[i + 1];
+                                        const segEnd = nextEntry ? getPosition(new Date(nextEntry.changed_at)) : getPosition(projectEnd);
+                                        const segWidth = Math.max(segEnd - segStart, 0.5);
+
+                                        segments.push(
+                                          <div key={i} style={{
+                                            position: 'absolute',
+                                            left: `${segStart}%`,
+                                            width: `${segWidth}%`,
+                                            height: '18px',
+                                            top: '0px',
+                                            background: doiColors[entry.to_stage || 0],
+                                            borderRadius: i === 0 ? '6px 0 0 6px' : i === sortedHistory.length - 1 ? '0 6px 6px 0' : '0',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                                            zIndex: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            borderRight: i < sortedHistory.length - 1 ? '2px solid rgba(255,255,255,0.5)' : 'none',
+                                            transition: 'all 0.2s'
+                                          }}>
+                                            <span style={{
+                                              fontSize: '0.65rem',
+                                              fontWeight: 700,
+                                              color: '#fff',
+                                              textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                                            }}>
+                                              {segWidth > 3 ? `DOI ${entry.to_stage}` : entry.to_stage}
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+
+                                      // Add remaining unfilled segment if project not complete
+                                      if (project.doi_stage < 5 && sortedHistory.length > 0) {
+                                        const lastEntry = sortedHistory[sortedHistory.length - 1];
+                                        const unfilledStart = getPosition(new Date(lastEntry.changed_at));
+                                        const unfilledEnd = getPosition(projectEnd);
+                                        if (unfilledEnd > unfilledStart) {
+                                          segments.push(
+                                            <div key="unfilled" style={{
+                                              position: 'absolute',
+                                              left: `${unfilledStart}%`,
+                                              width: `${unfilledEnd - unfilledStart}%`,
+                                              height: '18px',
+                                              top: '0px',
+                                              background: 'rgba(148, 163, 184, 0.3)',
+                                              borderRadius: '0 6px 6px 0',
+                                              zIndex: 1,
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}>
+                                              <span style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                                                Remaining
+                                              </span>
+                                            </div>
+                                          );
+                                        }
+                                      }
+                                    }
+
+                                    return segments;
+                                  })()}
+                                </>
+                              )}
+
+                              {/* DOI milestones - only show when not hovered */}
+                              {!isHovered && project.history.filter(h => h.to_stage > 0).map((h, hIdx) => {
+                                const pos = getPosition(new Date(h.changed_at));
+                                return (
+                                  <div key={hIdx} style={{
+                                    position: 'absolute',
+                                    left: `${pos}%`,
+                                    top: '50%',
+                                    transform: 'translate(-50%, -50%)',
+                                    width: '10px',
+                                    height: '10px',
+                                    borderRadius: '50%',
+                                    background: doiColors[h.to_stage || 0],
+                                    border: '2px solid #fff',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                                    zIndex: 4
+                                  }} />
+                                );
+                              })}
+
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      </div>
+                      {filteredProjects.length > 0 && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '8px', textAlign: 'right' }}>
+                          {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div className="widgets-dashboard">
               {widgets.length > 0 ? (
                 widgets.map(widget => (

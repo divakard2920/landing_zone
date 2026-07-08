@@ -136,6 +136,29 @@ function Admin() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const { theme, toggleTheme } = useTheme();
 
+  // Use Case Intake
+  const [useCaseIntakes, setUseCaseIntakes] = useState([]);
+  const [useCaseForm, setUseCaseForm] = useState({
+    idea_name: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
+    product_owner: '', capacity_confirmed: '', line_of_business: '', motivation: '',
+    description_target: '', value_add: '', problem_evidence: '', solution_maturity: '',
+    value_proof: '', dependencies_risks: '',
+    complexity_integration: 1, complexity_data_security: 1, complexity_solution_type: 1,
+    complexity_users: 1, complexity_process_change: 1, complexity_stakeholder: 1, complexity_effort_cost: 1,
+    benefit_availability: 1, benefit_time_saving: 1, benefit_cost_reduction: 1,
+    benefit_legacy_consolidation: 1, benefit_automation: 1, benefit_data_quality: 1, benefit_compliance: 1,
+    status: 'Draft'
+  });
+  const [editingUseCase, setEditingUseCase] = useState(null);
+  const [showUseCaseModal, setShowUseCaseModal] = useState(false);
+  const [useCaseStep, setUseCaseStep] = useState(1);
+  const [viewingUseCase, setViewingUseCase] = useState(null);
+  const [actionModal, setActionModal] = useState({ show: false, useCase: null, action: '', comment: '' });
+  const [showAdminProfile, setShowAdminProfile] = useState(false);
+  const [useCaseSearchQuery, setUseCaseSearchQuery] = useState('');
+  const [useCaseStatusFilter, setUseCaseStatusFilter] = useState('all');
+  const [useCaseClusterFilter, setUseCaseClusterFilter] = useState('all');
+
   const handleSort = (key) => {
     setSortConfig(prev => ({
       key,
@@ -247,16 +270,28 @@ function Admin() {
     loadDeletedProjects();
   }, []);
 
+  // Close admin profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (showAdminProfile && !e.target.closest('.admin-profile-wrapper')) {
+        setShowAdminProfile(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showAdminProfile]);
+
   const loadData = async () => {
     try {
-      const [appsRes, annRes, fbRes, widgetsRes, doiRes, usersRes, logsRes] = await Promise.all([
+      const [appsRes, annRes, fbRes, widgetsRes, doiRes, usersRes, logsRes, useCasesRes] = await Promise.all([
         api.admin.getApps(),
         api.admin.getAnnouncements(),
         api.admin.getFeedback(),
         api.admin.getWidgets(),
         api.admin.getDoiStages(),
         api.admin.getAdminUsers(),
-        api.admin.getActivityLogs(10)
+        api.admin.getActivityLogs(10),
+        api.admin.getUseCaseIntakes()
       ]);
       setProjects(appsRes.data);
       setAnnouncements(annRes.data);
@@ -266,6 +301,7 @@ function Admin() {
       setAdminUsers(usersRes.data);
       setActivityLogs(logsRes.data);
       setHasMoreLogs(logsRes.data.length >= 10);
+      setUseCaseIntakes(useCasesRes.data);
     } catch (error) {
       console.error('Failed to load admin data:', error);
     } finally {
@@ -670,6 +706,179 @@ function Admin() {
     });
   };
 
+  // Use Case Intake Handlers
+  const emptyUseCaseForm = {
+    idea_name: '', usecase_type: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
+    product_owner: '', capacity_confirmed: '', line_of_business: '', motivation: '',
+    description_target: '', value_add: '', problem_evidence: '', solution_maturity: '',
+    value_proof: '', dependencies_risks: '',
+    complexity_integration: 1, complexity_data_security: 1, complexity_solution_type: 1,
+    complexity_users: 1, complexity_process_change: 1, complexity_stakeholder: 1, complexity_effort_cost: 1,
+    benefit_availability: 1, benefit_time_saving: 1, benefit_cost_reduction: 1,
+    benefit_legacy_consolidation: 1, benefit_automation: 1, benefit_data_quality: 1, benefit_compliance: 1,
+    status: 'Draft'
+  };
+
+  const calculateUseCaseScores = (form) => {
+    const complexityScore = (form.complexity_integration || 1) + (form.complexity_data_security || 1) +
+      (form.complexity_solution_type || 1) + (form.complexity_users || 1) + (form.complexity_process_change || 1) +
+      (form.complexity_stakeholder || 1) + (form.complexity_effort_cost || 1);
+
+    const benefitScore = (form.benefit_availability || 1) + (form.benefit_time_saving || 1) +
+      (form.benefit_cost_reduction || 1) + (form.benefit_legacy_consolidation || 1) +
+      (form.benefit_automation || 1) + (form.benefit_data_quality || 1) + (form.benefit_compliance || 1);
+
+    const priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
+
+    let priorityCluster;
+    if (complexityScore > 16 && benefitScore < 18) priorityCluster = 'Rework';
+    else if (complexityScore <= 16 && benefitScore >= 18) priorityCluster = 'High Priority / Quick Win';
+    else if (complexityScore <= 16 && benefitScore < 18) priorityCluster = 'Low Priority';
+    else priorityCluster = 'Medium Priority';
+
+    let recommendedAction;
+    if (priorityCluster === 'High Priority / Quick Win') recommendedAction = 'Start with DOI1';
+    else if (priorityCluster === 'Medium Priority') recommendedAction = 'Approval for DOI1 necessary';
+    else if (priorityCluster === 'Low Priority') recommendedAction = 'Park in Backlog; Benefit not sufficient';
+    else recommendedAction = 'Decline and rework';
+
+    const totalScore = complexityScore + benefitScore;
+    let tshirtSize;
+    if (totalScore < 16) tshirtSize = 'XS';
+    else if (totalScore <= 20) tshirtSize = 'S';
+    else if (totalScore <= 28) tshirtSize = 'M';
+    else if (totalScore <= 42) tshirtSize = 'L';
+    else tshirtSize = 'XL';
+
+    return { complexityScore, benefitScore, priorityIndex, priorityCluster, recommendedAction, tshirtSize };
+  };
+
+  const handleUseCaseSubmit = async (e) => {
+    e.preventDefault();
+    if (!useCaseForm.idea_name) {
+      showAlert('Idea name is required', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (editingUseCase) {
+        await api.admin.updateUseCaseIntake(editingUseCase.id, { ...useCaseForm, status: 'Resubmitted' });
+        logActivity('updated', 'use_case', editingUseCase.id, useCaseForm.idea_name);
+        showToast('Use case updated and resubmitted for review', 'success');
+      } else {
+        const res = await api.admin.createUseCaseIntake({ ...useCaseForm, status: 'Submitted' });
+        logActivity('created', 'use_case', res.data.id, useCaseForm.idea_name);
+        showToast('Use case submitted successfully', 'success');
+      }
+      setShowUseCaseModal(false);
+      setEditingUseCase(null);
+      setUseCaseForm({ ...emptyUseCaseForm });
+      setUseCaseStep(1);
+      loadData();
+    } catch (error) {
+      showAlert('Failed to save use case', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEditUseCase = (useCase) => {
+    setEditingUseCase(useCase);
+    setUseCaseForm({
+      idea_name: useCase.idea_name || '',
+      idea_owner: useCase.idea_owner || '',
+      submission_date: useCase.submission_date || '',
+      sponsor: useCase.sponsor || '',
+      division: useCase.division || '',
+      product_owner: useCase.product_owner || '',
+      capacity_confirmed: useCase.capacity_confirmed || '',
+      line_of_business: useCase.line_of_business || '',
+      motivation: useCase.motivation || '',
+      description_target: useCase.description_target || '',
+      value_add: useCase.value_add || '',
+      problem_evidence: useCase.problem_evidence || '',
+      solution_maturity: useCase.solution_maturity || '',
+      value_proof: useCase.value_proof || '',
+      dependencies_risks: useCase.dependencies_risks || '',
+      complexity_integration: useCase.complexity_integration || 1,
+      complexity_data_security: useCase.complexity_data_security || 1,
+      complexity_solution_type: useCase.complexity_solution_type || 1,
+      complexity_users: useCase.complexity_users || 1,
+      complexity_process_change: useCase.complexity_process_change || 1,
+      complexity_stakeholder: useCase.complexity_stakeholder || 1,
+      complexity_effort_cost: useCase.complexity_effort_cost || 1,
+      benefit_availability: useCase.benefit_availability || 1,
+      benefit_time_saving: useCase.benefit_time_saving || 1,
+      benefit_cost_reduction: useCase.benefit_cost_reduction || 1,
+      benefit_legacy_consolidation: useCase.benefit_legacy_consolidation || 1,
+      benefit_automation: useCase.benefit_automation || 1,
+      benefit_data_quality: useCase.benefit_data_quality || 1,
+      benefit_compliance: useCase.benefit_compliance || 1,
+      status: useCase.status || 'Draft'
+    });
+    setUseCaseStep(1);
+    setShowUseCaseModal(true);
+  };
+
+  const handleDeleteUseCase = (id, name) => {
+    showConfirm('Delete Use Case', `Are you sure you want to delete "${name}"?`, async () => {
+      await api.admin.deleteUseCaseIntake(id);
+      logActivity('deleted', 'use_case', id, name);
+      showToast('Use case deleted', 'success');
+      loadData();
+    });
+  };
+
+  const handleUseCaseAction = (useCase, action) => {
+    setActionModal({ show: true, useCase, action, comment: '' });
+  };
+
+  const getActionDetails = (action) => {
+    switch (action) {
+      case 'approve': return { status: 'Approved', title: 'Approve Use Case', placeholder: 'Add approval notes (optional)', required: false };
+      case 'start_doi1': return { status: 'In Progress', title: 'Start DOI1', placeholder: 'Add notes for starting DOI1 (optional)', required: false };
+      case 'park': return { status: 'Parked', title: 'Park Use Case', placeholder: 'Why is this being parked? (optional)', required: false };
+      case 'decline': return { status: 'Declined', title: 'Decline Use Case', placeholder: 'Reason for declining (required)', required: true };
+      case 'rework': return { status: 'Rework Required', title: 'Send for Rework', placeholder: 'What needs to be reworked? (required)', required: true };
+      default: return { status: '', title: '', placeholder: '', required: false };
+    }
+  };
+
+  const handleActionConfirm = async () => {
+    const { useCase, action, comment } = actionModal;
+    const details = getActionDetails(action);
+
+    if (details.required && !comment.trim()) {
+      showAlert('A comment is required for this action', 'error');
+      return;
+    }
+
+    const adminName = currentAdmin?.name || 'Admin';
+    const timestamp = new Date().toLocaleString();
+    const newNote = comment.trim()
+      ? `[${timestamp}] ${details.status} by ${adminName}: ${comment}`
+      : `[${timestamp}] ${details.status} by ${adminName}`;
+
+    try {
+      // Update use case status - backend will automatically move linked project to DOI 1
+      await api.admin.updateUseCaseIntake(useCase.id, {
+        ...useCase,
+        status: details.status,
+        admin_notes: useCase.admin_notes ? `${newNote}\n${useCase.admin_notes}` : newNote
+      });
+      logActivity('updated_status', 'use_case', useCase.id, `${useCase.idea_name} → ${details.status}`);
+      const toastMsg = (action === 'approve' || action === 'start_doi1')
+        ? `Use case ${details.status.toLowerCase()} - Project moved to DOI 1`
+        : `Use case ${details.status.toLowerCase()}`;
+      showToast(toastMsg, 'success');
+      setActionModal({ show: false, useCase: null, action: '', comment: '' });
+      loadData();
+    } catch (error) {
+      console.error('Error:', error);
+      showAlert('Failed to update use case', 'error');
+    }
+  };
+
   const getDOILabel = (stage) => {
     const doi = doiStages.find(d => d.id === stage);
     return doi ? `DOI ${doi.id} - ${doi.label}` : `DOI ${stage}`;
@@ -703,6 +912,14 @@ function Admin() {
             <circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
           </svg>
           Teams
+        </button>
+        <button className={`header-tab ${activeTab === 'use-cases' ? 'active' : ''}`} onClick={() => setActiveTab('use-cases')}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <path d="M9 12h6"/><path d="M9 16h6"/>
+          </svg>
+          Use Cases
         </button>
         <button className={`header-tab ${activeTab === 'widgets' ? 'active' : ''}`} onClick={() => setActiveTab('widgets')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -747,21 +964,33 @@ function Admin() {
           </span>
         </button>
         {currentAdmin && (
-          <div className="admin-user-pill">
-            <div className="admin-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
-            <span>{currentAdmin.name}</span>
+          <div className="admin-profile-wrapper">
+            <button className="admin-avatar-btn" onClick={() => setShowAdminProfile(!showAdminProfile)}>
+              {currentAdmin.name.charAt(0).toUpperCase()}
+            </button>
+            {showAdminProfile && (
+              <div className="admin-profile-dropdown">
+                <div className="admin-profile-info">
+                  <div className="admin-profile-avatar">{currentAdmin.name.charAt(0).toUpperCase()}</div>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{currentAdmin.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{currentAdmin.email}</div>
+                  </div>
+                </div>
+                <div className="admin-profile-actions">
+                  <Link to="/" className="admin-profile-link" onClick={() => setShowAdminProfile(false)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Go to Portal
+                  </Link>
+                  <button className="admin-profile-link logout" onClick={handleLogout}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
-        <Link to="/" className="btn btn-outline btn-sm">
-          Portal
-        </Link>
-        <button onClick={handleLogout} className="logout-btn" data-tooltip-id="admin-tooltip" data-tooltip-content="Logout">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-        </button>
       </div>
     </header>
   );
@@ -1519,6 +1748,219 @@ function Admin() {
           </div>
         )}
 
+        {/* Use Cases */}
+        {activeTab === 'use-cases' && (
+          <div>
+            <div className="admin-table-container">
+              <div className="projects-toolbar">
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', marginRight: '12px' }}>{useCaseIntakes.length}</span>
+                <div className="admin-search-bar">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="m21 21-4.35-4.35"/>
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search by name, owner, division..."
+                    value={useCaseSearchQuery}
+                    onChange={(e) => setUseCaseSearchQuery(e.target.value)}
+                  />
+                  {useCaseSearchQuery && (
+                    <button className="search-clear" onClick={() => setUseCaseSearchQuery('')}>×</button>
+                  )}
+                </div>
+                <select
+                  className="filter-select"
+                  value={useCaseStatusFilter}
+                  onChange={(e) => setUseCaseStatusFilter(e.target.value)}
+                >
+                  <option value="all">All Status</option>
+                  <option value="Submitted">Submitted</option>
+                  <option value="Resubmitted">Resubmitted</option>
+                  <option value="Approved">Approved</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Parked">Parked</option>
+                  <option value="Declined">Declined</option>
+                  <option value="Rework Required">Rework Required</option>
+                </select>
+                <select
+                  className="filter-select"
+                  value={useCaseClusterFilter}
+                  onChange={(e) => setUseCaseClusterFilter(e.target.value)}
+                >
+                  <option value="all">All Clusters</option>
+                  <option value="High Priority / Quick Win">High Priority / Quick Win</option>
+                  <option value="Medium Priority">Medium Priority</option>
+                  <option value="Low Priority">Low Priority</option>
+                  <option value="Rework">Rework</option>
+                </select>
+                <button className="btn btn-primary" onClick={() => { setEditingUseCase(null); setUseCaseForm({ ...emptyUseCaseForm }); setUseCaseStep(1); setShowUseCaseModal(true); }}>
+                  + New Use Case
+                </button>
+              </div>
+              <table className="admin-table usecase-intake-table">
+              <thead>
+                <tr>
+                  <th>Idea Name</th>
+                  <th>Type</th>
+                  <th>Owner</th>
+                  <th>Division</th>
+                  <th>Priority Index</th>
+                  <th>Cluster</th>
+                  <th>T-Shirt</th>
+                  <th>Recommendation</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {useCaseIntakes.filter(uc => {
+                  const matchesSearch = !useCaseSearchQuery ||
+                    uc.idea_name?.toLowerCase().includes(useCaseSearchQuery.toLowerCase()) ||
+                    uc.idea_owner?.toLowerCase().includes(useCaseSearchQuery.toLowerCase()) ||
+                    uc.division?.toLowerCase().includes(useCaseSearchQuery.toLowerCase());
+                  const matchesStatus = useCaseStatusFilter === 'all' || uc.status === useCaseStatusFilter;
+                  const matchesCluster = useCaseClusterFilter === 'all' || uc.priority_cluster === useCaseClusterFilter;
+                  return matchesSearch && matchesStatus && matchesCluster;
+                }).map(uc => (
+                  <tr key={uc.id}>
+                    <td style={{ fontWeight: 600 }}>{uc.idea_name}</td>
+                    <td><span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', background: uc.usecase_type === 'AI Usecase' ? '#dbeafe' : '#f3e8ff', color: uc.usecase_type === 'AI Usecase' ? '#1e40af' : '#7c3aed' }}>{uc.usecase_type || '-'}</span></td>
+                    <td>{uc.idea_owner || '-'}</td>
+                    <td>{uc.division || '-'}</td>
+                    <td>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        background: uc.priority_index >= 70 ? '#dcfce7' : uc.priority_index >= 50 ? '#fef3c7' : '#fee2e2',
+                        color: uc.priority_index >= 70 ? '#166534' : uc.priority_index >= 50 ? '#92400e' : '#991b1b'
+                      }}>
+                        {uc.priority_index}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status-badge ${uc.priority_cluster === 'High Priority / Quick Win' ? 'active' : uc.priority_cluster === 'Medium Priority' ? 'on-hold' : uc.priority_cluster === 'Low Priority' ? 'cancelled' : 'in-review'}`}>
+                        {uc.priority_cluster}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        background: '#e0e7ff',
+                        color: '#3730a3'
+                      }}>
+                        {uc.tshirt_size}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        color: uc.priority_cluster === 'High Priority / Quick Win' ? '#166534' :
+                               uc.priority_cluster === 'Rework' ? '#991b1b' : 'var(--text-primary)'
+                      }}>
+                        {uc.recommended_action}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`status-badge ${
+                        uc.status === 'Submitted' || uc.status === 'Resubmitted' ? 'active' :
+                        uc.status === 'Approved' || uc.status === 'In Progress' ? 'completed' :
+                        uc.status === 'Parked' ? 'on-hold' :
+                        uc.status === 'Declined' ? 'cancelled' :
+                        uc.status === 'Rework Required' ? 'in-review' : 'in-review'
+                      }`}>{uc.status}</span>
+                    </td>
+                    <td>
+                      <div className="action-buttons">
+                        {(uc.status === 'Submitted' || uc.status === 'Resubmitted') && (
+                          <>
+                            {uc.priority_cluster === 'High Priority / Quick Win' && (
+                              <button className="btn btn-sm btn-success" onClick={() => handleUseCaseAction(uc, 'start_doi1')}>Start DOI1</button>
+                            )}
+                            {uc.priority_cluster === 'Medium Priority' && (
+                              <>
+                                <button className="btn btn-sm btn-success" onClick={() => handleUseCaseAction(uc, 'approve')}>Approve</button>
+                                <button className="btn btn-sm" onClick={() => handleUseCaseAction(uc, 'park')}>Park</button>
+                              </>
+                            )}
+                            {uc.priority_cluster === 'Low Priority' && (
+                              <button className="btn btn-sm" onClick={() => handleUseCaseAction(uc, 'park')}>Park</button>
+                            )}
+                            {uc.priority_cluster === 'Rework' && (
+                              <>
+                                <button className="btn btn-sm btn-warning" onClick={() => handleUseCaseAction(uc, 'rework')}>Rework</button>
+                                <button className="btn btn-sm btn-danger" onClick={() => handleUseCaseAction(uc, 'decline')}>Decline</button>
+                              </>
+                            )}
+                          </>
+                        )}
+                        {uc.status === 'Parked' && (
+                          <>
+                            <button className="btn btn-sm btn-success" onClick={() => handleUseCaseAction(uc, 'approve')}>Approve</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => handleUseCaseAction(uc, 'decline')}>Decline</button>
+                          </>
+                        )}
+                        {uc.status === 'Rework Required' && (
+                          <>
+                            <button className="btn btn-sm" onClick={() => handleUseCaseAction(uc, 'park')}>Park</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => handleUseCaseAction(uc, 'decline')}>Decline</button>
+                          </>
+                        )}
+                        {!['Approved', 'Declined', 'In Progress'].includes(uc.status) && (
+                          <button className="btn btn-sm btn-icon" onClick={() => handleEditUseCase(uc)} title="Edit" data-tooltip-id="admin-tooltip" data-tooltip-content="Edit">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+                        )}
+                        <button className="btn btn-sm btn-icon btn-icon-danger" onClick={() => handleDeleteUseCase(uc.id, uc.idea_name)} title="Delete" data-tooltip-id="admin-tooltip" data-tooltip-content="Delete">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
+                        <button className="btn btn-sm btn-icon btn-icon-primary" onClick={() => setViewingUseCase(uc)} title="View" data-tooltip-id="admin-tooltip" data-tooltip-content="View">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {useCaseIntakes.filter(uc => {
+                  const matchesSearch = !useCaseSearchQuery ||
+                    uc.idea_name?.toLowerCase().includes(useCaseSearchQuery.toLowerCase()) ||
+                    uc.idea_owner?.toLowerCase().includes(useCaseSearchQuery.toLowerCase()) ||
+                    uc.division?.toLowerCase().includes(useCaseSearchQuery.toLowerCase());
+                  const matchesStatus = useCaseStatusFilter === 'all' || uc.status === useCaseStatusFilter;
+                  const matchesCluster = useCaseClusterFilter === 'all' || uc.priority_cluster === useCaseClusterFilter;
+                  return matchesSearch && matchesStatus && matchesCluster;
+                }).length === 0 && (
+                  <tr>
+                    <td colSpan="10" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                      {useCaseIntakes.length === 0
+                        ? 'No use cases yet. Click "New Use Case" to create one.'
+                        : 'No use cases match your filters.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Admin User Modal */}
         {showAdminModal && (
           <div className="modal-overlay" onClick={() => setShowAdminModal(false)}>
@@ -1658,6 +2100,455 @@ function Admin() {
           </div>
         )}
 
+        {/* Use Case Modal */}
+        {showUseCaseModal && (
+          <div className="modal-overlay" onClick={() => setShowUseCaseModal(false)}>
+            <div className="modal modal-large" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="modal-header">
+                <h2>{editingUseCase ? 'Edit Use Case' : 'New Use Case Intake'}</h2>
+                <button className="modal-close" onClick={() => setShowUseCaseModal(false)}>&times;</button>
+              </div>
+
+              {/* Step Indicator */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px 24px', borderBottom: '1px solid var(--border-light)' }}>
+                {[1, 2, 3, 4].map(step => {
+                  const canAccess = step === 1 || (useCaseForm.idea_name?.trim() && useCaseForm.usecase_type && useCaseForm.submission_date);
+                  return (
+                    <div
+                      key={step}
+                      onClick={() => {
+                        if (step > 1 && !useCaseForm.idea_name?.trim()) {
+                          showAlert('Please fill in Idea Name first', 'error');
+                          return;
+                        }
+                        if (step > 1 && !useCaseForm.usecase_type) {
+                          showAlert('Please select Use Case Type first', 'error');
+                          return;
+                        }
+                        if (step > 1 && !useCaseForm.submission_date) {
+                          showAlert('Please fill in Submission Date first', 'error');
+                          return;
+                        }
+                        setUseCaseStep(step);
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px',
+                        borderRadius: '20px', cursor: canAccess ? 'pointer' : 'not-allowed',
+                        background: useCaseStep === step ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                        color: useCaseStep === step ? 'white' : 'var(--text-secondary)',
+                        fontWeight: 500, fontSize: '0.85rem',
+                        opacity: canAccess ? 1 : 0.5
+                      }}
+                    >
+                      <span style={{
+                        width: '20px', height: '20px', borderRadius: '50%',
+                        background: useCaseStep === step ? 'white' : 'var(--border-light)',
+                        color: useCaseStep === step ? 'var(--brand-primary)' : 'var(--text-muted)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700
+                      }}>{step}</span>
+                      {step === 1 ? 'Basic Info' : step === 2 ? 'Details' : step === 3 ? 'Complexity' : 'Benefit'}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <form onSubmit={handleUseCaseSubmit} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+                  {/* Step 1: Basic Info */}
+                  {useCaseStep === 1 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                      <div className="form-group">
+                        <label>Idea Name *</label>
+                        <input type="text" className="form-control" value={useCaseForm.idea_name} onChange={e => setUseCaseForm({...useCaseForm, idea_name: e.target.value})} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Use Case Type *</label>
+                        <select className="form-control" value={useCaseForm.usecase_type || ''} onChange={e => setUseCaseForm({...useCaseForm, usecase_type: e.target.value})} required>
+                          <option value="">Select...</option>
+                          {USECASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Idea Owner</label>
+                        <input type="text" className="form-control" value={useCaseForm.idea_owner} onChange={e => setUseCaseForm({...useCaseForm, idea_owner: e.target.value})} />
+                      </div>
+                      <div className="form-group">
+                        <label>Submission Date *</label>
+                        <input type="date" className="form-control" value={useCaseForm.submission_date} onChange={e => setUseCaseForm({...useCaseForm, submission_date: e.target.value})} max={new Date().toISOString().split('T')[0]} required />
+                      </div>
+                      <div className="form-group">
+                        <label>Sponsor</label>
+                        <input type="text" className="form-control" value={useCaseForm.sponsor} onChange={e => setUseCaseForm({...useCaseForm, sponsor: e.target.value})} />
+                      </div>
+                      <div className="form-group">
+                        <label>Division</label>
+                        <input type="text" className="form-control" value={useCaseForm.division} onChange={e => setUseCaseForm({...useCaseForm, division: e.target.value})} />
+                      </div>
+                      <div className="form-group">
+                        <label>Product Owner</label>
+                        <input type="text" className="form-control" value={useCaseForm.product_owner} onChange={e => setUseCaseForm({...useCaseForm, product_owner: e.target.value})} />
+                      </div>
+                      <div className="form-group">
+                        <label>Capacity Confirmed</label>
+                        <select className="form-control" value={useCaseForm.capacity_confirmed} onChange={e => setUseCaseForm({...useCaseForm, capacity_confirmed: e.target.value})}>
+                          <option value="">Select...</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Line of Business</label>
+                        <input type="text" className="form-control" value={useCaseForm.line_of_business} onChange={e => setUseCaseForm({...useCaseForm, line_of_business: e.target.value})} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Details */}
+                  {useCaseStep === 2 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div className="form-group">
+                        <label>Motivation <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Why?)</span></label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.motivation} onChange={e => setUseCaseForm({...useCaseForm, motivation: e.target.value})} placeholder="Why is this idea important?" />
+                      </div>
+                      <div className="form-group">
+                        <label>Description & Target <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(What?)</span></label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.description_target} onChange={e => setUseCaseForm({...useCaseForm, description_target: e.target.value})} placeholder="What is the idea and its target?" />
+                      </div>
+                      <div className="form-group">
+                        <label>Value Add <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Benefit?)</span></label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.value_add} onChange={e => setUseCaseForm({...useCaseForm, value_add: e.target.value})} placeholder="What benefits will this bring?" />
+                      </div>
+                      <div className="form-group">
+                        <label>Problem Evidence <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(How do you know?)</span></label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.problem_evidence} onChange={e => setUseCaseForm({...useCaseForm, problem_evidence: e.target.value})} placeholder="What evidence supports this problem?" />
+                      </div>
+                      <div className="form-group">
+                        <label>Solution Maturity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Why now?)</span></label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.solution_maturity} onChange={e => setUseCaseForm({...useCaseForm, solution_maturity: e.target.value})} placeholder="Why is this solution ready now?" />
+                      </div>
+                      <div className="form-group">
+                        <label>Value Proof <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(Business Case)</span></label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.value_proof} onChange={e => setUseCaseForm({...useCaseForm, value_proof: e.target.value})} placeholder="Simplified business case" />
+                      </div>
+                      <div className="form-group">
+                        <label>Dependencies & Risks</label>
+                        <textarea className="form-control" rows="2" value={useCaseForm.dependencies_risks} onChange={e => setUseCaseForm({...useCaseForm, dependencies_risks: e.target.value})} placeholder="What are the dependencies and risks?" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Complexity Scorecard */}
+                  {useCaseStep === 3 && (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                          <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Complexity Scorecard</h4>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the complexity</p>
+                        </div>
+                        <div style={{ padding: '8px 16px', background: '#fef3c7', borderRadius: '8px', fontWeight: 700, color: '#92400e' }}>
+                          Score: {(useCaseForm.complexity_integration || 1) + (useCaseForm.complexity_data_security || 1) + (useCaseForm.complexity_solution_type || 1) + (useCaseForm.complexity_users || 1) + (useCaseForm.complexity_process_change || 1) + (useCaseForm.complexity_stakeholder || 1) + (useCaseForm.complexity_effort_cost || 1)} / 28
+                        </div>
+                      </div>
+                      {[
+                        { key: 'complexity_integration', label: 'Integration / System Landscape', options: ['1 system / standalone', '2-3 systems', '4-5 systems', '6+ or unclear'] },
+                        { key: 'complexity_data_security', label: 'Data & Information Security', options: ['Non-critical, 1 source', 'Multiple sources, non-critical', 'Unstructured / distributed', 'Sensitive / personal / IP-critical'] },
+                        { key: 'complexity_solution_type', label: 'Type of Solution / Implementation', options: ['Configuration of standard solution', 'Standard solution + customization', 'In-house development / custom component', 'Architecture / platform intervention, multi-layered'] },
+                        { key: 'complexity_users', label: 'Users / Reach', options: ['< 20 (pilot/team)', '20-200 (department)', '200-2,000 (division)', '2,000+ (cross-functional / company-wide)'] },
+                        { key: 'complexity_process_change', label: 'Process & Organizational Change', options: ['Only a tool, same process', 'Minor process adjustments', 'New workflow, roles shift', 'Cross-functional redesign, governance change'] },
+                        { key: 'complexity_stakeholder', label: 'Change & Stakeholder Complexity', options: ['Single team, no change mgmt needed', 'Multiple teams, informal alignment', 'Formal change mgmt, training required', 'Works council / legal approval, cross-division'] },
+                        { key: 'complexity_effort_cost', label: 'Effort / Cost (indicative)', options: ['10-50 k€', '50-250 k€', '250-750 k€', '> 750 k€'] }
+                      ].map(item => (
+                        <div key={item.key} style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
+                          <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>{item.label}</label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                            {item.options.map((opt, idx) => (
+                              <label key={idx} style={{
+                                padding: '10px 8px', borderRadius: '6px', cursor: 'pointer', textAlign: 'center',
+                                background: useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'white',
+                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-secondary)',
+                                border: `1px solid ${useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--border-light)'}`,
+                                fontSize: '0.7rem', transition: 'all 0.15s', lineHeight: 1.3
+                              }}>
+                                <input type="radio" name={item.key} checked={useCaseForm[item.key] === idx + 1}
+                                  onChange={() => setUseCaseForm({...useCaseForm, [item.key]: idx + 1})} style={{ display: 'none' }} />
+                                {opt}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Step 4: Benefit Scorecard */}
+                  {useCaseStep === 4 && (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                          <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Benefit Scorecard</h4>
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the expected benefit</p>
+                        </div>
+                        <div style={{ padding: '8px 16px', background: '#dcfce7', borderRadius: '8px', fontWeight: 700, color: '#166534' }}>
+                          Score: {(useCaseForm.benefit_availability || 1) + (useCaseForm.benefit_time_saving || 1) + (useCaseForm.benefit_cost_reduction || 1) + (useCaseForm.benefit_legacy_consolidation || 1) + (useCaseForm.benefit_automation || 1) + (useCaseForm.benefit_data_quality || 1) + (useCaseForm.benefit_compliance || 1)} / 28
+                        </div>
+                      </div>
+                      {[
+                        { key: 'benefit_availability', label: 'Availability & Resilience', options: ['No impact on system availability', 'Reduces planned downtime / maintenance windows', 'Eliminates single points of failure in one system', 'Improves availability company-wide / SLA-relevant'] },
+                        { key: 'benefit_time_saving', label: 'Process Time Saving', options: ['No measurable time saving', '< 10% of process time saved', '10-30% of process time saved', '> 30% or entire process step eliminated'] },
+                        { key: 'benefit_cost_reduction', label: 'Run Cost Reduction (p.a.)', options: ['< 50k € (licensing, infra, support)', '50-150k €', '150-500k €', '> 500k € or full cost category eliminated'] },
+                        { key: 'benefit_legacy_consolidation', label: 'Legacy System Consolidation', options: ['No legacy system affected', 'Legacy system remains but workload reduced', '1 system fully decommissioned', '2+ systems decommissioned or full platform replaced'] },
+                        { key: 'benefit_automation', label: 'Automation Depth', options: ['Digitisation of an analogue process only', 'Partial automation of individual steps', 'Full end-to-end automation of one process', 'AI / rule-based decision replaces manual judgement'] },
+                        { key: 'benefit_data_quality', label: 'Data Quality & Decision Enablement', options: ['No improvement to data basis', 'Manual data consolidation reduced', 'Automated data availability in one system', 'Real-time data foundation enabling new decision logic'] },
+                        { key: 'benefit_compliance', label: 'Compliance & Audit-Readiness', options: ['No compliance relevance', 'Reduces manual audit effort / documentation', 'Closes a known audit finding or regulatory gap', 'Fulfils a mandatory regulatory requirement (DSGVO, NIS2, SOX...)'] }
+                      ].map(item => (
+                        <div key={item.key} style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
+                          <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>{item.label}</label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                            {item.options.map((opt, idx) => (
+                              <label key={idx} style={{
+                                padding: '10px 8px', borderRadius: '6px', cursor: 'pointer', textAlign: 'center',
+                                background: useCaseForm[item.key] === idx + 1 ? '#10b981' : 'white',
+                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-secondary)',
+                                border: `1px solid ${useCaseForm[item.key] === idx + 1 ? '#10b981' : 'var(--border-light)'}`,
+                                fontSize: '0.7rem', transition: 'all 0.15s', lineHeight: 1.3
+                              }}>
+                                <input type="radio" name={item.key} checked={useCaseForm[item.key] === idx + 1}
+                                  onChange={() => setUseCaseForm({...useCaseForm, [item.key]: idx + 1})} style={{ display: 'none' }} />
+                                {opt}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Results Preview */}
+                      {(() => {
+                        const scores = calculateUseCaseScores(useCaseForm);
+                        return (
+                          <div style={{ marginTop: '16px', padding: '16px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border: '2px solid #0ea5e9', borderRadius: '10px' }}>
+                            <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem' }}>Calculated Results</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: scores.priorityIndex >= 70 ? '#166534' : scores.priorityIndex >= 50 ? '#92400e' : '#991b1b' }}>{scores.priorityIndex}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Priority Index</div>
+                              </div>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{scores.priorityCluster}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cluster</div>
+                              </div>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#3730a3' }}>{scores.tshirtSize}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>T-Shirt</div>
+                              </div>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-primary)' }}>{scores.recommendedAction}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Action</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                <div className="modal-actions" style={{ borderTop: '1px solid var(--border-light)', padding: '16px 24px', display: 'flex', justifyContent: 'space-between' }}>
+                  <div>
+                    {useCaseStep > 1 && (
+                      <button type="button" className="btn btn-outline" onClick={(e) => { e.preventDefault(); setUseCaseStep(useCaseStep - 1); }}>← Previous</button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button type="button" className="btn btn-outline" onClick={() => setShowUseCaseModal(false)} disabled={saving}>Cancel</button>
+                    {useCaseStep < 4 ? (
+                      <button type="button" className="btn btn-primary" onClick={(e) => {
+                        e.preventDefault();
+                        if (useCaseStep === 1) {
+                          if (!useCaseForm.idea_name?.trim()) {
+                            showAlert('Please fill in Idea Name', 'error');
+                            return;
+                          }
+                          if (!useCaseForm.usecase_type) {
+                            showAlert('Please select Use Case Type', 'error');
+                            return;
+                          }
+                          if (!useCaseForm.submission_date) {
+                            showAlert('Please fill in Submission Date', 'error');
+                            return;
+                          }
+                        }
+                        setUseCaseStep(useCaseStep + 1);
+                      }}>Next →</button>
+                    ) : (
+                      <button type="submit" className="btn btn-primary" disabled={saving}>
+                        {saving ? 'Saving...' : (editingUseCase ? 'Update' : 'Submit') + ' Use Case'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Use Case View Modal */}
+        {viewingUseCase && (
+          <div className="modal-overlay" onClick={() => setViewingUseCase(null)}>
+            <div className="modal modal-large" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
+              <div className="modal-header">
+                <h2>{viewingUseCase.idea_name}</h2>
+                <button className="modal-close" onClick={() => setViewingUseCase(null)}>&times;</button>
+              </div>
+              <div style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}>
+                {/* Score Summary */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: viewingUseCase.priority_index >= 70 ? '#dcfce7' : viewingUseCase.priority_index >= 50 ? '#fef3c7' : '#fee2e2', borderRadius: '10px', border: '1px solid', borderColor: viewingUseCase.priority_index >= 70 ? '#86efac' : viewingUseCase.priority_index >= 50 ? '#fde68a' : '#fecaca' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: viewingUseCase.priority_index >= 70 ? '#166534' : viewingUseCase.priority_index >= 50 ? '#854d0e' : '#991b1b' }}>{viewingUseCase.priority_index}</div>
+                    <div style={{ fontSize: '0.7rem', color: viewingUseCase.priority_index >= 70 ? '#166534' : viewingUseCase.priority_index >= 50 ? '#854d0e' : '#991b1b', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Priority Index</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#dcfce7' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#dbeafe' : viewingUseCase.priority_cluster === 'Low Priority' ? '#fef3c7' : '#fee2e2', borderRadius: '10px', border: '1px solid', borderColor: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#86efac' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#93c5fd' : viewingUseCase.priority_cluster === 'Low Priority' ? '#fde68a' : '#fecaca' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#166534' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#1e40af' : viewingUseCase.priority_cluster === 'Low Priority' ? '#854d0e' : '#991b1b' }}>{viewingUseCase.priority_cluster}</div>
+                    <div style={{ fontSize: '0.7rem', color: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#166534' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#1e40af' : viewingUseCase.priority_cluster === 'Low Priority' ? '#854d0e' : '#991b1b', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Priority Cluster</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{viewingUseCase.tshirt_size}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>T-Shirt Size</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', borderRadius: '10px', border: '1px solid #7dd3fc' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369a1', lineHeight: 1.3 }}>{viewingUseCase.recommended_action}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#0369a1', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Action</div>
+                  </div>
+                </div>
+
+                {/* Basic Info */}
+                <div style={{ marginBottom: '20px', background: 'var(--bg-muted)', borderRadius: '10px', padding: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Basic Information</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Use Case Type:</span> <span style={{ padding: '2px 8px', borderRadius: '4px', background: viewingUseCase.usecase_type === 'AI Usecase' ? '#dbeafe' : '#f3e8ff', color: viewingUseCase.usecase_type === 'AI Usecase' ? '#1e40af' : '#7c3aed', fontSize: '0.85rem' }}>{viewingUseCase.usecase_type || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Submission Date:</span> <span>{viewingUseCase.submission_date ? new Date(viewingUseCase.submission_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Idea Owner:</span> <span>{viewingUseCase.idea_owner || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Division:</span> <span>{viewingUseCase.division || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Sponsor:</span> <span>{viewingUseCase.sponsor || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Product Owner:</span> <span>{viewingUseCase.product_owner || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Line of Business:</span> <span>{viewingUseCase.line_of_business || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Capacity:</span> <span>{viewingUseCase.capacity_confirmed || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px', gridColumn: 'span 2' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Status:</span> <span className={`status-badge ${viewingUseCase.status === 'Submitted' || viewingUseCase.status === 'Resubmitted' ? 'active' : viewingUseCase.status === 'Approved' || viewingUseCase.status === 'In Progress' ? 'completed' : viewingUseCase.status === 'Declined' ? 'cancelled' : 'on-hold'}`}>{viewingUseCase.status}</span></div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {(viewingUseCase.motivation || viewingUseCase.description_target || viewingUseCase.value_add) && (
+                  <div style={{ marginBottom: '20px', background: 'var(--bg-muted)', borderRadius: '10px', padding: '16px' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Description & Details</h4>
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {viewingUseCase.motivation && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Motivation</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.motivation}</div></div>}
+                      {viewingUseCase.description_target && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Description & Target</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.description_target}</div></div>}
+                      {viewingUseCase.value_add && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Value Add</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.value_add}</div></div>}
+                      {viewingUseCase.problem_evidence && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Problem Evidence</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.problem_evidence}</div></div>}
+                      {viewingUseCase.dependencies_risks && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Dependencies & Risks</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.dependencies_risks}</div></div>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Scores */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  {/* Complexity Score */}
+                  <div style={{ background: 'rgba(254, 243, 199, 0.1)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(253, 230, 138, 0.2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Complexity</h4>
+                      <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{viewingUseCase.complexity_score}/28</span>
+                    </div>
+                    <div style={{ display: 'grid', gap: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Integration</span><strong>{viewingUseCase.complexity_integration}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Data Security</span><strong>{viewingUseCase.complexity_data_security}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Solution Type</span><strong>{viewingUseCase.complexity_solution_type}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Users / Reach</span><strong>{viewingUseCase.complexity_users}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Process Change</span><strong>{viewingUseCase.complexity_process_change}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Stakeholder</span><strong>{viewingUseCase.complexity_stakeholder}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Effort & Cost</span><strong>{viewingUseCase.complexity_effort_cost}/4</strong></div>
+                    </div>
+                  </div>
+
+                  {/* Benefit Score */}
+                  <div style={{ background: 'rgba(220, 252, 231, 0.1)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(187, 247, 208, 0.2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Benefit</h4>
+                      <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#166534' }}>{viewingUseCase.benefit_score}/28</span>
+                    </div>
+                    <div style={{ display: 'grid', gap: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Availability</span><strong>{viewingUseCase.benefit_availability}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Time Saving</span><strong>{viewingUseCase.benefit_time_saving}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Cost Reduction</span><strong>{viewingUseCase.benefit_cost_reduction}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Legacy Consolidation</span><strong>{viewingUseCase.benefit_legacy_consolidation}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Automation</span><strong>{viewingUseCase.benefit_automation}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Data Quality</span><strong>{viewingUseCase.benefit_data_quality}/4</strong></div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Compliance</span><strong>{viewingUseCase.benefit_compliance}/4</strong></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Admin Notes */}
+                {viewingUseCase.admin_notes && (
+                  <div style={{ marginTop: '16px', background: 'rgba(237, 233, 254, 0.1)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(221, 214, 254, 0.2)' }}>
+                    <h4 style={{ margin: '0 0 10px', fontSize: '0.85rem', color: '#6d28d9', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Admin Notes</h4>
+                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      {viewingUseCase.admin_notes}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button className="btn btn-outline" onClick={() => setViewingUseCase(null)}>Close</button>
+                {!['Approved', 'Declined', 'In Progress'].includes(viewingUseCase.status) && (
+                  <button className="btn btn-primary" onClick={() => { handleEditUseCase(viewingUseCase); setViewingUseCase(null); }}>Edit</button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Use Case Action Modal */}
+        {actionModal.show && (
+          <div className="modal-overlay" onClick={() => setActionModal({ show: false, useCase: null, action: '', comment: '' })}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <h2>{getActionDetails(actionModal.action).title}</h2>
+                <button className="modal-close" onClick={() => setActionModal({ show: false, useCase: null, action: '', comment: '' })}>&times;</button>
+              </div>
+              <div style={{ padding: '24px' }}>
+                <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
+                  <strong>{actionModal.useCase?.idea_name}</strong>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {actionModal.useCase?.idea_owner} • {actionModal.useCase?.division}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>
+                    Comment {getActionDetails(actionModal.action).required && <span style={{ color: '#ef4444' }}>*</span>}
+                  </label>
+                  <textarea
+                    className="form-control"
+                    rows="3"
+                    placeholder={getActionDetails(actionModal.action).placeholder}
+                    value={actionModal.comment}
+                    onChange={e => setActionModal({ ...actionModal, comment: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                <button className="btn btn-outline" onClick={() => setActionModal({ show: false, useCase: null, action: '', comment: '' })}>Cancel</button>
+                <button
+                  className={`btn ${actionModal.action === 'decline' ? 'btn-danger' : actionModal.action === 'rework' ? 'btn-warning' : 'btn-success'}`}
+                  onClick={handleActionConfirm}
+                >
+                  {getActionDetails(actionModal.action).title}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Project Modal */}
         {showProjectModal && (
           <div className="modal-overlay" onClick={() => setShowProjectModal(false)}>
@@ -1767,7 +2658,15 @@ function Admin() {
                       type="date"
                       className="form-control"
                       value={projectForm.doi_changed_at}
-                      onChange={e => setProjectForm({...projectForm, doi_changed_at: e.target.value})}
+                      onChange={e => {
+                        const newDate = e.target.value;
+                        const updates = { doi_changed_at: newDate };
+                        // Auto-fill start_date when DOI stage is 0 (for new projects)
+                        if (projectForm.doi_stage === 0 && !editingProject) {
+                          updates.start_date = newDate;
+                        }
+                        setProjectForm({...projectForm, ...updates});
+                      }}
                       max={new Date().toISOString().split('T')[0]}
                     />
                     <small style={{ color: 'var(--text-muted)' }}>{editingProject ? 'Update the date for the current DOI stage' : 'Set the project creation date'}</small>
@@ -2065,7 +2964,7 @@ function Admin() {
                   </div>
                   <div className="preview-item">
                     <span className="preview-label">Timeline</span>
-                    <span className="preview-value">{projectForm.start_date || 'TBD'} → {projectForm.end_date || 'TBD'}</span>
+                    <span className="preview-value">{projectForm.start_date || projectForm.doi_changed_at || new Date().toISOString().split('T')[0]} → {projectForm.end_date || 'Ongoing'}</span>
                   </div>
                 </div>
               </div>

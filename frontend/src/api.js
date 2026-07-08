@@ -37,6 +37,7 @@ export const api = {
   getWidgets: () => axios.get(`${API_BASE}/widgets`),
   getDoiStages: () => axios.get(`${API_BASE}/doi-stages`),
   getDoiHistory: (appId) => axios.get(`${API_BASE}/apps/${appId}/doi-history`),
+  getAllDoiHistory: () => axios.get(`${API_BASE}/all-doi-history`),
   submitFeedback: (data) => axios.post(`${API_BASE}/feedback`, data),
   submitAppRequest: (data) => axios.post(`${API_BASE}/app-requests`, data),
 
@@ -94,5 +95,12 @@ export const api = {
     // Activity logs
     getActivityLogs: (limit = 50) => axios.get(`${API_BASE}/admin/activity-logs?limit=${limit}`),
     logActivity: (data) => axios.post(`${API_BASE}/admin/activity-logs`, data),
+
+    // Use Case Intake
+    getUseCaseIntakes: () => axios.get(`${API_BASE}/admin/use-case-intake`),
+    getUseCaseIntake: (id) => axios.get(`${API_BASE}/admin/use-case-intake/${id}`),
+    createUseCaseIntake: (data) => axios.post(`${API_BASE}/admin/use-case-intake`, data),
+    updateUseCaseIntake: (id, data) => axios.put(`${API_BASE}/admin/use-case-intake/${id}`, data),
+    deleteUseCaseIntake: (id) => axios.delete(`${API_BASE}/admin/use-case-intake/${id}`),
   },
 };

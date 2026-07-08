@@ -219,7 +219,81 @@ const initDb = async () => {
         usecase_identifier TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS use_case_intake (
+        id TEXT PRIMARY KEY,
+        idea_name TEXT NOT NULL,
+        usecase_type TEXT,
+        idea_owner TEXT,
+        submission_date DATE DEFAULT CURRENT_DATE,
+        sponsor TEXT,
+        division TEXT,
+        product_owner TEXT,
+        capacity_confirmed TEXT,
+        line_of_business TEXT,
+        motivation TEXT,
+        description_target TEXT,
+        value_add TEXT,
+        problem_evidence TEXT,
+        solution_maturity TEXT,
+        value_proof TEXT,
+        dependencies_risks TEXT,
+        complexity_integration INTEGER DEFAULT 1,
+        complexity_data_security INTEGER DEFAULT 1,
+        complexity_solution_type INTEGER DEFAULT 1,
+        complexity_users INTEGER DEFAULT 1,
+        complexity_process_change INTEGER DEFAULT 1,
+        complexity_stakeholder INTEGER DEFAULT 1,
+        complexity_effort_cost INTEGER DEFAULT 1,
+        complexity_score INTEGER DEFAULT 7,
+        benefit_availability INTEGER DEFAULT 1,
+        benefit_time_saving INTEGER DEFAULT 1,
+        benefit_cost_reduction INTEGER DEFAULT 1,
+        benefit_legacy_consolidation INTEGER DEFAULT 1,
+        benefit_automation INTEGER DEFAULT 1,
+        benefit_data_quality INTEGER DEFAULT 1,
+        benefit_compliance INTEGER DEFAULT 1,
+        benefit_score INTEGER DEFAULT 7,
+        priority_index INTEGER,
+        priority_cluster TEXT,
+        recommended_action TEXT,
+        tshirt_size TEXT,
+        status TEXT DEFAULT 'Draft',
+        admin_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
+
+    // Migration: Add admin_notes column to use_case_intake if it doesn't exist
+    const adminNotesCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'use_case_intake' AND column_name = 'admin_notes'
+    `);
+    if (adminNotesCheck.rows.length === 0) {
+      await client.query('ALTER TABLE use_case_intake ADD COLUMN admin_notes TEXT');
+      console.log('Migration: Added admin_notes column to use_case_intake table');
+    }
+
+    // Migration: Add usecase_type column to use_case_intake if it doesn't exist
+    const usecaseTypeCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'use_case_intake' AND column_name = 'usecase_type'
+    `);
+    if (usecaseTypeCheck.rows.length === 0) {
+      await client.query('ALTER TABLE use_case_intake ADD COLUMN usecase_type TEXT');
+      console.log('Migration: Added usecase_type column to use_case_intake table');
+    }
+
+    // Migration: Add app_id column to use_case_intake to link to AI Pipeline project
+    const appIdCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'use_case_intake' AND column_name = 'app_id'
+    `);
+    if (appIdCheck.rows.length === 0) {
+      await client.query('ALTER TABLE use_case_intake ADD COLUMN app_id TEXT');
+      console.log('Migration: Added app_id column to use_case_intake table');
+    }
 
     // Seed DOI stages if empty
     const doiCount = await client.query('SELECT COUNT(*) as count FROM doi_stages');

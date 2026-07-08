@@ -92,9 +92,33 @@ router.get('/apps/:appId/doi-history', async (req, res) => {
   try {
     const { appId } = req.params;
     const history = await queryAll('SELECT * FROM doi_history WHERE app_id = $1 ORDER BY changed_at ASC', [appId]);
-    res.json(history);
+    const formattedHistory = history.map(h => ({
+      ...h,
+      changed_at: h.changed_at ? h.changed_at.toISOString() : null
+    }));
+    res.json(formattedHistory);
   } catch (error) {
     console.error('Error fetching DOI history:', error);
+    res.status(500).json({ error: 'Failed to fetch DOI history' });
+  }
+});
+
+router.get('/all-doi-history', async (req, res) => {
+  try {
+    const history = await queryAll(`
+      SELECT dh.*, a.name as app_name, a.start_date, a.end_date, a.doi_stage as current_stage, a.business_division
+      FROM doi_history dh
+      JOIN apps a ON dh.app_id = a.id
+      WHERE a.deleted_at IS NULL
+      ORDER BY dh.app_id, dh.changed_at ASC
+    `);
+    const formattedHistory = history.map(h => ({
+      ...h,
+      changed_at: h.changed_at ? (typeof h.changed_at === 'string' ? h.changed_at : h.changed_at.toISOString()) : null
+    }));
+    res.json(formattedHistory);
+  } catch (error) {
+    console.error('Error fetching all DOI history:', error);
     res.status(500).json({ error: 'Failed to fetch DOI history' });
   }
 });

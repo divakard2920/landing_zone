@@ -92,6 +92,10 @@ router.post('/apps', async (req, res) => {
     // Always start new projects at DOI Stage 0
     const initialDoiStage = 0;
 
+    // If start_date not provided, use doi_changed_at or current date
+    const { doi_changed_at } = req.body;
+    const effectiveStartDate = start_date || doi_changed_at || new Date().toISOString().split('T')[0];
+
     // Generate or reuse usecase_identifier based on usecase_type
     let usecase_identifier = null;
     if (usecase_type) {
@@ -164,13 +168,12 @@ router.post('/apps', async (req, res) => {
       business_division || null, business_function || null, requester_name || null, ai_spoc || null,
       priority || null, strategic_focus || null, initialDoiStage, project_id || null,
       current_status || null, last_status || null, demand_type || null, platform || null,
-      estimated_costs || null, start_date || null, end_date || null, ai_skills || null,
+      estimated_costs || null, effectiveStartDate, end_date || null, ai_skills || null,
       risks || null, dependencies || null,
       usecase_type || null, usecase_identifier
     ]);
 
     // Record initial DOI stage in history
-    const { doi_changed_at } = req.body;
     if (doi_changed_at) {
       await query(
         'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
@@ -867,6 +870,308 @@ router.post('/activity-logs', async (req, res) => {
   } catch (error) {
     console.error('Error logging activity:', error);
     res.status(500).json({ error: 'Failed to log activity' });
+  }
+});
+
+// Use Case Intake
+router.get('/use-case-intake', async (req, res) => {
+  try {
+    const useCases = await queryAll('SELECT * FROM use_case_intake ORDER BY created_at DESC');
+    res.json(useCases);
+  } catch (error) {
+    console.error('Error fetching use cases:', error);
+    res.status(500).json({ error: 'Failed to fetch use cases' });
+  }
+});
+
+router.get('/use-case-intake/:id', async (req, res) => {
+  try {
+    const useCase = await queryOne('SELECT * FROM use_case_intake WHERE id = $1', [req.params.id]);
+    if (!useCase) {
+      return res.status(404).json({ error: 'Use case not found' });
+    }
+    res.json(useCase);
+  } catch (error) {
+    console.error('Error fetching use case:', error);
+    res.status(500).json({ error: 'Failed to fetch use case' });
+  }
+});
+
+router.post('/use-case-intake', async (req, res) => {
+  try {
+    const id = uuidv4();
+    const {
+      idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
+      capacity_confirmed, line_of_business, motivation, description_target,
+      value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
+      complexity_integration, complexity_data_security, complexity_solution_type,
+      complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
+      benefit_availability, benefit_time_saving, benefit_cost_reduction,
+      benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
+      status
+    } = req.body;
+
+    const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
+      (complexity_solution_type || 1) + (complexity_users || 1) + (complexity_process_change || 1) +
+      (complexity_stakeholder || 1) + (complexity_effort_cost || 1);
+
+    const benefitScore = (benefit_availability || 1) + (benefit_time_saving || 1) +
+      (benefit_cost_reduction || 1) + (benefit_legacy_consolidation || 1) +
+      (benefit_automation || 1) + (benefit_data_quality || 1) + (benefit_compliance || 1);
+
+    const priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
+
+    let priorityCluster;
+    if (complexityScore > 16 && benefitScore < 18) {
+      priorityCluster = 'Rework';
+    } else if (complexityScore <= 16 && benefitScore >= 18) {
+      priorityCluster = 'High Priority / Quick Win';
+    } else if (complexityScore <= 16 && benefitScore < 18) {
+      priorityCluster = 'Low Priority';
+    } else {
+      priorityCluster = 'Medium Priority';
+    }
+
+    let recommendedAction;
+    if (priorityCluster === 'High Priority / Quick Win') {
+      recommendedAction = 'Start with DOI1';
+    } else if (priorityCluster === 'Medium Priority') {
+      recommendedAction = 'Approval for DOI1 necessary';
+    } else if (priorityCluster === 'Low Priority') {
+      recommendedAction = 'Park in Backlog; Benefit not sufficient';
+    } else {
+      recommendedAction = 'Decline and rework';
+    }
+
+    const totalScore = complexityScore + benefitScore;
+    let tshirtSize;
+    if (totalScore < 16) tshirtSize = 'XS';
+    else if (totalScore <= 20) tshirtSize = 'S';
+    else if (totalScore <= 28) tshirtSize = 'M';
+    else if (totalScore <= 42) tshirtSize = 'L';
+    else tshirtSize = 'XL';
+
+    const effectiveSubmissionDate = submission_date || new Date().toISOString().split('T')[0];
+
+    // Only create project if NOT Low Priority or Rework
+    let appId = null;
+    if (priorityCluster !== 'Low Priority' && priorityCluster !== 'Rework') {
+      appId = uuidv4();
+
+      // Generate usecase_identifier for the project
+      let usecase_identifier = null;
+      if (usecase_type) {
+        const prefixMap = { 'AI Usecase': 'AI', 'Foundation': 'F' };
+        const prefix = prefixMap[usecase_type];
+        if (prefix) {
+          const lastFromApps = await queryOne(
+            `SELECT usecase_identifier FROM apps WHERE usecase_type = $1 AND usecase_identifier IS NOT NULL ORDER BY usecase_identifier DESC LIMIT 1`,
+            [usecase_type]
+          );
+          const lastFromRegistry = await queryOne(
+            `SELECT usecase_identifier FROM usecase_identifier_registry WHERE usecase_type = $1 ORDER BY usecase_identifier DESC LIMIT 1`,
+            [usecase_type]
+          );
+          const extractNumber = (identifier) => {
+            if (!identifier) return 0;
+            const match = identifier.match(/_(\d+)$/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          const numFromApps = extractNumber(lastFromApps?.usecase_identifier);
+          const numFromRegistry = extractNumber(lastFromRegistry?.usecase_identifier);
+          const nextNumber = Math.max(numFromApps, numFromRegistry) + 1;
+          usecase_identifier = `${prefix}_${String(nextNumber).padStart(3, '0')}`;
+
+          await query(
+            `INSERT INTO usecase_identifier_registry (id, project_name, usecase_type, usecase_identifier) VALUES ($1, $2, $3, $4)`,
+            [uuidv4(), idea_name, usecase_type, usecase_identifier]
+          );
+        }
+      }
+
+      // Create the project at DOI 0
+      await query(`
+        INSERT INTO apps (
+          id, name, description, business_division, business_function, requester_name, ai_spoc,
+          priority, doi_stage, current_status, start_date, risks, usecase_type, usecase_identifier
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      `, [
+        appId, idea_name, description_target || motivation || null, division || null,
+        line_of_business || null, idea_owner || null, product_owner || null,
+        priorityCluster === 'High Priority / Quick Win' ? 'High' : 'Medium',
+        0, 'Use case defined', effectiveSubmissionDate, dependencies_risks || null, usecase_type || null, usecase_identifier
+      ]);
+
+      // Record DOI 0 in history with submission date
+      await query(
+        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+        [uuidv4(), appId, null, 0, effectiveSubmissionDate, 'Use case submitted']
+      );
+    }
+
+    // Create the use case intake record (with or without linked app_id)
+    await query(
+      `INSERT INTO use_case_intake (
+        id, idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
+        capacity_confirmed, line_of_business, motivation, description_target,
+        value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
+        complexity_integration, complexity_data_security, complexity_solution_type,
+        complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
+        complexity_score, benefit_availability, benefit_time_saving, benefit_cost_reduction,
+        benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
+        benefit_score, priority_index, priority_cluster, recommended_action, tshirt_size, status, app_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)`,
+      [
+        id, idea_name, usecase_type, idea_owner, effectiveSubmissionDate,
+        sponsor, division, product_owner, capacity_confirmed, line_of_business,
+        motivation, description_target, value_add, problem_evidence, solution_maturity,
+        value_proof, dependencies_risks, complexity_integration || 1, complexity_data_security || 1,
+        complexity_solution_type || 1, complexity_users || 1, complexity_process_change || 1,
+        complexity_stakeholder || 1, complexity_effort_cost || 1, complexityScore,
+        benefit_availability || 1, benefit_time_saving || 1, benefit_cost_reduction || 1,
+        benefit_legacy_consolidation || 1, benefit_automation || 1, benefit_data_quality || 1,
+        benefit_compliance || 1, benefitScore, priorityIndex, priorityCluster, recommendedAction,
+        tshirtSize, status || 'Draft', appId
+      ]
+    );
+
+    res.status(201).json({
+      id, app_id: appId, complexity_score: complexityScore, benefit_score: benefitScore,
+      priority_index: priorityIndex, priority_cluster: priorityCluster,
+      recommended_action: recommendedAction, tshirt_size: tshirtSize
+    });
+  } catch (error) {
+    console.error('Error creating use case:', error);
+    res.status(500).json({ error: 'Failed to create use case' });
+  }
+});
+
+router.put('/use-case-intake/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
+      capacity_confirmed, line_of_business, motivation, description_target,
+      value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
+      complexity_integration, complexity_data_security, complexity_solution_type,
+      complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
+      benefit_availability, benefit_time_saving, benefit_cost_reduction,
+      benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
+      status, admin_notes
+    } = req.body;
+
+    const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
+      (complexity_solution_type || 1) + (complexity_users || 1) + (complexity_process_change || 1) +
+      (complexity_stakeholder || 1) + (complexity_effort_cost || 1);
+
+    const benefitScore = (benefit_availability || 1) + (benefit_time_saving || 1) +
+      (benefit_cost_reduction || 1) + (benefit_legacy_consolidation || 1) +
+      (benefit_automation || 1) + (benefit_data_quality || 1) + (benefit_compliance || 1);
+
+    const priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
+
+    let priorityCluster;
+    if (complexityScore > 16 && benefitScore < 18) {
+      priorityCluster = 'Rework';
+    } else if (complexityScore <= 16 && benefitScore >= 18) {
+      priorityCluster = 'High Priority / Quick Win';
+    } else if (complexityScore <= 16 && benefitScore < 18) {
+      priorityCluster = 'Low Priority';
+    } else {
+      priorityCluster = 'Medium Priority';
+    }
+
+    let recommendedAction;
+    if (priorityCluster === 'High Priority / Quick Win') {
+      recommendedAction = 'Start with DOI1';
+    } else if (priorityCluster === 'Medium Priority') {
+      recommendedAction = 'Approval for DOI1 necessary';
+    } else if (priorityCluster === 'Low Priority') {
+      recommendedAction = 'Park in Backlog; Benefit not sufficient';
+    } else {
+      recommendedAction = 'Decline and rework';
+    }
+
+    const totalScore = complexityScore + benefitScore;
+    let tshirtSize;
+    if (totalScore < 16) tshirtSize = 'XS';
+    else if (totalScore <= 20) tshirtSize = 'S';
+    else if (totalScore <= 28) tshirtSize = 'M';
+    else if (totalScore <= 42) tshirtSize = 'L';
+    else tshirtSize = 'XL';
+
+    // Get current use case to check status change and get app_id
+    const currentUseCase = await queryOne('SELECT status, app_id FROM use_case_intake WHERE id = $1', [id]);
+    const oldStatus = currentUseCase?.status;
+    const appId = currentUseCase?.app_id;
+
+    await query(
+      `UPDATE use_case_intake SET
+        idea_name = $1, usecase_type = $2, idea_owner = $3, submission_date = $4, sponsor = $5, division = $6,
+        product_owner = $7, capacity_confirmed = $8, line_of_business = $9, motivation = $10,
+        description_target = $11, value_add = $12, problem_evidence = $13, solution_maturity = $14,
+        value_proof = $15, dependencies_risks = $16, complexity_integration = $17,
+        complexity_data_security = $18, complexity_solution_type = $19, complexity_users = $20,
+        complexity_process_change = $21, complexity_stakeholder = $22, complexity_effort_cost = $23,
+        complexity_score = $24, benefit_availability = $25, benefit_time_saving = $26,
+        benefit_cost_reduction = $27, benefit_legacy_consolidation = $28, benefit_automation = $29,
+        benefit_data_quality = $30, benefit_compliance = $31, benefit_score = $32,
+        priority_index = $33, priority_cluster = $34, recommended_action = $35, tshirt_size = $36,
+        status = $37, admin_notes = $38, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $39`,
+      [
+        idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
+        capacity_confirmed, line_of_business, motivation, description_target, value_add,
+        problem_evidence, solution_maturity, value_proof, dependencies_risks,
+        complexity_integration || 1, complexity_data_security || 1, complexity_solution_type || 1,
+        complexity_users || 1, complexity_process_change || 1, complexity_stakeholder || 1,
+        complexity_effort_cost || 1, complexityScore, benefit_availability || 1,
+        benefit_time_saving || 1, benefit_cost_reduction || 1, benefit_legacy_consolidation || 1,
+        benefit_automation || 1, benefit_data_quality || 1, benefit_compliance || 1, benefitScore,
+        priorityIndex, priorityCluster, recommendedAction, tshirtSize, status || 'Draft', admin_notes, id
+      ]
+    );
+
+    // If status changed to Approved or In Progress, move the linked project to DOI 1
+    if (appId && (status === 'Approved' || status === 'In Progress') && oldStatus !== status) {
+      // Update project to DOI 1
+      await query(
+        `UPDATE apps SET doi_stage = 1, current_status = 'Idea Generated', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [appId]
+      );
+      // Record DOI 1 in history
+      await query(
+        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
+        [uuidv4(), appId, 0, 1, status === 'In Progress' ? 'Started DOI1' : 'Use case approved']
+      );
+    }
+
+    res.json({
+      id, complexity_score: complexityScore, benefit_score: benefitScore,
+      priority_index: priorityIndex, priority_cluster: priorityCluster,
+      recommended_action: recommendedAction, tshirt_size: tshirtSize
+    });
+  } catch (error) {
+    console.error('Error updating use case:', error);
+    res.status(500).json({ error: 'Failed to update use case' });
+  }
+});
+
+router.delete('/use-case-intake/:id', async (req, res) => {
+  try {
+    // Get linked app_id before deleting
+    const useCase = await queryOne('SELECT app_id FROM use_case_intake WHERE id = $1', [req.params.id]);
+
+    // Soft delete the linked project if it exists
+    if (useCase?.app_id) {
+      await query('UPDATE apps SET deleted_at = CURRENT_TIMESTAMP WHERE id = $1', [useCase.app_id]);
+    }
+
+    await query('DELETE FROM use_case_intake WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Use case deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting use case:', error);
+    res.status(500).json({ error: 'Failed to delete use case' });
   }
 });
 
