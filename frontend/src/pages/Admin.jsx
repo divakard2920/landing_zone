@@ -158,6 +158,9 @@ function Admin() {
   const [useCaseSearchQuery, setUseCaseSearchQuery] = useState('');
   const [useCaseStatusFilter, setUseCaseStatusFilter] = useState('all');
   const [useCaseClusterFilter, setUseCaseClusterFilter] = useState('all');
+  const [useCaseTshirtFilter, setUseCaseTshirtFilter] = useState('all');
+  const [useCaseSortColumn, setUseCaseSortColumn] = useState('submission_date');
+  const [useCaseSortDirection, setUseCaseSortDirection] = useState('desc');
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -1815,6 +1818,18 @@ function Admin() {
                   <option value="Low Priority">Low Priority</option>
                   <option value="Rework">Rework</option>
                 </select>
+                <select
+                  className="filter-select"
+                  value={useCaseTshirtFilter}
+                  onChange={(e) => setUseCaseTshirtFilter(e.target.value)}
+                >
+                  <option value="all">All T-Shirts</option>
+                  <option value="XS">XS</option>
+                  <option value="S">S</option>
+                  <option value="M">M</option>
+                  <option value="L">L</option>
+                  <option value="XL">XL</option>
+                </select>
                 <button className="btn btn-primary" onClick={() => { setEditingUseCase(null); setUseCaseForm({ ...emptyUseCaseForm, submission_date: new Date().toISOString().split('T')[0] }); setUseCaseStep(1); setShowUseCaseModal(true); }}>
                   + New Use Case
                 </button>
@@ -1822,15 +1837,34 @@ function Admin() {
               <table className="admin-table usecase-intake-table">
               <thead>
                 <tr>
-                  <th>Idea Name</th>
-                  <th>Type</th>
-                  <th>Owner</th>
-                  <th>Division</th>
-                  <th>Priority Index</th>
-                  <th>Cluster</th>
-                  <th>T-Shirt</th>
+                  <th onClick={() => { setUseCaseSortColumn('idea_name'); setUseCaseSortDirection(useCaseSortColumn === 'idea_name' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Idea Name {useCaseSortColumn === 'idea_name' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('usecase_type'); setUseCaseSortDirection(useCaseSortColumn === 'usecase_type' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Type {useCaseSortColumn === 'usecase_type' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('submission_date'); setUseCaseSortDirection(useCaseSortColumn === 'submission_date' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Submitted {useCaseSortColumn === 'submission_date' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('idea_owner'); setUseCaseSortDirection(useCaseSortColumn === 'idea_owner' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Owner {useCaseSortColumn === 'idea_owner' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('division'); setUseCaseSortDirection(useCaseSortColumn === 'division' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Division {useCaseSortColumn === 'division' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('priority_index'); setUseCaseSortDirection(useCaseSortColumn === 'priority_index' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Priority Index {useCaseSortColumn === 'priority_index' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('priority_cluster'); setUseCaseSortDirection(useCaseSortColumn === 'priority_cluster' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Cluster {useCaseSortColumn === 'priority_cluster' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => { setUseCaseSortColumn('tshirt_size'); setUseCaseSortDirection(useCaseSortColumn === 'tshirt_size' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    T-Shirt {useCaseSortColumn === 'tshirt_size' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th>Recommendation</th>
-                  <th>Status</th>
+                  <th onClick={() => { setUseCaseSortColumn('status'); setUseCaseSortDirection(useCaseSortColumn === 'status' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Status {useCaseSortColumn === 'status' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th></th>
                 </tr>
               </thead>
@@ -1842,11 +1876,33 @@ function Admin() {
                     uc.division?.toLowerCase().includes(useCaseSearchQuery.toLowerCase());
                   const matchesStatus = useCaseStatusFilter === 'all' || uc.status === useCaseStatusFilter;
                   const matchesCluster = useCaseClusterFilter === 'all' || uc.priority_cluster === useCaseClusterFilter;
-                  return matchesSearch && matchesStatus && matchesCluster;
+                  const matchesTshirt = useCaseTshirtFilter === 'all' || uc.tshirt_size === useCaseTshirtFilter;
+                  return matchesSearch && matchesStatus && matchesCluster && matchesTshirt;
+                }).sort((a, b) => {
+                  const tshirtOrder = { 'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5 };
+                  let aVal = a[useCaseSortColumn];
+                  let bVal = b[useCaseSortColumn];
+                  if (useCaseSortColumn === 'tshirt_size') {
+                    aVal = tshirtOrder[aVal] || 0;
+                    bVal = tshirtOrder[bVal] || 0;
+                  } else if (useCaseSortColumn === 'priority_index') {
+                    aVal = aVal || 0;
+                    bVal = bVal || 0;
+                  } else if (useCaseSortColumn === 'submission_date') {
+                    aVal = aVal ? new Date(aVal).getTime() : 0;
+                    bVal = bVal ? new Date(bVal).getTime() : 0;
+                  } else {
+                    aVal = (aVal || '').toString().toLowerCase();
+                    bVal = (bVal || '').toString().toLowerCase();
+                  }
+                  if (aVal < bVal) return useCaseSortDirection === 'asc' ? -1 : 1;
+                  if (aVal > bVal) return useCaseSortDirection === 'asc' ? 1 : -1;
+                  return 0;
                 }).map(uc => (
                   <tr key={uc.id}>
                     <td style={{ fontWeight: 600 }}>{uc.idea_name}</td>
                     <td><span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', background: uc.usecase_type === 'AI Usecase' ? '#dbeafe' : '#f3e8ff', color: uc.usecase_type === 'AI Usecase' ? '#1e40af' : '#7c3aed' }}>{uc.usecase_type || '-'}</span></td>
+                    <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{uc.submission_date ? new Date(uc.submission_date).toLocaleDateString() : '-'}</td>
                     <td>{uc.idea_owner || '-'}</td>
                     <td>{uc.division || '-'}</td>
                     <td>
@@ -1966,10 +2022,11 @@ function Admin() {
                     uc.division?.toLowerCase().includes(useCaseSearchQuery.toLowerCase());
                   const matchesStatus = useCaseStatusFilter === 'all' || uc.status === useCaseStatusFilter;
                   const matchesCluster = useCaseClusterFilter === 'all' || uc.priority_cluster === useCaseClusterFilter;
-                  return matchesSearch && matchesStatus && matchesCluster;
+                  const matchesTshirt = useCaseTshirtFilter === 'all' || uc.tshirt_size === useCaseTshirtFilter;
+                  return matchesSearch && matchesStatus && matchesCluster && matchesTshirt;
                 }).length === 0 && (
                   <tr>
-                    <td colSpan="10" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                    <td colSpan="11" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
                       {useCaseIntakes.length === 0
                         ? 'No use cases yet. Click "New Use Case" to create one.'
                         : 'No use cases match your filters.'}
@@ -2415,12 +2472,12 @@ function Admin() {
         {/* Use Case View Modal */}
         {viewingUseCase && (
           <div className="modal-overlay" onClick={() => setViewingUseCase(null)}>
-            <div className="modal modal-large" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px' }}>
-              <div className="modal-header">
+            <div className="modal modal-large" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="modal-header" style={{ flexShrink: 0 }}>
                 <h2>{viewingUseCase.idea_name}</h2>
                 <button className="modal-close" onClick={() => setViewingUseCase(null)}>&times;</button>
               </div>
-              <div style={{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
                 {/* Score Summary */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
                   <div style={{ textAlign: 'center', padding: '14px 10px', background: viewingUseCase.priority_index >= 70 ? '#dcfce7' : viewingUseCase.priority_index >= 50 ? '#fef3c7' : '#fee2e2', borderRadius: '10px', border: '1px solid', borderColor: viewingUseCase.priority_index >= 70 ? '#86efac' : viewingUseCase.priority_index >= 50 ? '#fde68a' : '#fecaca' }}>
@@ -2479,14 +2536,24 @@ function Admin() {
                       <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Complexity</h4>
                       <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{viewingUseCase.complexity_score}/28</span>
                     </div>
-                    <div style={{ display: 'grid', gap: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Integration</span><strong>{viewingUseCase.complexity_integration}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Data Security</span><strong>{viewingUseCase.complexity_data_security}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Solution Type</span><strong>{viewingUseCase.complexity_solution_type}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Users / Reach</span><strong>{viewingUseCase.complexity_users}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Process Change</span><strong>{viewingUseCase.complexity_process_change}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Stakeholder</span><strong>{viewingUseCase.complexity_stakeholder}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Effort & Cost</span><strong>{viewingUseCase.complexity_effort_cost}/4</strong></div>
+                    <div style={{ display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
+                      {[
+                        { label: 'Integration', value: viewingUseCase.complexity_integration, options: ['1 system / standalone', '2-3 systems', '4-5 systems', '6+ or unclear'] },
+                        { label: 'Data Security', value: viewingUseCase.complexity_data_security, options: ['Non-critical, 1 source', 'Multiple sources, non-critical', 'Unstructured / distributed', 'Sensitive / personal / IP-critical'] },
+                        { label: 'Solution Type', value: viewingUseCase.complexity_solution_type, options: ['Configuration of standard solution', 'Standard solution + customization', 'In-house development / custom component', 'Architecture / platform intervention'] },
+                        { label: 'Users / Reach', value: viewingUseCase.complexity_users, options: ['< 20 (pilot/team)', '20-200 (department)', '200-2,000 (division)', '2,000+ (company-wide)'] },
+                        { label: 'Process Change', value: viewingUseCase.complexity_process_change, options: ['Only a tool, same process', 'Minor process adjustments', 'New workflow, roles shift', 'Cross-functional redesign'] },
+                        { label: 'Stakeholder', value: viewingUseCase.complexity_stakeholder, options: ['Single team, no change mgmt', 'Multiple teams, informal', 'Formal change mgmt, training', 'Works council / legal approval'] },
+                        { label: 'Effort & Cost', value: viewingUseCase.complexity_effort_cost, options: ['10-50 k€', '50-250 k€', '250-750 k€', '> 750 k€'] }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 6 ? '1px solid var(--border-light)' : 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                            <span style={{ fontWeight: 700, color: '#92400e', fontSize: '0.75rem' }}>{item.value}/4</span>
+                          </div>
+                          <div style={{ marginTop: '2px', color: 'var(--text-primary)', fontWeight: 500 }}>{item.options[(item.value || 1) - 1]}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -2496,14 +2563,24 @@ function Admin() {
                       <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Benefit</h4>
                       <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#166534' }}>{viewingUseCase.benefit_score}/28</span>
                     </div>
-                    <div style={{ display: 'grid', gap: '6px', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Availability</span><strong>{viewingUseCase.benefit_availability}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Time Saving</span><strong>{viewingUseCase.benefit_time_saving}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Cost Reduction</span><strong>{viewingUseCase.benefit_cost_reduction}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Legacy Consolidation</span><strong>{viewingUseCase.benefit_legacy_consolidation}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Automation</span><strong>{viewingUseCase.benefit_automation}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border-light)' }}><span>Data Quality</span><strong>{viewingUseCase.benefit_data_quality}/4</strong></div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}><span>Compliance</span><strong>{viewingUseCase.benefit_compliance}/4</strong></div>
+                    <div style={{ display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
+                      {[
+                        { label: 'Availability', value: viewingUseCase.benefit_availability, options: ['No impact on availability', 'Reduces planned downtime', 'Eliminates single points of failure', 'Improves availability company-wide'] },
+                        { label: 'Time Saving', value: viewingUseCase.benefit_time_saving, options: ['No measurable time saving', '< 10% of process time saved', '10-30% of process time saved', '> 30% or step eliminated'] },
+                        { label: 'Cost Reduction', value: viewingUseCase.benefit_cost_reduction, options: ['< 50k € p.a.', '50-150k € p.a.', '150-500k € p.a.', '> 500k € or cost eliminated'] },
+                        { label: 'Legacy Consolidation', value: viewingUseCase.benefit_legacy_consolidation, options: ['No legacy system affected', 'Legacy workload reduced', '1 system decommissioned', '2+ systems decommissioned'] },
+                        { label: 'Automation', value: viewingUseCase.benefit_automation, options: ['Digitisation only', 'Partial automation', 'Full end-to-end automation', 'AI replaces manual judgement'] },
+                        { label: 'Data Quality', value: viewingUseCase.benefit_data_quality, options: ['No improvement', 'Manual consolidation reduced', 'Automated data availability', 'Real-time data foundation'] },
+                        { label: 'Compliance', value: viewingUseCase.benefit_compliance, options: ['No compliance relevance', 'Reduces audit effort', 'Closes audit finding', 'Fulfils regulatory requirement'] }
+                      ].map((item, idx) => (
+                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 6 ? '1px solid var(--border-light)' : 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                            <span style={{ fontWeight: 700, color: '#166534', fontSize: '0.75rem' }}>{item.value}/4</span>
+                          </div>
+                          <div style={{ marginTop: '2px', color: 'var(--text-primary)', fontWeight: 500 }}>{item.options[(item.value || 1) - 1]}</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -2518,7 +2595,7 @@ function Admin() {
                   </div>
                 )}
               </div>
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-light)', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexShrink: 0, background: 'var(--bg-primary)' }}>
                 <button className="btn btn-outline" onClick={() => setViewingUseCase(null)}>Close</button>
                 {!['Approved', 'Declined', 'In Progress'].includes(viewingUseCase.status) && (
                   <button className="btn btn-primary" onClick={() => { handleEditUseCase(viewingUseCase); setViewingUseCase(null); }}>Edit</button>
