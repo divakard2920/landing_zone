@@ -76,6 +76,7 @@ function Landing() {
   const [allDoiHistory, setAllDoiHistory] = useState([]);
   const [hoveredTimelineProject, setHoveredTimelineProject] = useState(null);
   const [timelineDoiFilter, setTimelineDoiFilter] = useState('all');
+  const [timelineExpanded, setTimelineExpanded] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'projects';
@@ -902,6 +903,32 @@ function Landing() {
                             </button>
                           );
                         })}
+                        <button
+                          onClick={() => setTimelineExpanded(true)}
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            border: '1px solid var(--border-light)',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            background: 'var(--bg-muted)',
+                            color: 'var(--text-secondary)',
+                            marginLeft: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="Expand timeline"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <polyline points="9 21 3 21 3 15"></polyline>
+                            <line x1="21" y1="3" x2="14" y2="10"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                          </svg>
+                          Expand
+                        </button>
                       </div>
                     </div>
 
@@ -1539,6 +1566,302 @@ function Landing() {
           )}
         </section>
       </main>
+
+      {/* Expanded Timeline Modal */}
+      {timelineExpanded && (() => {
+        const doiColors = ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'];
+        const allHistory = allDoiHistory || [];
+        const projectsWithHistory = apps
+          .filter(app => !app.deleted_at)
+          .map(app => {
+            const history = allHistory.filter(h => h.app_id === app.id);
+            const sortedHistory = [...history].sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+            const firstDate = sortedHistory.length > 0 ? new Date(sortedHistory[0].changed_at) : (app.start_date ? new Date(app.start_date) : null);
+            const endDate = app.end_date ? new Date(app.end_date) : null;
+            const progress = app.doi_stage !== undefined ? Math.round((app.doi_stage / 5) * 100) : 0;
+            return { ...app, history: sortedHistory, startDate: firstDate, endDate, progress };
+          })
+          .filter(p => p.history.length > 0 || p.startDate);
+
+        const expandedFilteredProjects = timelineDoiFilter === 'all'
+          ? projectsWithHistory
+          : projectsWithHistory.filter(p => p.doi_stage === parseInt(timelineDoiFilter));
+
+        const allDates = expandedFilteredProjects.flatMap(p => {
+          const dates = p.history.map(h => new Date(h.changed_at));
+          if (p.startDate) dates.push(new Date(p.startDate));
+          if (p.endDate) dates.push(new Date(p.endDate));
+          return dates;
+        }).filter(d => !isNaN(d.getTime()));
+
+        if (allDates.length === 0) return null;
+
+        const minDateVal = Math.min(...allDates.map(d => d.getTime()));
+        const maxDateVal = Math.max(...allDates.map(d => d.getTime()), new Date().getTime());
+        const timelineStart = new Date(minDateVal);
+        timelineStart.setDate(1);
+        const timelineEnd = new Date(maxDateVal);
+        timelineEnd.setMonth(timelineEnd.getMonth() + 1);
+        timelineEnd.setDate(1);
+        const totalMs = timelineEnd.getTime() - timelineStart.getTime();
+
+        const getExpandedPosition = (date) => {
+          if (!date) return 0;
+          const d = new Date(date);
+          return Math.max(0, Math.min(100, ((d.getTime() - timelineStart.getTime()) / totalMs) * 100));
+        };
+
+        const expandedMonths = [];
+        const current = new Date(timelineStart);
+        while (current < timelineEnd) {
+          expandedMonths.push(new Date(current));
+          current.setMonth(current.getMonth() + 1);
+        }
+
+        return (
+          <div className="modal-overlay" onClick={() => setTimelineExpanded(false)} style={{ zIndex: 1000 }}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+              <div className="modal-header" style={{ flexShrink: 0 }}>
+                <h2>Project Timeline</h2>
+                <button className="modal-close" onClick={() => setTimelineExpanded(false)}>&times;</button>
+              </div>
+
+              {/* Fixed Filter and Info Panel */}
+              <div style={{ flexShrink: 0, padding: '20px 32px', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-primary)' }}>
+                  {/* DOI Stage Filter */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginRight: '8px' }}>Filter:</span>
+                    <button
+                      onClick={() => setTimelineDoiFilter('all')}
+                      style={{
+                        padding: '6px 14px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        border: 'none',
+                        borderRadius: '14px',
+                        cursor: 'pointer',
+                        background: timelineDoiFilter === 'all' ? 'var(--brand-primary)' : 'var(--bg-muted)',
+                        color: timelineDoiFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      All ({projectsWithHistory.length})
+                    </button>
+                    {[0, 1, 2, 3, 4, 5].map(stage => {
+                      const count = projectsWithHistory.filter(p => p.doi_stage === stage).length;
+                      return (
+                        <button
+                          key={stage}
+                          onClick={() => setTimelineDoiFilter(stage.toString())}
+                          style={{
+                            padding: '6px 14px',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            border: 'none',
+                            borderRadius: '14px',
+                            cursor: 'pointer',
+                            background: timelineDoiFilter === stage.toString() ? doiColors[stage] : 'var(--bg-muted)',
+                            color: timelineDoiFilter === stage.toString() ? '#fff' : 'var(--text-secondary)',
+                            opacity: count === 0 ? 0.5 : 1,
+                            transition: 'all 0.15s'
+                          }}
+                          disabled={count === 0}
+                        >
+                          DOI {stage} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Info panel - shows legend & stats when not hovering, project details when hovering */}
+                  <div style={{ minHeight: '48px', marginBottom: '8px' }}>
+                    {hoveredTimelineProject ? (() => {
+                      const hoveredProject = expandedFilteredProjects.find(p => p.id === hoveredTimelineProject);
+                      if (!hoveredProject) return null;
+                      const sortedHistory = [...hoveredProject.history].sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+                      return (
+                        <div style={{
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-light)',
+                          borderRadius: '8px',
+                          padding: '10px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '20px',
+                          fontSize: '0.85rem'
+                        }}>
+                          <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {hoveredProject.name}
+                            <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: '8px' }}>
+                              ({hoveredProject.business_division || 'No Division'})
+                            </span>
+                          </div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                            {hoveredProject.startDate ? new Date(hoveredProject.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No start'}
+                            {' → '}
+                            {hoveredProject.endDate ? new Date(hoveredProject.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Ongoing'}
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            {sortedHistory.map((h, hIdx) => (
+                              <span key={hIdx} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: doiColors[h.to_stage || 0] }} />
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                                  DOI {h.to_stage} - {new Date(h.changed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })() : (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '20px',
+                        fontSize: '0.85rem',
+                        background: 'var(--bg-muted)',
+                        borderRadius: '8px',
+                        padding: '10px 16px'
+                      }}>
+                        {/* Quick Stats */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', color: 'var(--text-muted)' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#059669' }}>{expandedFilteredProjects.filter(p => p.doi_stage === 5).length}</span> Completed
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#3b82f6' }}>{expandedFilteredProjects.filter(p => p.doi_stage >= 2 && p.doi_stage < 5).length}</span> In Progress
+                          </span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#f59e0b' }}>{expandedFilteredProjects.filter(p => p.doi_stage < 2).length}</span> Early Stage
+                          </span>
+                        </div>
+                        {/* Legend inline */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          {doiStages.map(stage => (
+                            <span key={stage.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: doiColors[stage.id] }} />
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>DOI {stage.id}</span>
+                            </span>
+                          ))}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ width: '10px', height: '3px', background: '#ef4444', borderRadius: '1px' }} />
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Today</span>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+              </div>
+
+              {/* Scrollable content area */}
+              <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
+                {/* Month headers */}
+                <div style={{ display: 'flex', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid var(--border-light)' }}>
+                  <div style={{ width: '250px', flexShrink: 0, fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Project</div>
+                  <div style={{ flex: 1, position: 'relative', height: '18px' }}>
+                    {(() => {
+                      let firstVisible = true;
+                      return expandedMonths.map((month, idx) => {
+                        const pos = getExpandedPosition(month);
+                        if (pos < 1) return null;
+                        const showYear = firstVisible || month.getMonth() === 0;
+                        firstVisible = false;
+                        return (
+                          <div key={idx} style={{
+                            position: 'absolute',
+                            left: `${pos}%`,
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            color: 'var(--text-muted)',
+                            borderLeft: '1px solid var(--border-light)',
+                            paddingLeft: '4px'
+                          }}>
+                            {month.toLocaleDateString('en-US', { month: 'short', year: showYear ? 'numeric' : undefined })}
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Projects */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {expandedFilteredProjects.map(project => {
+                    const sortedHistory = [...project.history].sort((a, b) => new Date(a.changed_at) - new Date(b.changed_at));
+                    const isHovered = hoveredTimelineProject === project.id;
+                    return (
+                      <div
+                        key={project.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          background: isHovered ? 'var(--bg-muted)' : 'transparent',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s'
+                        }}
+                        onMouseEnter={() => setHoveredTimelineProject(project.id)}
+                        onMouseLeave={() => setHoveredTimelineProject(null)}
+                      >
+                        <div style={{ width: '250px', flexShrink: 0, paddingRight: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {project.name}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>({Math.round(project.progress)}%)</span>
+                        </div>
+                        <div style={{ flex: 1, height: '18px', position: 'relative', background: 'var(--bg-muted)', borderRadius: '4px' }}>
+                          {/* Grid lines */}
+                          {expandedMonths.map((month, mIdx) => (
+                            <div key={mIdx} style={{
+                              position: 'absolute',
+                              left: `${getExpandedPosition(month)}%`,
+                              top: 0, bottom: 0,
+                              width: '1px',
+                              background: 'var(--border-light)',
+                              opacity: 0.5
+                            }} />
+                          ))}
+                          {/* DOI segments */}
+                          {sortedHistory.map((h, hIdx) => {
+                            const segmentStart = new Date(h.changed_at);
+                            const nextEntry = sortedHistory[hIdx + 1];
+                            const segmentEnd = nextEntry ? new Date(nextEntry.changed_at) : (project.endDate || new Date());
+                            const leftPct = getExpandedPosition(segmentStart);
+                            const rightPct = getExpandedPosition(segmentEnd);
+                            const widthPct = Math.max(0.5, rightPct - leftPct);
+                            return (
+                              <div key={hIdx} style={{
+                                position: 'absolute',
+                                left: `${leftPct}%`,
+                                width: `${widthPct}%`,
+                                top: '3px', bottom: '3px',
+                                background: doiColors[h.to_stage || 0],
+                                borderRadius: '4px'
+                              }} />
+                            );
+                          })}
+                          {/* Today marker */}
+                          <div style={{
+                            position: 'absolute',
+                            left: `${getExpandedPosition(new Date())}%`,
+                            top: 0, bottom: 0,
+                            width: '2px',
+                            background: '#ef4444',
+                            zIndex: 10
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Project Detail Slider */}
       {selectedApp && (
