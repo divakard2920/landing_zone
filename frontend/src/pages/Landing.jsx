@@ -1078,8 +1078,8 @@ function Landing() {
                             onMouseEnter={() => setHoveredTimelineProject(project.id)}
                             onMouseLeave={() => setHoveredTimelineProject(null)}
                           >
-                            <div style={{ width: '150px', flexShrink: 0, paddingRight: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <div style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }} title={project.name}>
+                            <div style={{ width: '200px', flexShrink: 0, paddingRight: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }} title={project.name}>
                                 {project.name}
                               </div>
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, flexShrink: 0 }}>({Math.round(project.progress)}%)</span>
