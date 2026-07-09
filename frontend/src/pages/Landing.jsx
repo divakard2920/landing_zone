@@ -1078,10 +1078,11 @@ function Landing() {
                             onMouseEnter={() => setHoveredTimelineProject(project.id)}
                             onMouseLeave={() => setHoveredTimelineProject(null)}
                           >
-                            <div style={{ width: '150px', flexShrink: 0, paddingRight: '8px', paddingLeft: '4px' }}>
-                              <div style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={project.name}>
-                                {project.name} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({Math.round(project.progress)}%)</span>
+                            <div style={{ width: '150px', flexShrink: 0, paddingRight: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }} title={project.name}>
+                                {project.name}
                               </div>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, flexShrink: 0 }}>({Math.round(project.progress)}%)</span>
                             </div>
                             <div style={{ flex: 1, height: '18px', position: 'relative' }}>
                               {/* Grid lines for months */}
