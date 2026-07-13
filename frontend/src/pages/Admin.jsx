@@ -32,8 +32,10 @@ const DefaultAppIcon = () => (
   </svg>
 );
 
+const isUploadedIcon = (icon) => icon && (icon.startsWith('/uploads') || icon.startsWith('https://'));
+
 const AppIcon = ({ icon, usecaseType }) => {
-  if (icon && icon.startsWith('/uploads')) {
+  if (isUploadedIcon(icon)) {
     return <img src={icon} alt="app icon" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />;
   }
   if (icon) return <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{icon}</span>;
@@ -2795,7 +2797,7 @@ function Admin() {
                   <div className="form-group">
                     <label>Icon</label>
                     <div className="icon-upload-group">
-                      <select className="form-control" value={projectForm.icon?.startsWith('/uploads') ? '' : (projectForm.icon || '')} onChange={e => setProjectForm({...projectForm, icon: e.target.value})}>
+                      <select className="form-control" value={isUploadedIcon(projectForm.icon) ? '' : (projectForm.icon || '')} onChange={e => setProjectForm({...projectForm, icon: e.target.value})}>
                         <option value="">Default Icon</option>
                         <option value="AI">AI</option>
                         <option value="ML">ML</option>
@@ -2823,7 +2825,7 @@ function Admin() {
                       </label>
                       {projectForm.icon && (
                         <div className="icon-preview-wrapper" onClick={() => setProjectForm({...projectForm, icon: ''})}>
-                          {projectForm.icon.startsWith('/uploads')
+                          {isUploadedIcon(projectForm.icon)
                             ? <img src={projectForm.icon} alt="icon" className="icon-preview" />
                             : <span className="icon-preview-text">{projectForm.icon}</span>
                           }
