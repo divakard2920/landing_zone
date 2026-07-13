@@ -3,22 +3,20 @@ const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const { BlobServiceClient } = require('@azure/storage-blob');
+const { DefaultAzureCredential } = require('@azure/identity');
 const { query, queryOne, queryAll } = require('../db/database');
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../uploads'));
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `icon-${uuidv4()}${ext}`);
-  }
-});
+// Azure Blob Storage configuration
+const STORAGE_ACCOUNT = 'devaifactory45whyrst20';
+const CONTAINER_NAME = 'kbase';
+const BLOB_URL = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
 
+// Use memory storage for multer, then upload to Azure
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     const allowed = ['.png', '.jpg', '.jpeg', '.svg', '.gif', '.webp'];
     const ext = path.extname(file.originalname).toLowerCase();
@@ -31,11 +29,38 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 }
 });
 
-router.post('/upload-icon', upload.single('icon'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded' });
+// Get Azure Blob container client
+let containerClient = null;
+const getContainerClient = async () => {
+  if (!containerClient) {
+    const credential = new DefaultAzureCredential();
+    const blobServiceClient = new BlobServiceClient(BLOB_URL, credential);
+    containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
   }
-  res.json({ url: `/uploads/${req.file.filename}` });
+  return containerClient;
+};
+
+router.post('/upload-icon', upload.single('icon'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    const blobName = `icons/icon-${uuidv4()}${ext}`;
+
+    const container = await getContainerClient();
+    const blockBlobClient = container.getBlockBlobClient(blobName);
+
+    await blockBlobClient.upload(req.file.buffer, req.file.buffer.length, {
+      blobHTTPHeaders: { blobContentType: req.file.mimetype }
+    });
+
+    res.json({ url: `${BLOB_URL}/${CONTAINER_NAME}/${blobName}` });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Failed to upload file' });
+  }
 });
 
 // Apps management
