@@ -2545,25 +2545,27 @@ function Admin() {
                       {viewingUseCase.value_add && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Value Add</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.value_add}</div></div>}
                       {viewingUseCase.problem_evidence && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Problem Evidence</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.problem_evidence}</div></div>}
                       {viewingUseCase.dependencies_risks && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Dependencies & Risks</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.dependencies_risks}</div></div>}
-                      {(() => {
-                        const attachments = viewingUseCase.attachments ? (typeof viewingUseCase.attachments === 'string' ? JSON.parse(viewingUseCase.attachments) : viewingUseCase.attachments) : [];
-                        return attachments.length > 0 && (
-                          <div>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Attachments</span>
-                            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                              {attachments.map((att, idx) => (
-                                <a key={idx} href={att.url} download={att.name} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'white', borderRadius: '6px', border: '1px solid var(--border-light)', textDecoration: 'none', color: 'var(--brand-primary)', fontSize: '0.85rem', cursor: 'pointer' }}>
-                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                  {att.name}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })()}
                     </div>
                   </div>
                 )}
+
+                {/* Attachments */}
+                {(() => {
+                  const attachments = viewingUseCase.attachments ? (typeof viewingUseCase.attachments === 'string' ? JSON.parse(viewingUseCase.attachments) : viewingUseCase.attachments) : [];
+                  return attachments.length > 0 && (
+                    <div style={{ marginBottom: '20px', background: 'var(--bg-muted)', borderRadius: '10px', padding: '16px' }}>
+                      <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Attachments</h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {attachments.map((att, idx) => (
+                          <a key={idx} href={att.url} download={att.name} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'white', borderRadius: '6px', border: '1px solid var(--border-light)', textDecoration: 'none', color: 'var(--brand-primary)', fontSize: '0.85rem', cursor: 'pointer' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            {att.name}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Scores */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
