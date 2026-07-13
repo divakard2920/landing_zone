@@ -56,10 +56,36 @@ router.post('/upload-icon', upload.single('icon'), async (req, res) => {
       blobHTTPHeaders: { blobContentType: req.file.mimetype }
     });
 
-    res.json({ url: blockBlobClient.url });
+    // Return proxy URL instead of direct Azure URL
+    res.json({ url: `/api/icons/${blobName.replace('icons/', '')}` });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
+  }
+});
+
+// Proxy endpoint to serve icons from Azure Blob Storage
+router.get('/icons/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    // Block path traversal
+    if (filename.includes('..') || filename.includes('/')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const blobName = `icons/${filename}`;
+    const container = await getContainerClient();
+    const blockBlobClient = container.getBlockBlobClient(blobName);
+
+    const downloadResponse = await blockBlobClient.download(0);
+
+    res.setHeader('Content-Type', downloadResponse.contentType || 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+
+    downloadResponse.readableStreamBody.pipe(res);
+  } catch (error) {
+    console.error('Icon fetch error:', error);
+    res.status(404).json({ error: 'Icon not found' });
   }
 });
 

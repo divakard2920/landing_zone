@@ -35,7 +35,7 @@ const DefaultAppIcon = () => (
   </svg>
 );
 
-const isUploadedIcon = (icon) => icon && (icon.startsWith('/uploads') || icon.startsWith('https://'));
+const isUploadedIcon = (icon) => icon && (icon.startsWith('/uploads') || icon.startsWith('/api/icons/') || icon.startsWith('https://'));
 
 const AppIcon = ({ icon, usecaseType }) => {
   if (isUploadedIcon(icon)) {
