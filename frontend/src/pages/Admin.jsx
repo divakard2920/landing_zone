@@ -2552,8 +2552,8 @@ function Admin() {
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Attachments</span>
                             <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                               {attachments.map((att, idx) => (
-                                <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'white', borderRadius: '6px', border: '1px solid var(--border-light)', textDecoration: 'none', color: 'var(--brand-primary)', fontSize: '0.85rem' }}>
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                                <a key={idx} href={att.url} download={att.name} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: 'white', borderRadius: '6px', border: '1px solid var(--border-light)', textDecoration: 'none', color: 'var(--brand-primary)', fontSize: '0.85rem', cursor: 'pointer' }}>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                   {att.name}
                                 </a>
                               ))}

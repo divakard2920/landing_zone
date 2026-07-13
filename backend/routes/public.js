@@ -33,7 +33,10 @@ router.get('/files/:filename', async (req, res) => {
     const blockBlobClient = container.getBlockBlobClient(blobName);
     const downloadResponse = await blockBlobClient.download(0);
 
+    // Extract original filename (format: uuid-originalname.ext)
+    const originalName = filename.replace(/^[a-f0-9-]+-/, '');
     res.setHeader('Content-Type', downloadResponse.contentType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${originalName}"`);
     res.setHeader('Cache-Control', 'public, max-age=31536000');
     downloadResponse.readableStreamBody.pipe(res);
   } catch (error) {
