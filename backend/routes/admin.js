@@ -4,15 +4,12 @@ const multer = require('multer');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const { BlobServiceClient } = require('@azure/storage-blob');
-const { DefaultAzureCredential } = require('@azure/identity');
 const { query, queryOne, queryAll } = require('../db/database');
 
 const router = express.Router();
 
 // Azure Blob Storage configuration
-const STORAGE_ACCOUNT = 'devaifactory45whyrst20';
 const CONTAINER_NAME = 'kbase';
-const BLOB_URL = `https://${STORAGE_ACCOUNT}.blob.core.windows.net`;
 
 // Use memory storage for multer, then upload to Azure
 const upload = multer({
@@ -29,12 +26,15 @@ const upload = multer({
   limits: { fileSize: 2 * 1024 * 1024 }
 });
 
-// Get Azure Blob container client
+// Get Azure Blob container client using connection string
 let containerClient = null;
+let blobServiceClient = null;
 const getContainerClient = async () => {
   if (!containerClient) {
-    const credential = new DefaultAzureCredential();
-    const blobServiceClient = new BlobServiceClient(BLOB_URL, credential);
+    if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
+      throw new Error('AZURE_STORAGE_CONNECTION_STRING environment variable not set');
+    }
+    blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
     containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
   }
   return containerClient;
@@ -56,7 +56,7 @@ router.post('/upload-icon', upload.single('icon'), async (req, res) => {
       blobHTTPHeaders: { blobContentType: req.file.mimetype }
     });
 
-    res.json({ url: `${BLOB_URL}/${CONTAINER_NAME}/${blobName}` });
+    res.json({ url: blockBlobClient.url });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
