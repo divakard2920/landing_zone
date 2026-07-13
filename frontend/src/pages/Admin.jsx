@@ -140,7 +140,7 @@ function Admin() {
   const [useCaseIntakes, setUseCaseIntakes] = useState([]);
   const [useCaseForm, setUseCaseForm] = useState({
     idea_name: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
-    product_owner: '', capacity_confirmed: '', line_of_business: '', motivation: '',
+    product_owner: '', line_of_business: '', motivation: '',
     description_target: '', value_add: '', problem_evidence: '', solution_maturity: '',
     value_proof: '', dependencies_risks: '',
     complexity_integration: 1, complexity_data_security: 1, complexity_solution_type: 1,
@@ -726,7 +726,7 @@ function Admin() {
   // Use Case Intake Handlers
   const emptyUseCaseForm = {
     idea_name: '', usecase_type: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
-    product_owner: '', capacity_confirmed: '', line_of_business: '', motivation: '',
+    product_owner: '', line_of_business: '', motivation: '',
     description_target: '', value_add: '', problem_evidence: '', solution_maturity: '',
     value_proof: '', dependencies_risks: '',
     complexity_integration: 1, complexity_data_security: 1, complexity_solution_type: 1,
@@ -815,7 +815,6 @@ function Admin() {
       sponsor: useCase.sponsor || '',
       division: useCase.division || '',
       product_owner: useCase.product_owner || '',
-      capacity_confirmed: useCase.capacity_confirmed || '',
       line_of_business: useCase.line_of_business || '',
       motivation: useCase.motivation || '',
       description_target: useCase.description_target || '',
@@ -2267,14 +2266,6 @@ function Admin() {
                         <input type="text" className="form-control" value={useCaseForm.product_owner} onChange={e => setUseCaseForm({...useCaseForm, product_owner: e.target.value})} />
                       </div>
                       <div className="form-group">
-                        <label>Capacity Confirmed</label>
-                        <select className="form-control" value={useCaseForm.capacity_confirmed} onChange={e => setUseCaseForm({...useCaseForm, capacity_confirmed: e.target.value})}>
-                          <option value="">Select...</option>
-                          <option value="Yes">Yes</option>
-                          <option value="No">No</option>
-                        </select>
-                      </div>
-                      <div className="form-group">
                         <label>Line of Business</label>
                         <input type="text" className="form-control" value={useCaseForm.line_of_business} onChange={e => setUseCaseForm({...useCaseForm, line_of_business: e.target.value})} />
                       </div>
@@ -2509,7 +2500,6 @@ function Admin() {
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Sponsor:</span> <span>{viewingUseCase.sponsor || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Product Owner:</span> <span>{viewingUseCase.product_owner || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Line of Business:</span> <span>{viewingUseCase.line_of_business || '-'}</span></div>
-                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Capacity:</span> <span>{viewingUseCase.capacity_confirmed || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px', gridColumn: 'span 2' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Status:</span> <span className={`status-badge ${viewingUseCase.status === 'Submitted' || viewingUseCase.status === 'Resubmitted' ? 'active' : viewingUseCase.status === 'Approved' || viewingUseCase.status === 'In Progress' ? 'completed' : viewingUseCase.status === 'Declined' ? 'cancelled' : 'on-hold'}`}>{viewingUseCase.status}</span></div>
                   </div>
                 </div>

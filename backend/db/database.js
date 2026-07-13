@@ -229,7 +229,6 @@ const initDb = async () => {
         sponsor TEXT,
         division TEXT,
         product_owner TEXT,
-        capacity_confirmed TEXT,
         line_of_business TEXT,
         motivation TEXT,
         description_target TEXT,
@@ -293,6 +292,16 @@ const initDb = async () => {
     if (appIdCheck.rows.length === 0) {
       await client.query('ALTER TABLE use_case_intake ADD COLUMN app_id TEXT');
       console.log('Migration: Added app_id column to use_case_intake table');
+    }
+
+    // Migration: Drop capacity_confirmed column from use_case_intake (no longer needed)
+    const capacityCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'use_case_intake' AND column_name = 'capacity_confirmed'
+    `);
+    if (capacityCheck.rows.length > 0) {
+      await client.query('ALTER TABLE use_case_intake DROP COLUMN capacity_confirmed');
+      console.log('Migration: Dropped capacity_confirmed column from use_case_intake table');
     }
 
     // Seed DOI stages if empty

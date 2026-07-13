@@ -908,7 +908,7 @@ router.post('/use-case-intake', async (req, res) => {
     const id = uuidv4();
     const {
       idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
-      capacity_confirmed, line_of_business, motivation, description_target,
+      line_of_business, motivation, description_target,
       value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
       complexity_integration, complexity_data_security, complexity_solution_type,
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
@@ -1019,17 +1019,17 @@ router.post('/use-case-intake', async (req, res) => {
     await query(
       `INSERT INTO use_case_intake (
         id, idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
-        capacity_confirmed, line_of_business, motivation, description_target,
+        line_of_business, motivation, description_target,
         value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
         complexity_integration, complexity_data_security, complexity_solution_type,
         complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
         complexity_score, benefit_availability, benefit_time_saving, benefit_cost_reduction,
         benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
         benefit_score, priority_index, priority_cluster, recommended_action, tshirt_size, status, app_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38)`,
       [
         id, idea_name, usecase_type, idea_owner, effectiveSubmissionDate,
-        sponsor, division, product_owner, capacity_confirmed, line_of_business,
+        sponsor, division, product_owner, line_of_business,
         motivation, description_target, value_add, problem_evidence, solution_maturity,
         value_proof, dependencies_risks, complexity_integration || 1, complexity_data_security || 1,
         complexity_solution_type || 1, complexity_users || 1, complexity_process_change || 1,
@@ -1057,7 +1057,7 @@ router.put('/use-case-intake/:id', async (req, res) => {
     const { id } = req.params;
     const {
       idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
-      capacity_confirmed, line_of_business, motivation, description_target,
+      line_of_business, motivation, description_target,
       value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
       complexity_integration, complexity_data_security, complexity_solution_type,
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
@@ -1115,20 +1115,20 @@ router.put('/use-case-intake/:id', async (req, res) => {
     await query(
       `UPDATE use_case_intake SET
         idea_name = $1, usecase_type = $2, idea_owner = $3, submission_date = $4, sponsor = $5, division = $6,
-        product_owner = $7, capacity_confirmed = $8, line_of_business = $9, motivation = $10,
-        description_target = $11, value_add = $12, problem_evidence = $13, solution_maturity = $14,
-        value_proof = $15, dependencies_risks = $16, complexity_integration = $17,
-        complexity_data_security = $18, complexity_solution_type = $19, complexity_users = $20,
-        complexity_process_change = $21, complexity_stakeholder = $22, complexity_effort_cost = $23,
-        complexity_score = $24, benefit_availability = $25, benefit_time_saving = $26,
-        benefit_cost_reduction = $27, benefit_legacy_consolidation = $28, benefit_automation = $29,
-        benefit_data_quality = $30, benefit_compliance = $31, benefit_score = $32,
-        priority_index = $33, priority_cluster = $34, recommended_action = $35, tshirt_size = $36,
-        status = $37, admin_notes = $38, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $39`,
+        product_owner = $7, line_of_business = $8, motivation = $9,
+        description_target = $10, value_add = $11, problem_evidence = $12, solution_maturity = $13,
+        value_proof = $14, dependencies_risks = $15, complexity_integration = $16,
+        complexity_data_security = $17, complexity_solution_type = $18, complexity_users = $19,
+        complexity_process_change = $20, complexity_stakeholder = $21, complexity_effort_cost = $22,
+        complexity_score = $23, benefit_availability = $24, benefit_time_saving = $25,
+        benefit_cost_reduction = $26, benefit_legacy_consolidation = $27, benefit_automation = $28,
+        benefit_data_quality = $29, benefit_compliance = $30, benefit_score = $31,
+        priority_index = $32, priority_cluster = $33, recommended_action = $34, tshirt_size = $35,
+        status = $36, admin_notes = $37, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $38`,
       [
         idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
-        capacity_confirmed, line_of_business, motivation, description_target, value_add,
+        line_of_business, motivation, description_target, value_add,
         problem_evidence, solution_maturity, value_proof, dependencies_risks,
         complexity_integration || 1, complexity_data_security || 1, complexity_solution_type || 1,
         complexity_users || 1, complexity_process_change || 1, complexity_stakeholder || 1,
