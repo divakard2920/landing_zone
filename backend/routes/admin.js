@@ -57,7 +57,7 @@ router.post('/upload-icon', upload.single('icon'), async (req, res) => {
     });
 
     // Return proxy URL instead of direct Azure URL
-    res.json({ url: `/api/icons/${blobName.replace('icons/', '')}` });
+    res.json({ url: `/api/admin/icons/${blobName.replace('icons/', '')}` });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
