@@ -1,8 +1,46 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const { BlobServiceClient } = require('@azure/storage-blob');
 const { query, queryOne, queryAll } = require('../db/database');
 
 const router = express.Router();
+
+// Azure Blob Storage for icons
+const CONTAINER_NAME = 'kbase';
+let containerClient = null;
+const getContainerClient = async () => {
+  if (!containerClient && process.env.AZURE_STORAGE_CONNECTION_STRING) {
+    const blobServiceClient = BlobServiceClient.fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING);
+    containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
+  }
+  return containerClient;
+};
+
+// Proxy endpoint to serve icons from Azure Blob Storage
+router.get('/icons/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    if (filename.includes('..') || filename.includes('/')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const container = await getContainerClient();
+    if (!container) {
+      return res.status(503).json({ error: 'Storage not configured' });
+    }
+
+    const blobName = `icons/${filename}`;
+    const blockBlobClient = container.getBlockBlobClient(blobName);
+    const downloadResponse = await blockBlobClient.download(0);
+
+    res.setHeader('Content-Type', downloadResponse.contentType || 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    downloadResponse.readableStreamBody.pipe(res);
+  } catch (error) {
+    console.error('Icon fetch error:', error);
+    res.status(404).json({ error: 'Icon not found' });
+  }
+});
 
 router.get('/apps', async (req, res) => {
   try {
