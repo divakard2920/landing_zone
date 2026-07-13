@@ -11,19 +11,10 @@ const router = express.Router();
 // Azure Blob Storage configuration
 const CONTAINER_NAME = 'kbase';
 
-// Use memory storage for multer, then upload to Azure
+// Use memory storage for multer, then upload to Azure (any file type, up to 50MB)
 const upload = multer({
   storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    const allowed = ['.png', '.jpg', '.jpeg', '.svg', '.gif', '.webp'];
-    const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type'));
-    }
-  },
-  limits: { fileSize: 2 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 // Get Azure Blob container client using connection string
@@ -40,14 +31,15 @@ const getContainerClient = async () => {
   return containerClient;
 };
 
-router.post('/upload-icon', upload.single('icon'), async (req, res) => {
+// Generic file upload handler
+const handleFileUpload = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const blobName = `icons/icon-${uuidv4()}${ext}`;
+    const sanitizedName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const blobName = `files/${uuidv4()}-${sanitizedName}`;
 
     const container = await getContainerClient();
     const blockBlobClient = container.getBlockBlobClient(blobName);
@@ -56,14 +48,19 @@ router.post('/upload-icon', upload.single('icon'), async (req, res) => {
       blobHTTPHeaders: { blobContentType: req.file.mimetype }
     });
 
-    // Return proxy URL instead of direct Azure URL
-    res.json({ url: `/api/icons/${blobName.replace('icons/', '')}` });
+    res.json({
+      url: `/api/files/${blobName.replace('files/', '')}`,
+      name: req.file.originalname,
+      size: req.file.size
+    });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Failed to upload file' });
   }
-});
+};
 
+router.post('/upload-icon', upload.single('icon'), handleFileUpload);
+router.post('/upload-file', upload.single('file'), handleFileUpload);
 
 // Apps management
 router.get('/apps', async (req, res) => {
@@ -941,7 +938,7 @@ router.post('/use-case-intake', async (req, res) => {
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
       benefit_availability, benefit_time_saving, benefit_cost_reduction,
       benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
-      status
+      status, attachments
     } = req.body;
 
     const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
@@ -1052,8 +1049,8 @@ router.post('/use-case-intake', async (req, res) => {
         complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
         complexity_score, benefit_availability, benefit_time_saving, benefit_cost_reduction,
         benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
-        benefit_score, priority_index, priority_cluster, recommended_action, tshirt_size, status, app_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38)`,
+        benefit_score, priority_index, priority_cluster, recommended_action, tshirt_size, status, app_id, attachments
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)`,
       [
         id, idea_name, usecase_type, idea_owner, effectiveSubmissionDate,
         sponsor, division, product_owner, line_of_business,
@@ -1064,7 +1061,7 @@ router.post('/use-case-intake', async (req, res) => {
         benefit_availability || 1, benefit_time_saving || 1, benefit_cost_reduction || 1,
         benefit_legacy_consolidation || 1, benefit_automation || 1, benefit_data_quality || 1,
         benefit_compliance || 1, benefitScore, priorityIndex, priorityCluster, recommendedAction,
-        tshirtSize, status || 'Draft', appId
+        tshirtSize, status || 'Draft', appId, attachments ? JSON.stringify(attachments) : null
       ]
     );
 
@@ -1090,7 +1087,7 @@ router.put('/use-case-intake/:id', async (req, res) => {
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
       benefit_availability, benefit_time_saving, benefit_cost_reduction,
       benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
-      status, admin_notes
+      status, admin_notes, attachments
     } = req.body;
 
     const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
@@ -1151,8 +1148,8 @@ router.put('/use-case-intake/:id', async (req, res) => {
         benefit_cost_reduction = $26, benefit_legacy_consolidation = $27, benefit_automation = $28,
         benefit_data_quality = $29, benefit_compliance = $30, benefit_score = $31,
         priority_index = $32, priority_cluster = $33, recommended_action = $34, tshirt_size = $35,
-        status = $36, admin_notes = $37, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $38`,
+        status = $36, admin_notes = $37, attachments = $38, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $39`,
       [
         idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
         line_of_business, motivation, description_target, value_add,
@@ -1162,7 +1159,8 @@ router.put('/use-case-intake/:id', async (req, res) => {
         complexity_effort_cost || 1, complexityScore, benefit_availability || 1,
         benefit_time_saving || 1, benefit_cost_reduction || 1, benefit_legacy_consolidation || 1,
         benefit_automation || 1, benefit_data_quality || 1, benefit_compliance || 1, benefitScore,
-        priorityIndex, priorityCluster, recommendedAction, tshirtSize, status || 'Draft', admin_notes, id
+        priorityIndex, priorityCluster, recommendedAction, tshirtSize, status || 'Draft', admin_notes,
+        attachments ? JSON.stringify(attachments) : null, id
       ]
     );
 

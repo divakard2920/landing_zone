@@ -32,10 +32,10 @@ const DefaultAppIcon = () => (
   </svg>
 );
 
-const isUploadedIcon = (icon) => icon && (icon.startsWith('/uploads') || icon.startsWith('/api/') || icon.startsWith('https://'));
+const isUploadedFile = (url) => url && (url.startsWith('/uploads') || url.startsWith('/api/') || url.startsWith('https://'));
 
 const AppIcon = ({ icon, usecaseType }) => {
-  if (isUploadedIcon(icon)) {
+  if (isUploadedFile(icon)) {
     return <img src={icon} alt="app icon" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />;
   }
   if (icon) return <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{icon}</span>;
@@ -735,7 +735,8 @@ function Admin() {
     complexity_users: 1, complexity_process_change: 1, complexity_stakeholder: 1, complexity_effort_cost: 1,
     benefit_availability: 1, benefit_time_saving: 1, benefit_cost_reduction: 1,
     benefit_legacy_consolidation: 1, benefit_automation: 1, benefit_data_quality: 1, benefit_compliance: 1,
-    status: 'Draft'
+    status: 'Draft',
+    attachments: []
   };
 
   const calculateUseCaseScores = (form) => {
@@ -839,7 +840,8 @@ function Admin() {
       benefit_automation: useCase.benefit_automation || 1,
       benefit_data_quality: useCase.benefit_data_quality || 1,
       benefit_compliance: useCase.benefit_compliance || 1,
-      status: useCase.status || 'Draft'
+      status: useCase.status || 'Draft',
+      attachments: useCase.attachments ? (typeof useCase.attachments === 'string' ? JSON.parse(useCase.attachments) : useCase.attachments) : []
     });
     setUseCaseStep(1);
     setShowUseCaseModal(true);
@@ -2305,6 +2307,33 @@ function Admin() {
                         <label>Dependencies & Risks</label>
                         <textarea className="form-control" rows="2" value={useCaseForm.dependencies_risks} onChange={e => setUseCaseForm({...useCaseForm, dependencies_risks: e.target.value})} placeholder="What are the dependencies and risks?" />
                       </div>
+                      <div className="form-group">
+                        <label>Attachments</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          <label className="icon-upload-btn" style={{ margin: 0 }}>
+                            Upload File
+                            <input type="file" hidden onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                try {
+                                  const res = await api.admin.uploadFile(file);
+                                  setUseCaseForm({...useCaseForm, attachments: [...(useCaseForm.attachments || []), res.data]});
+                                } catch (err) {
+                                  console.error('Upload failed', err);
+                                }
+                              }
+                              e.target.value = '';
+                            }} />
+                          </label>
+                          {(useCaseForm.attachments || []).map((att, idx) => (
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: 'var(--bg-muted)', borderRadius: '6px', fontSize: '0.85rem' }}>
+                              <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand-primary)', textDecoration: 'none' }}>{att.name}</a>
+                              <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>({Math.round(att.size / 1024)} KB)</span>
+                              <button type="button" onClick={() => setUseCaseForm({...useCaseForm, attachments: useCaseForm.attachments.filter((_, i) => i !== idx)})} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '2px' }}>×</button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -2516,6 +2545,22 @@ function Admin() {
                       {viewingUseCase.value_add && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Value Add</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.value_add}</div></div>}
                       {viewingUseCase.problem_evidence && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Problem Evidence</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.problem_evidence}</div></div>}
                       {viewingUseCase.dependencies_risks && <div><span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Dependencies & Risks</span><div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{viewingUseCase.dependencies_risks}</div></div>}
+                      {(() => {
+                        const attachments = viewingUseCase.attachments ? (typeof viewingUseCase.attachments === 'string' ? JSON.parse(viewingUseCase.attachments) : viewingUseCase.attachments) : [];
+                        return attachments.length > 0 && (
+                          <div>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Attachments</span>
+                            <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {attachments.map((att, idx) => (
+                                <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: 'white', borderRadius: '6px', border: '1px solid var(--border-light)', textDecoration: 'none', color: 'var(--brand-primary)', fontSize: '0.85rem' }}>
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+                                  {att.name}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
@@ -2797,7 +2842,7 @@ function Admin() {
                   <div className="form-group">
                     <label>Icon</label>
                     <div className="icon-upload-group">
-                      <select className="form-control" value={isUploadedIcon(projectForm.icon) ? '' : (projectForm.icon || '')} onChange={e => setProjectForm({...projectForm, icon: e.target.value})}>
+                      <select className="form-control" value={isUploadedFile(projectForm.icon) ? '' : (projectForm.icon || '')} onChange={e => setProjectForm({...projectForm, icon: e.target.value})}>
                         <option value="">Default Icon</option>
                         <option value="AI">AI</option>
                         <option value="ML">ML</option>
@@ -2825,7 +2870,7 @@ function Admin() {
                       </label>
                       {projectForm.icon && (
                         <div className="icon-preview-wrapper" onClick={() => setProjectForm({...projectForm, icon: ''})}>
-                          {isUploadedIcon(projectForm.icon)
+                          {isUploadedFile(projectForm.icon)
                             ? <img src={projectForm.icon} alt="icon" className="icon-preview" />
                             : <span className="icon-preview-text">{projectForm.icon}</span>
                           }

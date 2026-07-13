@@ -259,6 +259,7 @@ const initDb = async () => {
         tshirt_size TEXT,
         status TEXT DEFAULT 'Draft',
         admin_notes TEXT,
+        attachments TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -302,6 +303,16 @@ const initDb = async () => {
     if (capacityCheck.rows.length > 0) {
       await client.query('ALTER TABLE use_case_intake DROP COLUMN capacity_confirmed');
       console.log('Migration: Dropped capacity_confirmed column from use_case_intake table');
+    }
+
+    // Migration: Add attachments column to use_case_intake for file uploads
+    const attachmentsCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'use_case_intake' AND column_name = 'attachments'
+    `);
+    if (attachmentsCheck.rows.length === 0) {
+      await client.query('ALTER TABLE use_case_intake ADD COLUMN attachments TEXT');
+      console.log('Migration: Added attachments column to use_case_intake table');
     }
 
     // Seed DOI stages if empty

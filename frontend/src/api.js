@@ -78,6 +78,14 @@ export const api = {
       });
     },
 
+    uploadFile: (file) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return axios.post(`${API_BASE}/admin/upload-file`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    },
+
     getDoiStages: () => axios.get(`${API_BASE}/admin/doi-stages`),
     updateDoiStage: (id, data) => axios.put(`${API_BASE}/admin/doi-stages/${id}`, data),
 

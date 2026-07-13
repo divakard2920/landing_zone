@@ -16,7 +16,33 @@ const getContainerClient = async () => {
   return containerClient;
 };
 
-// Proxy endpoint to serve icons from Azure Blob Storage
+// Proxy endpoint to serve files from Azure Blob Storage
+router.get('/files/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    if (filename.includes('..') || filename.includes('/')) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+
+    const container = await getContainerClient();
+    if (!container) {
+      return res.status(503).json({ error: 'Storage not configured' });
+    }
+
+    const blobName = `files/${filename}`;
+    const blockBlobClient = container.getBlockBlobClient(blobName);
+    const downloadResponse = await blockBlobClient.download(0);
+
+    res.setHeader('Content-Type', downloadResponse.contentType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    downloadResponse.readableStreamBody.pipe(res);
+  } catch (error) {
+    console.error('File fetch error:', error);
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
+// Keep icons route for backwards compatibility
 router.get('/icons/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
