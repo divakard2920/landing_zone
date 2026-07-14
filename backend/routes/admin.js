@@ -693,6 +693,33 @@ router.put('/doi-stages/:id', async (req, res) => {
   }
 });
 
+// Update DOI history entry date
+router.put('/doi-history/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { changed_at } = req.body;
+
+    if (!changed_at) {
+      return res.status(400).json({ error: 'Date is required' });
+    }
+
+    // Get the history entry to check if it's DOI 0
+    const historyEntry = await queryOne('SELECT app_id, to_stage FROM doi_history WHERE id = $1', [id]);
+
+    await query('UPDATE doi_history SET changed_at = $1 WHERE id = $2', [changed_at, id]);
+
+    // If this is DOI 0, also update project start_date
+    if (historyEntry && historyEntry.to_stage === 0) {
+      await query('UPDATE apps SET start_date = $1 WHERE id = $2', [changed_at, historyEntry.app_id]);
+    }
+
+    res.json({ message: 'DOI history date updated successfully' });
+  } catch (error) {
+    console.error('Error updating DOI history:', error);
+    res.status(500).json({ error: 'Failed to update DOI history date' });
+  }
+});
+
 // App Requests management
 router.get('/app-requests', async (req, res) => {
   try {
@@ -906,7 +933,14 @@ router.post('/activity-logs', async (req, res) => {
 // Use Case Intake
 router.get('/use-case-intake', async (req, res) => {
   try {
-    const useCases = await queryAll('SELECT * FROM use_case_intake ORDER BY created_at DESC');
+    const useCases = await queryAll(`
+      SELECT u.*,
+        CASE WHEN a.id IS NOT NULL AND a.deleted_at IS NOT NULL THEN true ELSE false END as project_deleted,
+        a.name as linked_project_name
+      FROM use_case_intake u
+      LEFT JOIN apps a ON u.app_id = a.id
+      ORDER BY u.created_at DESC
+    `);
     res.json(useCases);
   } catch (error) {
     console.error('Error fetching use cases:', error);
@@ -1087,7 +1121,7 @@ router.put('/use-case-intake/:id', async (req, res) => {
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
       benefit_availability, benefit_time_saving, benefit_cost_reduction,
       benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
-      status, admin_notes, attachments
+      status, admin_notes, attachments, restore_project
     } = req.body;
 
     const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
@@ -1164,8 +1198,13 @@ router.put('/use-case-intake/:id', async (req, res) => {
       ]
     );
 
+    // If restoring deleted project
+    if (restore_project && appId) {
+      await query('UPDATE apps SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1', [appId]);
+    }
+
     // If status changed to Approved or In Progress
-    if ((status === 'Approved' || status === 'In Progress') && oldStatus !== status) {
+    if ((status === 'Approved' || status === 'In Progress') && oldStatus !== status && !restore_project) {
       if (appId) {
         // Restore if soft-deleted, then move to DOI 1
         await query(

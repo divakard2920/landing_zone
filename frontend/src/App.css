@@ -24,6 +24,22 @@
   --status-warning: #f59e0b;
   --status-success: #10b981;
   --status-update: #8b5cf6;
+
+  --ai-usecase-bg: #dbeafe;
+  --ai-usecase-color: #1e40af;
+  --foundation-bg: #f3e8ff;
+  --foundation-color: #7c3aed;
+  --identifier-bg: #e8ede9;
+  --identifier-color: #5f6f65;
+
+  --change-indicator: #3b82f6;
+  --change-bg: rgba(59, 130, 246, 0.08);
+
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --error-text: #dc2626;
+  --success-bg: #f0fdf4;
+  --success-text: #22c55e;
 }
 
 /* Dark Mode */
@@ -46,6 +62,22 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+
+  --ai-usecase-bg: #1e3a5f;
+  --ai-usecase-color: #60a5fa;
+  --foundation-bg: #3b2d5c;
+  --foundation-color: #a78bfa;
+  --identifier-bg: #2d3b2d;
+  --identifier-color: #86efac;
+
+  --change-indicator: #60a5fa;
+  --change-bg: rgba(96, 165, 250, 0.15);
+
+  --error-bg: #450a0a;
+  --error-border: #7f1d1d;
+  --error-text: #fca5a5;
+  --success-bg: #052e16;
+  --success-text: #4ade80;
 }
 
 [data-theme="dark"] .project-card {
@@ -4610,15 +4642,14 @@ select.form-control {
 }
 
 .inline-select {
-  padding: 6px 10px;
+  padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: 6px;
   font-size: 0.85rem;
   background-color: transparent;
   color: var(--text-primary);
   cursor: pointer;
-  min-width: 120px;
-  max-width: 160px;
+  width: auto;
   transition: all 0.15s ease;
 }
 

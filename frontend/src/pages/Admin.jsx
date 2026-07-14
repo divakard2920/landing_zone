@@ -3,6 +3,9 @@ import { api } from '../api';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Tooltip } from 'react-tooltip';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, DEMAND_TYPES, PLATFORMS, USECASE_TYPES } from '../constants';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 const AIUsecaseIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -38,29 +41,11 @@ const AppIcon = ({ icon, usecaseType }) => {
   if (isUploadedFile(icon)) {
     return <img src={icon} alt="app icon" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />;
   }
-  if (icon) return <span style={{ background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{icon}</span>;
+  if (icon) return <span style={{ background: 'var(--bg-muted)', padding: '4px 8px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{icon}</span>;
   if (usecaseType === 'AI Usecase') return <AIUsecaseIcon />;
   if (usecaseType === 'Foundation') return <FoundationIcon />;
   return <DefaultAppIcon />;
 };
-
-const STATUS_OPTIONS = [
-  'Active', 'On Hold', 'Completed', 'Cancelled', 'In Review',
-  'Ongoing Project', 'POC active', 'POC completed', 'Use case defined',
-  'Active in progress', 'Awaiting decision', 'To be started', 'MVP has been built'
-];
-
-const DEMAND_TYPES = [
-  'L1 - Platform Provision',
-  'L2 - Solution Partnering',
-  'L3 - Fully Managed'
-];
-
-const PLATFORMS = ['MS Azure', 'AWS', 'GCP', 'Other'];
-
-const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
-
-const USECASE_TYPES = ['AI Usecase', 'Foundation'];
 
 const emptyProjectForm = {
   name: '', description: '', url: '', icon: '', category: '',
@@ -856,6 +841,69 @@ function Admin() {
     });
   };
 
+  const exportUseCasesToExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Use Case Intake');
+
+      worksheet.columns = [
+        { header: 'Idea Name', key: 'idea_name', width: 30 },
+        { header: 'Use Case Type', key: 'usecase_type', width: 15 },
+        { header: 'Submission Date', key: 'submission_date', width: 15 },
+        { header: 'Idea Owner', key: 'idea_owner', width: 20 },
+        { header: 'Sponsor', key: 'sponsor', width: 20 },
+        { header: 'Division', key: 'division', width: 15 },
+        { header: 'Product Owner', key: 'product_owner', width: 20 },
+        { header: 'Line of Business', key: 'line_of_business', width: 20 },
+        { header: 'Priority Index', key: 'priority_index', width: 12 },
+        { header: 'Priority Cluster', key: 'priority_cluster', width: 20 },
+        { header: 'T-Shirt Size', key: 'tshirt_size', width: 12 },
+        { header: 'Recommended Action', key: 'recommended_action', width: 25 },
+        { header: 'Status', key: 'status', width: 15 },
+        { header: 'Complexity Score', key: 'complexity_score', width: 15 },
+        { header: 'Benefit Score', key: 'benefit_score', width: 12 },
+        { header: 'Motivation', key: 'motivation', width: 40 },
+        { header: 'Description & Target', key: 'description_target', width: 40 },
+        { header: 'Value Add', key: 'value_add', width: 40 },
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00457E' } };
+      worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+      useCaseIntakes.forEach(uc => {
+        worksheet.addRow({
+          idea_name: uc.idea_name,
+          usecase_type: uc.usecase_type,
+          submission_date: uc.submission_date ? new Date(uc.submission_date).toLocaleDateString() : '',
+          idea_owner: uc.idea_owner,
+          sponsor: uc.sponsor,
+          division: uc.division,
+          product_owner: uc.product_owner,
+          line_of_business: uc.line_of_business,
+          priority_index: uc.priority_index,
+          priority_cluster: uc.priority_cluster,
+          tshirt_size: uc.tshirt_size,
+          recommended_action: uc.recommended_action,
+          status: uc.status,
+          complexity_score: uc.complexity_score,
+          benefit_score: uc.benefit_score,
+          motivation: uc.motivation,
+          description_target: uc.description_target,
+          value_add: uc.value_add,
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `UseCase_Intake_${new Date().toISOString().split('T')[0]}.xlsx`);
+      showToast('Export completed', 'success');
+    } catch (error) {
+      console.error('Export error:', error);
+      showAlert('Failed to export data', 'error');
+    }
+  };
+
   const handleUseCaseAction = (useCase, action) => {
     setActionModal({ show: true, useCase, action, comment: '' });
   };
@@ -867,6 +915,7 @@ function Admin() {
       case 'park': return { status: 'Parked', title: 'Park Use Case', placeholder: 'Why is this being parked? (optional)', required: false };
       case 'decline': return { status: 'Declined', title: 'Decline Use Case', placeholder: 'Reason for declining (required)', required: true };
       case 'rework': return { status: 'Rework Required', title: 'Send for Rework', placeholder: 'What needs to be reworked? (required)', required: true };
+      case 'recreate': return { status: 'In Progress', title: 'Restore Project', placeholder: 'Add notes for restoring project (optional)', required: false, restore: true };
       default: return { status: '', title: '', placeholder: '', required: false };
     }
   };
@@ -888,15 +937,22 @@ function Admin() {
 
     try {
       // Update use case status - backend will automatically move linked project to DOI 1
-      await api.admin.updateUseCaseIntake(useCase.id, {
+      const updateData = {
         ...useCase,
         status: details.status,
         admin_notes: useCase.admin_notes ? `${newNote}\n${useCase.admin_notes}` : newNote
-      });
+      };
+      // If restoring, restore the deleted project
+      if (action === 'recreate') {
+        updateData.restore_project = true;
+      }
+      await api.admin.updateUseCaseIntake(useCase.id, updateData);
       logActivity('updated_status', 'use_case', useCase.id, `${useCase.idea_name} → ${details.status}`);
-      const toastMsg = (action === 'approve' || action === 'start_doi1')
-        ? `Use case ${details.status.toLowerCase()} - Project moved to DOI 1`
-        : `Use case ${details.status.toLowerCase()}`;
+      const toastMsg = action === 'recreate'
+        ? 'Project restored successfully'
+        : (action === 'approve' || action === 'start_doi1')
+          ? `Use case ${details.status.toLowerCase()} - Project moved to DOI 1`
+          : `Use case ${details.status.toLowerCase()}`;
       showToast(toastMsg, 'success');
       setActionModal({ show: false, useCase: null, action: '', comment: '' });
       loadData();
@@ -1241,7 +1297,7 @@ function Admin() {
                   onChange={(e) => setProjectSearchQuery(e.target.value)}
                 />
                 {projectSearchQuery && (
-                  <button className="search-clear" onClick={() => setProjectSearchQuery('')}>×</button>
+                  <button className="search-clear" onClick={() => setProjectSearchQuery('')} title="Clear search">×</button>
                 )}
               </div>
               <button
@@ -1302,9 +1358,9 @@ function Admin() {
                         <div className="admin-project-icon">
                           <AppIcon icon={project.icon} usecaseType={project.usecase_type} />
                         </div>
-                        <div>
-                          {project.usecase_identifier && <div style={{ fontSize: '0.75rem', color: '#5f6f65', background: '#e8ede9', padding: '2px 8px', borderRadius: '4px', display: 'inline-block', fontWeight: 500, marginBottom: '2px' }}>{project.usecase_identifier}</div>}
-                          <div style={{ fontWeight: 600 }}>{project.name}</div>
+                        <div style={{ cursor: 'pointer' }} onClick={() => navigate(`/admin/projects/${project.id}`)}>
+                          {project.usecase_identifier && <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'var(--bg-muted)', padding: '2px 8px', borderRadius: '4px', display: 'inline-block', fontWeight: 500, marginBottom: '2px' }}>{project.usecase_identifier}</div>}
+                          <div style={{ fontWeight: 600, color: 'var(--brand-primary)' }}>{project.name}</div>
                           {project.project_id && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ID: {project.project_id}</div>}
                         </div>
                       </div>
@@ -1344,13 +1400,34 @@ function Admin() {
                       <div className="action-buttons">
                         {showDeletedProjects ? (
                           <>
-                            <button className="btn btn-success btn-sm" onClick={() => handleRestoreProject(project)}>Restore</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => handlePermanentDelete(project)}>Delete Forever</button>
+                            <button className="btn btn-success btn-sm" onClick={() => handleRestoreProject(project)} data-tooltip-id="admin-tooltip" data-tooltip-content="Restore" style={{ padding: '6px 10px' }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/>
+                                <path d="M21 3v5h-5"/>
+                                <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/>
+                              </svg>
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handlePermanentDelete(project)} data-tooltip-id="admin-tooltip" data-tooltip-content="Delete Forever" style={{ padding: '6px 10px' }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                <line x1="10" y1="11" x2="10" y2="17"/>
+                                <line x1="14" y1="11" x2="14" y2="17"/>
+                              </svg>
+                            </button>
                           </>
                         ) : (
                           <>
-                            <button className="btn btn-secondary btn-sm" onClick={() => handleEditProject(project)}>Edit</button>
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(project.id, project.name)}>Delete</button>
+                            <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/admin/projects/${project.id}`)} data-tooltip-id="admin-tooltip" data-tooltip-content="Edit" style={{ padding: '6px 10px' }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                            </button>
+                            <button className="btn btn-danger btn-sm" onClick={() => handleDeleteProject(project.id, project.name)} data-tooltip-id="admin-tooltip" data-tooltip-content="Delete" style={{ padding: '6px 10px' }}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                              </svg>
+                            </button>
                           </>
                         )}
                       </div>
@@ -1535,8 +1612,17 @@ function Admin() {
                               </div>
                               <div className="team-member-email-inline">{m.email || '-'}</div>
                               <div className="team-member-actions">
-                                <button className="edit" onClick={() => handleEditTeamMember(m)}>Edit</button>
-                                <button className="remove" onClick={() => handleDeleteTeamMember(m.id)}>Remove</button>
+                                <button className="edit" onClick={() => handleEditTeamMember(m)} data-tooltip-id="admin-tooltip" data-tooltip-content="Edit">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                  </svg>
+                                </button>
+                                <button className="remove" onClick={() => handleDeleteTeamMember(m.id)} data-tooltip-id="admin-tooltip" data-tooltip-content="Remove">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                  </svg>
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -1581,8 +1667,17 @@ function Admin() {
                       <td>{new Date(item.created_at).toLocaleDateString()}</td>
                       <td>
                         <div className="action-buttons">
-                          <button className="btn btn-sm" onClick={() => handleEditAnnouncement(item)}>Edit</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAnnouncement(item.id, item.title)}>Delete</button>
+                          <button className="btn btn-sm" onClick={() => handleEditAnnouncement(item)} data-tooltip-id="admin-tooltip" data-tooltip-content="Edit" style={{ padding: '6px 10px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteAnnouncement(item.id, item.title)} data-tooltip-id="admin-tooltip" data-tooltip-content="Delete" style={{ padding: '6px 10px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1695,8 +1790,17 @@ function Admin() {
                       </td>
                       <td>
                         <div className="action-buttons">
-                          <button className="btn btn-sm" onClick={() => handleEditWidget(widget)}>Edit</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteWidget(widget.id, widget.title)}>Delete</button>
+                          <button className="btn btn-sm" onClick={() => handleEditWidget(widget)} data-tooltip-id="admin-tooltip" data-tooltip-content="Edit" style={{ padding: '6px 10px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                          </button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteWidget(widget.id, widget.title)} data-tooltip-id="admin-tooltip" data-tooltip-content="Delete" style={{ padding: '6px 10px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1755,9 +1859,18 @@ function Admin() {
                     </td>
                     <td>
                       <div className="action-buttons">
-                        <button className="btn btn-sm" onClick={() => handleEditAdmin(admin)}>Edit</button>
+                        <button className="btn btn-sm" onClick={() => handleEditAdmin(admin)} data-tooltip-id="admin-tooltip" data-tooltip-content="Edit" style={{ padding: '6px 10px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                          </svg>
+                        </button>
                         {currentAdmin?.id !== admin.id && (
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteAdmin(admin)}>Delete</button>
+                          <button className="btn btn-sm btn-danger" onClick={() => handleDeleteAdmin(admin)} data-tooltip-id="admin-tooltip" data-tooltip-content="Delete" style={{ padding: '6px 10px' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                          </button>
                         )}
                       </div>
                     </td>
@@ -1833,6 +1946,14 @@ function Admin() {
                   <option value="L">L</option>
                   <option value="XL">XL</option>
                 </select>
+                <button className="btn btn-outline" onClick={exportUseCasesToExcel} data-tooltip-id="admin-tooltip" data-tooltip-content="Export to Excel">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Export
+                </button>
                 <button className="btn btn-primary" onClick={() => { setEditingUseCase(null); setUseCaseForm({ ...emptyUseCaseForm, submission_date: new Date().toISOString().split('T')[0] }); setUseCaseStep(1); setShowUseCaseModal(true); }}>
                   + New Use Case
                 </button>
@@ -2008,6 +2129,16 @@ function Admin() {
                             <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                           </svg>
                         </button>
+                        {uc.project_deleted && (
+                          <button className="btn btn-sm btn-warning" onClick={() => handleUseCaseAction(uc, 'recreate')} data-tooltip-id="admin-tooltip" data-tooltip-content="Restore deleted project">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/>
+                              <path d="M21 3v5h-5"/>
+                              <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/>
+                              <path d="M3 21v-5h5"/>
+                            </svg>
+                          </button>
+                        )}
                         <button className="btn btn-sm btn-icon btn-icon-primary" onClick={() => setViewingUseCase(uc)} title="View" data-tooltip-id="admin-tooltip" data-tooltip-content="View">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
@@ -2345,7 +2476,7 @@ function Admin() {
                           <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Complexity Scorecard</h4>
                           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the complexity</p>
                         </div>
-                        <div style={{ padding: '8px 16px', background: '#fef3c7', borderRadius: '8px', fontWeight: 700, color: '#92400e' }}>
+                        <div style={{ padding: '8px 16px', background: 'var(--bg-muted)', borderRadius: '8px', fontWeight: 700, color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
                           Score: {(useCaseForm.complexity_integration || 1) + (useCaseForm.complexity_data_security || 1) + (useCaseForm.complexity_solution_type || 1) + (useCaseForm.complexity_users || 1) + (useCaseForm.complexity_process_change || 1) + (useCaseForm.complexity_stakeholder || 1) + (useCaseForm.complexity_effort_cost || 1)} / 28
                         </div>
                       </div>
@@ -2364,8 +2495,8 @@ function Admin() {
                             {item.options.map((opt, idx) => (
                               <label key={idx} style={{
                                 padding: '10px 8px', borderRadius: '6px', cursor: 'pointer', textAlign: 'center',
-                                background: useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'white',
-                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-secondary)',
+                                background: useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--bg-base)',
+                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-primary)',
                                 border: `1px solid ${useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--border-light)'}`,
                                 fontSize: '0.7rem', transition: 'all 0.15s', lineHeight: 1.3
                               }}>
@@ -2388,7 +2519,7 @@ function Admin() {
                           <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Benefit Scorecard</h4>
                           <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the expected benefit</p>
                         </div>
-                        <div style={{ padding: '8px 16px', background: '#dcfce7', borderRadius: '8px', fontWeight: 700, color: '#166534' }}>
+                        <div style={{ padding: '8px 16px', background: 'var(--bg-muted)', borderRadius: '8px', fontWeight: 700, color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
                           Score: {(useCaseForm.benefit_availability || 1) + (useCaseForm.benefit_time_saving || 1) + (useCaseForm.benefit_cost_reduction || 1) + (useCaseForm.benefit_legacy_consolidation || 1) + (useCaseForm.benefit_automation || 1) + (useCaseForm.benefit_data_quality || 1) + (useCaseForm.benefit_compliance || 1)} / 28
                         </div>
                       </div>
@@ -2407,9 +2538,9 @@ function Admin() {
                             {item.options.map((opt, idx) => (
                               <label key={idx} style={{
                                 padding: '10px 8px', borderRadius: '6px', cursor: 'pointer', textAlign: 'center',
-                                background: useCaseForm[item.key] === idx + 1 ? '#10b981' : 'white',
-                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-secondary)',
-                                border: `1px solid ${useCaseForm[item.key] === idx + 1 ? '#10b981' : 'var(--border-light)'}`,
+                                background: useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--bg-base)',
+                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-primary)',
+                                border: `1px solid ${useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--border-light)'}`,
                                 fontSize: '0.7rem', transition: 'all 0.15s', lineHeight: 1.3
                               }}>
                                 <input type="radio" name={item.key} checked={useCaseForm[item.key] === idx + 1}
@@ -2425,22 +2556,22 @@ function Admin() {
                       {(() => {
                         const scores = calculateUseCaseScores(useCaseForm);
                         return (
-                          <div style={{ marginTop: '16px', padding: '16px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border: '2px solid #0ea5e9', borderRadius: '10px' }}>
-                            <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem' }}>Calculated Results</h4>
+                          <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-muted)', border: '2px solid var(--brand-primary)', borderRadius: '10px' }}>
+                            <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>Calculated Results</h4>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: scores.priorityIndex >= 70 ? '#166534' : scores.priorityIndex >= 50 ? '#92400e' : '#991b1b' }}>{scores.priorityIndex}</div>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{scores.priorityIndex}</div>
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Priority Index</div>
                               </div>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
                                 <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{scores.priorityCluster}</div>
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cluster</div>
                               </div>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#3730a3' }}>{scores.tshirtSize}</div>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{scores.tshirtSize}</div>
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>T-Shirt</div>
                               </div>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'white', borderRadius: '8px' }}>
+                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
                                 <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-primary)' }}>{scores.recommendedAction}</div>
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Action</div>
                               </div>
@@ -2502,21 +2633,21 @@ function Admin() {
               <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
                 {/* Score Summary */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
-                  <div style={{ textAlign: 'center', padding: '14px 10px', background: viewingUseCase.priority_index >= 70 ? '#dcfce7' : viewingUseCase.priority_index >= 50 ? '#fef3c7' : '#fee2e2', borderRadius: '10px', border: '1px solid', borderColor: viewingUseCase.priority_index >= 70 ? '#86efac' : viewingUseCase.priority_index >= 50 ? '#fde68a' : '#fecaca' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: viewingUseCase.priority_index >= 70 ? '#166534' : viewingUseCase.priority_index >= 50 ? '#854d0e' : '#991b1b' }}>{viewingUseCase.priority_index}</div>
-                    <div style={{ fontSize: '0.7rem', color: viewingUseCase.priority_index >= 70 ? '#166534' : viewingUseCase.priority_index >= 50 ? '#854d0e' : '#991b1b', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Priority Index</div>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '2px solid var(--brand-primary)' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-primary)' }}>{viewingUseCase.priority_index}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority Index</div>
                   </div>
-                  <div style={{ textAlign: 'center', padding: '14px 10px', background: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#dcfce7' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#dbeafe' : viewingUseCase.priority_cluster === 'Low Priority' ? '#fef3c7' : '#fee2e2', borderRadius: '10px', border: '1px solid', borderColor: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#86efac' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#93c5fd' : viewingUseCase.priority_cluster === 'Low Priority' ? '#fde68a' : '#fecaca' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#166534' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#1e40af' : viewingUseCase.priority_cluster === 'Low Priority' ? '#854d0e' : '#991b1b' }}>{viewingUseCase.priority_cluster}</div>
-                    <div style={{ fontSize: '0.7rem', color: viewingUseCase.priority_cluster === 'High Priority / Quick Win' ? '#166534' : viewingUseCase.priority_cluster === 'Medium Priority' ? '#1e40af' : viewingUseCase.priority_cluster === 'Low Priority' ? '#854d0e' : '#991b1b', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Priority Cluster</div>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{viewingUseCase.priority_cluster}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority Cluster</div>
                   </div>
                   <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{viewingUseCase.tshirt_size}</div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>T-Shirt Size</div>
                   </div>
-                  <div style={{ textAlign: 'center', padding: '14px 10px', background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', borderRadius: '10px', border: '1px solid #7dd3fc' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369a1', lineHeight: 1.3 }}>{viewingUseCase.recommended_action}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#0369a1', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Action</div>
+                  <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>{viewingUseCase.recommended_action}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Action</div>
                   </div>
                 </div>
 
@@ -2524,7 +2655,7 @@ function Admin() {
                 <div style={{ marginBottom: '20px', background: 'var(--bg-muted)', borderRadius: '10px', padding: '16px' }}>
                   <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Basic Information</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '0.9rem' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Use Case Type:</span> <span style={{ padding: '2px 8px', borderRadius: '4px', background: viewingUseCase.usecase_type === 'AI Usecase' ? '#dbeafe' : '#f3e8ff', color: viewingUseCase.usecase_type === 'AI Usecase' ? '#1e40af' : '#7c3aed', fontSize: '0.85rem' }}>{viewingUseCase.usecase_type || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Use Case Type:</span> <span style={{ padding: '2px 8px', borderRadius: '4px', background: 'var(--bg-base)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{viewingUseCase.usecase_type || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Submission Date:</span> <span>{viewingUseCase.submission_date ? new Date(viewingUseCase.submission_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Idea Owner:</span> <span>{viewingUseCase.idea_owner || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Division:</span> <span>{viewingUseCase.division || '-'}</span></div>
@@ -2551,7 +2682,15 @@ function Admin() {
 
                 {/* Attachments */}
                 {(() => {
-                  const attachments = viewingUseCase.attachments ? (typeof viewingUseCase.attachments === 'string' ? JSON.parse(viewingUseCase.attachments) : viewingUseCase.attachments) : [];
+                  let attachments = [];
+                  try {
+                    if (viewingUseCase.attachments) {
+                      const parsed = typeof viewingUseCase.attachments === 'string' ? JSON.parse(viewingUseCase.attachments) : viewingUseCase.attachments;
+                      attachments = Array.isArray(parsed) ? parsed : [];
+                    }
+                  } catch (e) {
+                    attachments = [];
+                  }
                   return attachments.length > 0 && (
                     <div style={{ marginBottom: '20px', background: 'var(--bg-muted)', borderRadius: '10px', padding: '16px' }}>
                       <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Attachments</h4>
@@ -2767,6 +2906,10 @@ function Admin() {
                     </select>
                   </div>
                   <div className="form-group">
+                    <label>Strategic Focus</label>
+                    <input type="text" className="form-control" value={projectForm.strategic_focus} onChange={e => setProjectForm({...projectForm, strategic_focus: e.target.value})} placeholder="e.g., Cost Reduction, Innovation, Compliance" />
+                  </div>
+                  <div className="form-group">
                     <label>
                       DOI Stage
                       {editingProject && (() => {
@@ -2808,6 +2951,42 @@ function Admin() {
                     />
                     <small style={{ color: 'var(--text-muted)' }}>{editingProject ? 'Update the date for the current DOI stage' : 'Set the project creation date'}</small>
                   </div>
+                  {editingProject && projectDoiHistory.length > 0 && (
+                    <div className="form-group full-width">
+                      <label>DOI History Dates</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', marginTop: '8px' }}>
+                        {projectDoiHistory.map(h => {
+                          const stage = doiStages.find(d => d.id === h.to_stage);
+                          return (
+                            <div key={h.id} style={{ padding: '10px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
+                              <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-secondary)' }}>
+                                DOI {h.to_stage} - {stage?.label || 'Unknown'}
+                              </div>
+                              <input
+                                type="date"
+                                className="form-control"
+                                style={{ fontSize: '0.85rem' }}
+                                value={h.changed_at ? new Date(h.changed_at).toISOString().split('T')[0] : ''}
+                                max={new Date().toISOString().split('T')[0]}
+                                onChange={async (e) => {
+                                  const newDate = e.target.value;
+                                  try {
+                                    await api.admin.updateDoiHistoryDate(h.id, newDate);
+                                    setProjectDoiHistory(projectDoiHistory.map(item =>
+                                      item.id === h.id ? { ...item, changed_at: newDate } : item
+                                    ));
+                                  } catch (err) {
+                                    console.error('Failed to update DOI date:', err);
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <small style={{ color: 'var(--text-muted)', marginTop: '8px', display: 'block' }}>Edit dates for any DOI stage directly</small>
+                    </div>
+                  )}
                   <div className="form-group">
                     <label>Current Status</label>
                     <select className="form-control" value={projectForm.current_status} onChange={e => setProjectForm({...projectForm, current_status: e.target.value})}>
@@ -2887,7 +3066,7 @@ function Admin() {
                       )}
                     </div>
                   </div>
-                  <div className="form-group">
+                  <div className="form-group full-width">
                     <label>Application URL</label>
                     <input type="url" className="form-control" value={projectForm.url} onChange={e => setProjectForm({...projectForm, url: e.target.value})} />
                   </div>
