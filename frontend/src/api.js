@@ -88,6 +88,7 @@ export const api = {
 
     getDoiStages: () => axios.get(`${API_BASE}/admin/doi-stages`),
     updateDoiStage: (id, data) => axios.put(`${API_BASE}/admin/doi-stages/${id}`, data),
+    updateDoiHistoryDate: (id, changed_at) => axios.put(`${API_BASE}/admin/doi-history/${id}`, { changed_at }),
 
     getAppRequests: () => axios.get(`${API_BASE}/admin/app-requests`),
     approveAppRequest: (id, notes) => axios.put(`${API_BASE}/admin/app-requests/${id}/approve`, { admin_notes: notes }),

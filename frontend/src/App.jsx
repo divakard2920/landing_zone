@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing';
 import Admin from './pages/Admin';
+import ProjectDetail from './pages/ProjectDetail';
 import Login from './pages/Login';
 import CapybaraAvatar from './components/CapybaraAvatar';
 import { ThemeProvider } from './context/ThemeContext';
@@ -22,6 +23,11 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/admin/projects/:id" element={
+          <ProtectedRoute>
+            <ProjectDetail />
+          </ProtectedRoute>
+        } />
         <Route path="/admin/*" element={
           <ProtectedRoute>
             <Admin />
