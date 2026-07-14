@@ -674,7 +674,7 @@ function ProjectDetail() {
                       type="date"
                       value={project.start_date ? formatDateForInput(project.start_date) : ''}
                       onChange={e => setProject({ ...project, start_date: e.target.value })}
-                      style={{ padding: '6px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.9rem', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+                      style={{ padding: '6px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.9rem', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                     />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -686,7 +686,7 @@ function ProjectDetail() {
                       type="date"
                       value={project.end_date ? formatDateForInput(project.end_date) : ''}
                       onChange={e => setProject({ ...project, end_date: e.target.value })}
-                      style={{ padding: '6px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.9rem', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+                      style={{ padding: '6px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.9rem', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                     />
                   </div>
                 </div>
@@ -857,7 +857,8 @@ function ProjectDetail() {
                               fontSize: '0.75rem',
                               color: 'var(--text-muted)',
                               background: 'var(--bg-base)',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              fontFamily: 'inherit'
                             }}
                           />
                         </div>
