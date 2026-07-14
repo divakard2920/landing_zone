@@ -272,8 +272,53 @@ function ProjectDetail() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', color: 'var(--text-muted)' }}>
-        Loading...
+      <div className="project-detail-page" style={{ background: 'var(--bg-base)', minHeight: '100vh' }}>
+        <header className="top-header">
+          <div className="brand-section">
+            <div className="skeleton-box" style={{ width: 120, height: 28 }}></div>
+          </div>
+        </header>
+        <main style={{ maxWidth: 1400, margin: '0 auto', padding: '24px 32px' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            <div className="skeleton-box" style={{ width: 80, height: 32, borderRadius: 6 }}></div>
+          </div>
+          <div style={{ display: 'flex', gap: '24px' }}>
+            <div style={{ flex: 1 }}>
+              <div className="skeleton-box" style={{ width: '60%', height: 32, marginBottom: 12 }}></div>
+              <div className="skeleton-box" style={{ width: '40%', height: 20, marginBottom: 24 }}></div>
+              <div style={{ background: 'var(--bg-panel)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div className="skeleton-box" style={{ width: 120, height: 16, marginBottom: 16 }}></div>
+                <div className="skeleton-box" style={{ width: '100%', height: 60, marginBottom: 12 }}></div>
+                <div className="skeleton-box" style={{ width: '80%', height: 16 }}></div>
+              </div>
+              <div style={{ background: 'var(--bg-panel)', borderRadius: 12, padding: 20 }}>
+                <div className="skeleton-box" style={{ width: 150, height: 16, marginBottom: 16 }}></div>
+                {[1,2,3,4].map(i => (
+                  <div key={i} style={{ display: 'flex', marginBottom: 12 }}>
+                    <div className="skeleton-box" style={{ width: 120, height: 16, marginRight: 16 }}></div>
+                    <div className="skeleton-box" style={{ width: '50%', height: 16 }}></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ width: 320 }}>
+              <div style={{ background: 'var(--bg-panel)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div className="skeleton-box" style={{ width: 100, height: 16, marginBottom: 16 }}></div>
+                <div className="skeleton-box" style={{ width: '100%', height: 8, borderRadius: 4, marginBottom: 16 }}></div>
+                <div className="skeleton-box" style={{ width: '100%', height: 60 }}></div>
+              </div>
+              <div style={{ background: 'var(--bg-panel)', borderRadius: 12, padding: 20 }}>
+                <div className="skeleton-box" style={{ width: 80, height: 16, marginBottom: 16 }}></div>
+                {[1,2,3].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div className="skeleton-box" style={{ width: 24, height: 24, borderRadius: '50%' }}></div>
+                    <div className="skeleton-box" style={{ width: '70%', height: 16 }}></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
