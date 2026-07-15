@@ -114,6 +114,7 @@ function Admin() {
   const [alertDialog, setAlertDialog] = useState({ show: false, title: '', message: '', type: 'error' });
   const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [activityLogs, setActivityLogs] = useState([]);
   const [activityLogLimit, setActivityLogLimit] = useState(10);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
@@ -2441,16 +2442,19 @@ function Admin() {
                       <div className="form-group">
                         <label>Attachments</label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                          <label className="icon-upload-btn" style={{ margin: 0 }}>
-                            Upload File
-                            <input type="file" hidden onChange={async (e) => {
+                          <label className="icon-upload-btn" style={{ margin: 0, opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto' }}>
+                            {uploading ? 'Uploading...' : 'Upload File'}
+                            <input type="file" hidden disabled={uploading} onChange={async (e) => {
                               const file = e.target.files[0];
                               if (file) {
+                                setUploading(true);
                                 try {
                                   const res = await api.admin.uploadFile(file);
                                   setUseCaseForm({...useCaseForm, attachments: [...(useCaseForm.attachments || []), res.data]});
                                 } catch (err) {
                                   console.error('Upload failed', err);
+                                } finally {
+                                  setUploading(false);
                                 }
                               }
                               e.target.value = '';
@@ -3035,16 +3039,19 @@ function Admin() {
                         <option value="API">API</option>
                       </select>
                       <span className="icon-or">or</span>
-                      <label className="icon-upload-btn">
-                        Upload
-                        <input type="file" accept="image/*" hidden onChange={async (e) => {
+                      <label className="icon-upload-btn" style={{ opacity: uploading ? 0.6 : 1, pointerEvents: uploading ? 'none' : 'auto' }}>
+                        {uploading ? 'Uploading...' : 'Upload'}
+                        <input type="file" accept="image/*" hidden disabled={uploading} onChange={async (e) => {
                           const file = e.target.files[0];
                           if (file) {
+                            setUploading(true);
                             try {
                               const res = await api.admin.uploadIcon(file);
                               setProjectForm({...projectForm, icon: res.data.url});
                             } catch (err) {
                               console.error('Upload failed', err);
+                            } finally {
+                              setUploading(false);
                             }
                           }
                         }} />

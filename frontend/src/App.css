@@ -2941,9 +2941,10 @@ body {
 }
 
 .icon-upload-btn {
+  display: inline-block;
   padding: 8px 16px;
   background: var(--brand-primary);
-  color: white;
+  color: white !important;
   border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 600;
