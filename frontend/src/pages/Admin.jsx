@@ -911,7 +911,7 @@ function Admin() {
 
   const getActionDetails = (action) => {
     switch (action) {
-      case 'approve': return { status: 'Approved', title: 'Approve Use Case', placeholder: 'Add approval notes (optional)', required: false };
+      case 'approve': return { status: 'In Progress', title: 'Approve Use Case', placeholder: 'Add approval notes (optional)', required: false };
       case 'start_doi1': return { status: 'In Progress', title: 'Start DOI1', placeholder: 'Add notes for starting DOI1 (optional)', required: false };
       case 'park': return { status: 'Parked', title: 'Park Use Case', placeholder: 'Why is this being parked? (optional)', required: false };
       case 'decline': return { status: 'Declined', title: 'Decline Use Case', placeholder: 'Reason for declining (required)', required: true };
