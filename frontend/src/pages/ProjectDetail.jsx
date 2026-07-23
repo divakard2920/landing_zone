@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import ReactRouterPrompt from 'react-router-prompt';
 import { api } from '../api';
 import { useTheme } from '../context/ThemeContext';
 import { STATUS_OPTIONS, PRIORITY_OPTIONS, DEMAND_TYPES, PLATFORMS, USECASE_TYPES } from '../constants';
@@ -146,6 +147,7 @@ function ProjectDetail() {
 
   const hasChanges = project && originalProject && JSON.stringify(project) !== JSON.stringify(originalProject);
 
+  
   const logActivity = async (action, entityType, entityId, entityName, details = null) => {
     try {
       await api.admin.logActivity({
@@ -942,6 +944,7 @@ function ProjectDetail() {
                     placeholder="Name *"
                     value={teamForm.name}
                     onChange={e => setTeamForm({ ...teamForm, name: e.target.value })}
+                    onKeyDown={e => e.key === 'Enter' && addTeamMember()}
                     style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '6px', boxSizing: 'border-box' }}
                   />
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
@@ -950,6 +953,7 @@ function ProjectDetail() {
                       placeholder="Role"
                       value={teamForm.role}
                       onChange={e => setTeamForm({ ...teamForm, role: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && addTeamMember()}
                       style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
                     />
                     <input
@@ -957,6 +961,7 @@ function ProjectDetail() {
                       placeholder="Email"
                       value={teamForm.email}
                       onChange={e => setTeamForm({ ...teamForm, email: e.target.value })}
+                      onKeyDown={e => e.key === 'Enter' && addTeamMember()}
                       style={{ flex: 1, minWidth: 0, padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', boxSizing: 'border-box' }}
                     />
                   </div>
@@ -1011,6 +1016,31 @@ function ProjectDetail() {
         </div>
         </div>
       </main>
+
+      {/* Unsaved Changes Prompt */}
+      <ReactRouterPrompt when={hasChanges}>
+        {({ isActive, onConfirm, onCancel }) =>
+          isActive && (
+            <div className="confirm-overlay" onClick={onCancel}>
+              <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
+                <div className="confirm-icon" style={{ color: 'var(--warning-color, #f59e0b)' }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                </div>
+                <h3 className="confirm-title">Unsaved Changes</h3>
+                <p className="confirm-message">You have unsaved changes. Are you sure you want to leave without saving?</p>
+                <div className="confirm-actions">
+                  <button className="btn btn-outline" onClick={onCancel}>Cancel</button>
+                  <button className="btn btn-warning" onClick={onConfirm}>Leave Without Saving</button>
+                </div>
+              </div>
+            </div>
+          )
+        }
+      </ReactRouterPrompt>
     </div>
   );
 }
