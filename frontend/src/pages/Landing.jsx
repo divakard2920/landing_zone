@@ -1587,7 +1587,7 @@ function Landing() {
       {timelineExpanded && (() => {
         const doiColors = ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'];
         const allHistory = allDoiHistory || [];
-        const projectsWithHistory = apps
+        const projectsWithHistory = filteredApps
           .filter(app => !app.deleted_at)
           .map(app => {
             const history = allHistory.filter(h => h.app_id === app.id);
@@ -1638,7 +1638,14 @@ function Landing() {
           <div className="modal-overlay" onClick={() => setTimelineExpanded(false)} style={{ zIndex: 1000 }}>
             <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '95vw', width: '95vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
               <div className="modal-header" style={{ flexShrink: 0 }}>
-                <h2>Project Timeline</h2>
+                <h2>
+                  Project Timeline
+                  {activeFiltersCount > 0 && (
+                    <span style={{ marginLeft: '12px', fontSize: '0.75rem', fontWeight: 500, padding: '4px 10px', background: 'var(--brand-primary)', color: 'white', borderRadius: '12px', verticalAlign: 'middle' }}>
+                      {activeFiltersCount} filter{activeFiltersCount > 1 ? 's' : ''} applied
+                    </span>
+                  )}
+                </h2>
                 <button className="modal-close" onClick={() => setTimelineExpanded(false)}>&times;</button>
               </div>
 
