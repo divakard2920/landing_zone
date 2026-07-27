@@ -306,12 +306,7 @@ router.put('/apps/:id', async (req, res) => {
       }
     }
 
-    // Validate DOI stage progression
-    if (oldDoiStage !== null && newDoiStage < oldDoiStage) {
-      return res.status(400).json({
-        error: `Cannot downgrade DOI stage. Current stage is DOI ${oldDoiStage}.`
-      });
-    }
+    // Validate DOI stage progression (only prevent skipping forward, allow backward)
     if (oldDoiStage !== null && newDoiStage > oldDoiStage && newDoiStage - oldDoiStage > 1) {
       return res.status(400).json({
         error: `Cannot skip DOI stages. Current stage is DOI ${oldDoiStage}, can only advance to DOI ${oldDoiStage + 1}.`
@@ -356,17 +351,38 @@ router.put('/apps/:id', async (req, res) => {
 
     // Handle DOI stage changes
     if (oldDoiStage !== null && oldDoiStage !== newDoiStage) {
-      // Stage changed - create new history entry
-      if (doi_changed_at) {
+      if (newDoiStage < oldDoiStage) {
+        // Moving backward - delete history entries for stages being undone
         await query(
-          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
-          [uuidv4(), id, oldDoiStage, newDoiStage, doi_changed_at, 'Stage updated (manual date)']
+          'DELETE FROM doi_history WHERE app_id = $1 AND to_stage > $2',
+          [id, newDoiStage]
         );
+        // Update date of target stage if provided
+        if (doi_changed_at) {
+          const targetEntry = await queryOne(
+            'SELECT id FROM doi_history WHERE app_id = $1 AND to_stage = $2 ORDER BY changed_at DESC LIMIT 1',
+            [id, newDoiStage]
+          );
+          if (targetEntry) {
+            await query(
+              'UPDATE doi_history SET changed_at = $1, notes = $2 WHERE id = $3',
+              [doi_changed_at, 'Date updated (downgrade)', targetEntry.id]
+            );
+          }
+        }
       } else {
-        await query(
-          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-          [uuidv4(), id, oldDoiStage, newDoiStage, 'Stage updated']
-        );
+        // Moving forward - create new history entry
+        if (doi_changed_at) {
+          await query(
+            'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+            [uuidv4(), id, oldDoiStage, newDoiStage, doi_changed_at, 'Stage updated (manual date)']
+          );
+        } else {
+          await query(
+            'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
+            [uuidv4(), id, oldDoiStage, newDoiStage, 'Stage updated']
+          );
+        }
       }
     } else if (doi_changed_at) {
       // Stage didn't change but date provided - update existing history entry for current stage

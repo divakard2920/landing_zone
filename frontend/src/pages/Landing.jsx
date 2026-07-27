@@ -94,7 +94,8 @@ function Landing() {
     status: '',
     platform: '',
     division: '',
-    usecase_type: ''
+    usecase_type: '',
+    demand_type: ''
   });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('card');
@@ -399,7 +400,8 @@ function Landing() {
     statuses: [...new Set(apps.map(a => a.current_status).filter(Boolean))].sort(),
     platforms: splitAndUnique(apps, 'platform'),
     divisions: splitAndUnique(apps, 'business_division'),
-    priorities: ['High', 'Medium', 'Low']
+    priorities: ['High', 'Medium', 'Low'],
+    demandTypes: [...new Set(apps.map(a => a.demand_type).filter(Boolean))].sort()
   };
 
   const filteredApps = apps.filter(app => {
@@ -431,8 +433,9 @@ function Landing() {
     const matchesPlatform = !filters.platform || (app.platform || '').split(',').map(v => v.trim()).includes(filters.platform);
     const matchesDivision = !filters.division || (app.business_division || '').split(',').map(v => v.trim()).includes(filters.division);
     const matchesUsecaseType = !filters.usecase_type || app.usecase_type === filters.usecase_type;
+    const matchesDemandType = !filters.demand_type || app.demand_type === filters.demand_type;
 
-    return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision && matchesUsecaseType;
+    return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision && matchesUsecaseType && matchesDemandType;
   }).sort((a, b) => {
     // If user selected a sort column, use that
     if (sortConfig.key) {
@@ -462,7 +465,7 @@ function Landing() {
   const activeFiltersCount = Object.values(filters).filter(v => v !== '').length;
 
   const clearFilters = () => {
-    setFilters({ doi_stage: '', priority: '', status: '', platform: '', division: '', usecase_type: '' });
+    setFilters({ doi_stage: '', priority: '', status: '', platform: '', division: '', usecase_type: '', demand_type: '' });
   };
 
   if (pageLoading) {
@@ -596,11 +599,11 @@ function Landing() {
           <div className="stats-search-row">
             <div className="quick-stats left">
               <div className="quick-stat-card">
-                <span className="quick-stat-value">{apps.length}</span>
+                <span className="quick-stat-value">{filteredApps.length}</span>
                 <span className="quick-stat-label">Total Projects</span>
               </div>
               <div className="quick-stat-card">
-                <span className="quick-stat-value">{apps.filter(a => !['Completed', 'Cancelled'].includes(a.current_status)).length}</span>
+                <span className="quick-stat-value">{filteredApps.filter(a => !['Completed', 'Cancelled'].includes(a.current_status)).length}</span>
                 <span className="quick-stat-label">Active</span>
               </div>
             </div>
@@ -721,11 +724,11 @@ function Landing() {
 
             <div className="quick-stats right">
               <div className="quick-stat-card highlight">
-                <span className="quick-stat-value">{apps.filter(a => a.priority === 'High').length}</span>
+                <span className="quick-stat-value">{filteredApps.filter(a => a.priority === 'High').length}</span>
                 <span className="quick-stat-label">High Priority</span>
               </div>
               <div className="quick-stat-card">
-                <span className="quick-stat-value">{apps.filter(a => a.doi_stage >= 4).length}</span>
+                <span className="quick-stat-value">{filteredApps.filter(a => a.doi_stage >= 4).length}</span>
                 <span className="quick-stat-label">In Production</span>
               </div>
             </div>
@@ -798,6 +801,17 @@ function Landing() {
                   <option value="">All Use Case Types</option>
                   {USECASE_TYPES.map(t => (
                     <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={filters.demand_type}
+                  onChange={(e) => setFilters({...filters, demand_type: e.target.value})}
+                  className="filter-select"
+                >
+                  <option value="">All Demand Types</option>
+                  {filterOptions.demandTypes.map(d => (
+                    <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
 

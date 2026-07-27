@@ -818,8 +818,19 @@ function ProjectDetail() {
                     <select
                       value={project.doi_stage}
                       onChange={(e) => {
-                        setProject({ ...project, doi_stage: parseInt(e.target.value) });
-                        setDoiChangedAt('');
+                        const newStage = parseInt(e.target.value);
+                        setProject({ ...project, doi_stage: newStage });
+                        // Prefill date when downgrading to a previous stage
+                        if (newStage < originalProject?.doi_stage) {
+                          const historyEntry = doiHistory.find(h => h.to_stage === newStage);
+                          if (historyEntry) {
+                            setDoiChangedAt(formatDateForInput(historyEntry.changed_at));
+                          } else {
+                            setDoiChangedAt('');
+                          }
+                        } else {
+                          setDoiChangedAt('');
+                        }
                       }}
                       style={{ width: '100%', padding: '10px 12px', border: doiChanged ? '1px solid var(--change-indicator)' : '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem', background: doiChanged ? 'var(--change-bg)' : 'var(--bg-base)', color: 'var(--text-primary)', cursor: 'pointer' }}
                     >
@@ -833,7 +844,7 @@ function ProjectDetail() {
                           value={doiChangedAt}
                           onChange={(e) => setDoiChangedAt(e.target.value)}
                           max={formatDateForInput(new Date())}
-                          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+                          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border-light)', borderRadius: '6px', fontSize: '0.85rem', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
                         />
                         <small style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Leave empty for current date</small>
                       </div>
