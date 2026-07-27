@@ -868,6 +868,8 @@ function ProjectDetail() {
 
                   {doiHistory.map((h, i) => {
                     const isLatest = i === doiHistory.length - 1;
+                    const isDowngrading = project.doi_stage < originalProject?.doi_stage;
+                    const willBeRemoved = isDowngrading && h.to_stage > project.doi_stage;
                     const doiColors = {
                       0: '#94a3b8',
                       1: '#f59e0b',
@@ -876,20 +878,20 @@ function ProjectDetail() {
                       4: '#10b981',
                       5: '#059669'
                     };
-                    const stageColor = doiColors[h.to_stage] || 'var(--brand-primary)';
+                    const stageColor = willBeRemoved ? '#ef4444' : (doiColors[h.to_stage] || 'var(--brand-primary)');
                     return (
-                      <div key={h.id} style={{ display: 'flex', gap: '14px', marginBottom: i < doiHistory.length - 1 ? '16px' : 0, position: 'relative' }}>
+                      <div key={h.id} style={{ display: 'flex', gap: '14px', marginBottom: i < doiHistory.length - 1 ? '16px' : 0, position: 'relative', opacity: willBeRemoved ? 0.6 : 1 }}>
                         {/* Timeline dot */}
                         <div style={{
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          background: isLatest ? stageColor : 'var(--bg-muted)',
-                          border: isLatest ? 'none' : `2px solid ${stageColor}`,
+                          background: willBeRemoved ? '#fecaca' : (isLatest ? stageColor : 'var(--bg-muted)'),
+                          border: willBeRemoved ? '2px dashed #ef4444' : (isLatest ? 'none' : `2px solid ${stageColor}`),
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: isLatest ? 'white' : stageColor,
+                          color: willBeRemoved ? '#ef4444' : (isLatest ? 'white' : stageColor),
                           fontSize: '0.7rem',
                           fontWeight: 600,
                           flexShrink: 0,
@@ -900,25 +902,28 @@ function ProjectDetail() {
 
                         {/* Content */}
                         <div style={{ flex: 1, paddingTop: '2px' }}>
-                          <div style={{ fontSize: '0.85rem', fontWeight: isLatest ? 600 : 400, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                          <div style={{ fontSize: '0.85rem', fontWeight: isLatest && !willBeRemoved ? 600 : 400, color: willBeRemoved ? '#ef4444' : 'var(--text-primary)', marginBottom: '4px', textDecoration: willBeRemoved ? 'line-through' : 'none' }}>
                             {getDOILabel(h.to_stage)}
+                            {willBeRemoved && <span style={{ marginLeft: '8px', fontSize: '0.7rem', background: '#fef2f2', color: '#dc2626', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>Will be removed</span>}
                           </div>
-                          <input
-                            type="date"
-                            value={formatDateForInput(h.changed_at)}
-                            max={formatDateForInput(new Date())}
-                            onChange={e => updateDoiHistoryDate(h.id, e.target.value)}
-                            style={{
-                              padding: '4px 8px',
-                              border: '1px solid var(--border-light)',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
-                              color: 'var(--text-muted)',
-                              background: 'var(--bg-base)',
-                              cursor: 'pointer',
-                              fontFamily: 'inherit'
-                            }}
-                          />
+                          {!willBeRemoved && (
+                            <input
+                              type="date"
+                              value={formatDateForInput(h.changed_at)}
+                              max={formatDateForInput(new Date())}
+                              onChange={e => updateDoiHistoryDate(h.id, e.target.value)}
+                              style={{
+                                padding: '4px 8px',
+                                border: '1px solid var(--border-light)',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                color: 'var(--text-muted)',
+                                background: 'var(--bg-base)',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit'
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                     );
