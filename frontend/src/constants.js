@@ -1,7 +1,8 @@
 export const STATUS_OPTIONS = [
   'Active', 'On Hold', 'Completed', 'Cancelled', 'In Review',
   'Ongoing Project', 'POC active', 'POC completed', 'Use case defined',
-  'Active in progress', 'Awaiting decision', 'To be started', 'MVP has been built'
+  'Active in progress', 'Awaiting decision', 'To be started', 'MVP has been built',
+  'User Testing'
 ];
 
 export const DEMAND_TYPES = [
