@@ -1287,29 +1287,28 @@ body {
 .doi-badge-sm.doi-5 { background-color: #059669; }
 
 .priority-badge-sm {
-  font-size: 0.65rem;
-  padding: 5px 10px;
-  border-radius: 6px;
-  font-weight: 700;
+  font-size: 0.6rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .priority-badge-sm.priority-high {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  background: #fef2f2;
   color: #dc2626;
-  border: 1px solid rgba(220, 38, 38, 0.15);
+  border: 1px solid #fecaca;
 }
 .priority-badge-sm.priority-medium {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: #fffbeb;
   color: #d97706;
-  border: 1px solid rgba(217, 119, 6, 0.15);
+  border: 1px solid #fde68a;
 }
 .priority-badge-sm.priority-low {
-  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  background: #f0fdf4;
   color: #16a34a;
-  border: 1px solid rgba(22, 163, 74, 0.15);
+  border: 1px solid #bbf7d0;
 }
 
 .project-card-title {
