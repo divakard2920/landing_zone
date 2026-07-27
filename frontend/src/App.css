@@ -1168,7 +1168,7 @@ body {
 }
 
 .project-card {
-  background: linear-gradient(135deg, #ffffff 0%, #ffffff 60%, color-mix(in srgb, var(--doi-color, var(--brand-primary)) 8%, white) 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #ffffff 60%, color-mix(in srgb, var(--doi-color, var(--brand-primary)) 4%, white) 100%);
   border: 1px solid var(--border-light);
   border-radius: 14px;
   padding: 16px;
@@ -1187,7 +1187,7 @@ body {
   right: 0;
   width: 120px;
   height: 120px;
-  background: radial-gradient(circle at bottom right, color-mix(in srgb, var(--doi-color, var(--brand-primary)) 12%, transparent) 0%, transparent 70%);
+  background: radial-gradient(circle at bottom right, color-mix(in srgb, var(--doi-color, var(--brand-primary)) 6%, transparent) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -1196,10 +1196,10 @@ body {
 }
 
 .project-card:hover {
-  border-color: color-mix(in srgb, var(--doi-color, var(--brand-primary)) 25%, #e2e8f0);
+  border-color: color-mix(in srgb, var(--doi-color, var(--brand-primary)) 20%, #e2e8f0);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.06);
   transform: translateY(-3px);
-  background: linear-gradient(165deg, #ffffff 0%, color-mix(in srgb, var(--doi-color, var(--brand-primary)) 4%, white) 100%);
+  background: linear-gradient(165deg, #ffffff 0%, color-mix(in srgb, var(--doi-color, var(--brand-primary)) 3%, white) 100%);
 }
 
 .card-serial-no {
