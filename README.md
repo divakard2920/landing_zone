@@ -16,7 +16,17 @@ cd backend
 npm run db:start
 ```
 
-This starts a PostgreSQL container using Docker.
+Or manually with docker-compose:
+
+```bash
+# Stop and remove old container
+docker-compose -f docker-compose.dev.yml down
+
+# Pull new image and start
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+This starts a PostgreSQL container with pgvector enabled for RAG.
 
 ### 2. Set Environment Variable
 
