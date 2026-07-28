@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -5,6 +6,7 @@ const { initDb } = require('./db/database');
 const publicRoutes = require('./routes/public');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
+const agentRoutes = require('./routes/agent');
 const { requireAuth } = require('./middleware/auth');
 
 const app = express();
@@ -18,6 +20,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', requireAuth, adminRoutes);
+app.use('/api/agent', agentRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

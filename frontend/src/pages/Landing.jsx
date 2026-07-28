@@ -171,6 +171,11 @@ function Landing() {
   };
 
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showFabMenu, setShowFabMenu] = useState(false);
+  const [showChatPanel, setShowChatPanel] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
   const [feedback, setFeedback] = useState({
     name: '',
     email: '',
@@ -387,6 +392,157 @@ function Landing() {
 
   const handleSupportChange = (e) => {
     setFeedback({ ...feedback, [e.target.name]: e.target.value });
+  };
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const userMessage = { role: 'user', content: chatInput.trim() };
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setChatLoading(true);
+    try {
+      const response = await api.agent.chat([...chatMessages, userMessage]);
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: response.message,
+        richContent: response.richContent
+      }]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', isError: true }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const renderRichContent = (richContent) => {
+    if (!richContent) return null;
+
+    switch (richContent.type) {
+      case 'projects':
+        return (
+          <div className="chat-rich-projects">
+            {richContent.data.map(project => (
+              <div key={project.id} className="chat-project-card" onClick={() => { setSelectedApp(apps.find(a => a.id === project.id)); setShowChatPanel(false); }}>
+                <div className="chat-project-header">
+                  <div className="chat-project-icon" style={{ '--doi-color': `var(--doi-${project.doi_stage})` }}>
+                    <AppIcon icon={project.icon} usecaseType={project.usecase_type} />
+                  </div>
+                  <div className="chat-project-info">
+                    <div className="chat-project-name">{project.name}</div>
+                    {project.usecase_identifier && <div className="chat-project-id">{project.usecase_identifier}</div>}
+                  </div>
+                  <div className="chat-project-doi" style={{ background: `var(--doi-${project.doi_stage})` }}>
+                    DOI {project.doi_stage}
+                  </div>
+                </div>
+                {project.description && <p className="chat-project-desc">{project.description}</p>}
+                <div className="chat-project-meta">
+                  {project.status && <span className="chat-meta-tag">{project.status}</span>}
+                  {project.priority && <span className={`chat-meta-tag priority-${project.priority?.toLowerCase()}`}>{project.priority}</span>}
+                  {project.usecase_type && <span className="chat-meta-tag">{project.usecase_type}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'stats':
+        return (
+          <div className="chat-rich-stats">
+            {richContent.data.map((stat, i) => (
+              <div key={i} className="chat-stat-bar">
+                <div className="chat-stat-label">{stat.label}</div>
+                <div className="chat-stat-bar-bg">
+                  <div
+                    className="chat-stat-bar-fill"
+                    style={{ width: `${Math.max(5, (stat.count / Math.max(...richContent.data.map(s => s.count))) * 100)}%` }}
+                  />
+                </div>
+                <div className="chat-stat-count">{stat.count}</div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'stats_overview':
+        return (
+          <div className="chat-rich-overview">
+            <div className="chat-overview-total">
+              <span className="chat-overview-number">{richContent.data.total}</span>
+              <span className="chat-overview-label">Total Projects</span>
+            </div>
+            <div className="chat-overview-grid">
+              <div className="chat-overview-section">
+                <div className="chat-overview-title">By DOI Stage</div>
+                {richContent.data.by_doi.map((d, i) => (
+                  <div key={i} className="chat-overview-item">
+                    <span className="chat-overview-dot" style={{ background: `var(--doi-${i})` }} />
+                    <span>{d.label}</span>
+                    <span className="chat-overview-count">{d.count}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="chat-overview-section">
+                <div className="chat-overview-title">By Priority</div>
+                {richContent.data.by_priority.map((p, i) => (
+                  <div key={i} className="chat-overview-item">
+                    <span>{p.label}</span>
+                    <span className="chat-overview-count">{p.count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'project_detail':
+        const p = richContent.data;
+        return (
+          <div className="chat-project-detail" onClick={() => { setSelectedApp(apps.find(a => a.id === p.id)); setShowChatPanel(false); }}>
+            <div className="chat-detail-header">
+              <div className="chat-project-icon large" style={{ '--doi-color': `var(--doi-${p.doi_stage})` }}>
+                <AppIcon icon={p.icon} usecaseType={p.usecase_type} />
+              </div>
+              <div>
+                <div className="chat-project-name large">{p.name}</div>
+                {p.usecase_identifier && <div className="chat-project-id">{p.usecase_identifier}</div>}
+              </div>
+            </div>
+            {p.description && <p className="chat-project-desc">{p.description}</p>}
+            <div className="chat-detail-grid">
+              <div className="chat-detail-item">
+                <span className="chat-detail-label">DOI Stage</span>
+                <span className="chat-detail-value" style={{ color: `var(--doi-${p.doi_stage})` }}>DOI {p.doi_stage} - {p.doiLabel}</span>
+              </div>
+              <div className="chat-detail-item">
+                <span className="chat-detail-label">Status</span>
+                <span className="chat-detail-value">{p.current_status || 'N/A'}</span>
+              </div>
+              <div className="chat-detail-item">
+                <span className="chat-detail-label">Priority</span>
+                <span className="chat-detail-value">{p.priority || 'N/A'}</span>
+              </div>
+              <div className="chat-detail-item">
+                <span className="chat-detail-label">Division</span>
+                <span className="chat-detail-value">{p.business_division || 'N/A'}</span>
+              </div>
+              <div className="chat-detail-item">
+                <span className="chat-detail-label">Type</span>
+                <span className="chat-detail-value">{p.usecase_type || 'N/A'}</span>
+              </div>
+              <div className="chat-detail-item">
+                <span className="chat-detail-label">Timeline</span>
+                <span className="chat-detail-value">{p.start_date ? formatDate(p.start_date) : 'TBD'} → {p.end_date ? formatDate(p.end_date) : 'TBD'}</span>
+              </div>
+            </div>
+            <div className="chat-detail-action">Click to view full details →</div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
 
   // Helper to split comma-separated values and get unique items
@@ -2209,10 +2365,132 @@ function Landing() {
         </>
       )}
 
-      {/* Floating Support Button */}
-      <button className="support-fab" onClick={() => setShowSupportModal(true)} title="Support / Feedback">
-        ?
+      {/* Floating Action Button */}
+      <button
+        className="support-fab"
+        onClick={() => {
+          if (showChatPanel || showSupportModal) {
+            setShowChatPanel(false);
+            setShowSupportModal(false);
+            setShowFabMenu(false);
+          } else {
+            setShowFabMenu(!showFabMenu);
+          }
+        }}
+        title="Help"
+      >
+        {showChatPanel || showSupportModal ? '×' : '?'}
       </button>
+
+      {/* FAB Menu */}
+      {showFabMenu && !showChatPanel && !showSupportModal && (
+        <div className="fab-menu">
+          <button className="fab-menu-item" onClick={() => { setShowChatPanel(true); setShowFabMenu(false); }}>
+            <div className="fab-menu-icon fab-menu-icon-blue">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+                <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+              </svg>
+            </div>
+            <div className="fab-menu-text">
+              <div className="fab-menu-title">Project Assistant</div>
+              <div className="fab-menu-subtitle">Ask about projects</div>
+            </div>
+            <svg className="fab-menu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+          <button className="fab-menu-item" onClick={() => { setShowSupportModal(true); setShowFabMenu(false); }}>
+            <div className="fab-menu-icon fab-menu-icon-green">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+            </div>
+            <div className="fab-menu-text">
+              <div className="fab-menu-title">Support / Feedback</div>
+              <div className="fab-menu-subtitle">Send us a message</div>
+            </div>
+            <svg className="fab-menu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+      )}
+
+      {/* AI Chat Panel */}
+      {showChatPanel && (
+        <div className="ai-chat-overlay" onClick={() => setShowChatPanel(false)}>
+          <div className="ai-chat-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="ai-chat-header">
+              <div className="ai-chat-header-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+                  <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+                </svg>
+              </div>
+              <div className="ai-chat-header-text">
+                <h3>Project Assistant</h3>
+                <p>Ask about projects, status, or analytics</p>
+              </div>
+              <button onClick={() => setChatMessages([])} className="btn btn-sm" style={{ marginLeft: 'auto', marginRight: '8px' }}>Clear Chat</button>
+              <button onClick={() => setShowChatPanel(false)} className="ai-chat-close">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          <div className="ai-chat-messages">
+            {chatMessages.length === 0 && (
+              <div className="ai-chat-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, marginBottom: '12px' }}>
+                  <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+                  <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+                </svg>
+                <p className="ai-chat-empty-title">Hi! I'm your Project Assistant</p>
+                <p className="ai-chat-empty-subtitle">Try asking me something:</p>
+                <div className="ai-chat-suggestions">
+                  {[
+                    'Show me project overview',
+                    'Show projects in DOI 0',
+                    'Show high priority projects',
+                    'What projects are in development?'
+                  ].map((q, i) => (
+                    <button key={i} onClick={() => setChatInput(q)} className="ai-chat-suggestion">{q}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {chatMessages.map((msg, idx) => (
+              <div key={idx} className={`ai-chat-message-wrapper ${msg.role}`}>
+                {msg.content && (
+                  <div className={`ai-chat-message ${msg.role}${msg.isError ? ' error' : ''}`}>
+                    {msg.content}
+                  </div>
+                )}
+                {msg.richContent && renderRichContent(msg.richContent)}
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="ai-chat-message assistant">
+                <div className="ai-chat-typing">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="ai-chat-input-area">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendChatMessage()}
+              placeholder="Ask about projects..."
+              disabled={chatLoading}
+              className="ai-chat-input"
+            />
+            <button onClick={sendChatMessage} disabled={!chatInput.trim() || chatLoading} className="ai-chat-send">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            </button>
+          </div>
+          </div>
+        </div>
+      )}
 
       {/* Support / Feedback Modal */}
       {showSupportModal && (

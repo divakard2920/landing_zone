@@ -32,6 +32,15 @@ export const api = {
     me: () => axios.get(`${API_BASE}/auth/me`),
   },
 
+  // AI Agent
+  agent: {
+    chat: async (messages) => {
+      const response = await axios.post(`${API_BASE}/agent/chat`, { messages });
+      return response.data;
+    },
+    health: () => axios.get(`${API_BASE}/agent/health`),
+  },
+
   getApps: () => axios.get(`${API_BASE}/apps`),
   getAnnouncements: () => axios.get(`${API_BASE}/announcements`),
   getWidgets: () => axios.get(`${API_BASE}/widgets`),
