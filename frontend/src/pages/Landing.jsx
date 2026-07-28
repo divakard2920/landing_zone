@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { Tooltip } from 'react-tooltip';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
+import ReactMarkdown from 'react-markdown';
 import WidgetRenderer from '../components/WidgetRenderer';
 
 const AIUsecaseIcon = () => (
@@ -2458,7 +2459,7 @@ function Landing() {
               <div key={idx} className={`ai-chat-message-wrapper ${msg.role}`}>
                 {msg.content && (
                   <div className={`ai-chat-message ${msg.role}${msg.isError ? ' error' : ''}`}>
-                    {msg.content}
+                    {msg.role === 'assistant' ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
                   </div>
                 )}
                 {msg.richContent && renderRichContent(msg.richContent)}

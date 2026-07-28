@@ -2764,6 +2764,43 @@ body {
   border-bottom-left-radius: 4px;
 }
 
+.ai-chat-message.assistant h1,
+.ai-chat-message.assistant h2,
+.ai-chat-message.assistant h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 12px 0 8px;
+}
+
+.ai-chat-message.assistant h3 {
+  font-size: 0.95rem;
+}
+
+.ai-chat-message.assistant p {
+  margin: 8px 0;
+}
+
+.ai-chat-message.assistant ul,
+.ai-chat-message.assistant ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.ai-chat-message.assistant li {
+  margin: 4px 0;
+}
+
+.ai-chat-message.assistant strong {
+  font-weight: 600;
+}
+
+.ai-chat-message.assistant code {
+  background: var(--bg-base);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
 .ai-chat-input-area {
   padding: 20px 28px;
   border-top: 1px solid var(--border-light);
