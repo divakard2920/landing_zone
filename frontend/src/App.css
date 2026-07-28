@@ -2776,7 +2776,7 @@ body {
 .ai-chat-message.assistant h2,
 .ai-chat-message.assistant h3,
 .ai-chat-message.assistant h4 {
-  margin: 0 !important;
+  margin: -6px 0 0 0 !important;
   padding: 0 !important;
 }
 
