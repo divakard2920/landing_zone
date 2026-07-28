@@ -54,18 +54,18 @@ const tools = [
     type: 'function',
     function: {
       name: 'show_projects',
-      description: 'Display projects as visual cards. Use this when user asks to show, list, or display projects.',
+      description: 'Display projects as visual cards. Use for showing, listing, or searching projects.',
       parameters: {
         type: 'object',
         properties: {
           filter_type: {
             type: 'string',
-            enum: ['doi_stage', 'priority', 'status', 'division', 'usecase_type', 'all'],
-            description: 'The type of filter to apply'
+            enum: ['doi_stage', 'priority', 'status', 'division', 'usecase_type', 'search', 'all'],
+            description: 'Filter type. Use "search" to search by keyword across all fields.'
           },
           filter_value: {
             type: 'string',
-            description: 'The value to filter by (e.g., "0" for DOI 0, "High" for priority)'
+            description: 'Value to filter/search by (e.g., "HR", "Finance", "High", "0")'
           },
           limit: {
             type: 'number',
@@ -122,21 +122,32 @@ const executeFunction = (functionName, args, context) => {
       const { filter_type, filter_value, limit = 10 } = args;
 
       if (filter_type !== 'all' && filter_value !== undefined) {
+        const searchVal = filter_value.toLowerCase();
         switch (filter_type) {
           case 'doi_stage':
             filtered = filtered.filter(p => String(p.doi_stage) === String(filter_value));
             break;
           case 'priority':
-            filtered = filtered.filter(p => p.priority?.toLowerCase() === filter_value.toLowerCase());
+            filtered = filtered.filter(p => p.priority?.toLowerCase() === searchVal);
             break;
           case 'status':
-            filtered = filtered.filter(p => p.current_status?.toLowerCase().includes(filter_value.toLowerCase()));
+            filtered = filtered.filter(p => p.current_status?.toLowerCase().includes(searchVal));
             break;
           case 'division':
-            filtered = filtered.filter(p => p.business_division?.toLowerCase().includes(filter_value.toLowerCase()));
+            filtered = filtered.filter(p => p.business_division?.toLowerCase().includes(searchVal));
             break;
           case 'usecase_type':
-            filtered = filtered.filter(p => p.usecase_type?.toLowerCase().includes(filter_value.toLowerCase()));
+            filtered = filtered.filter(p => p.usecase_type?.toLowerCase().includes(searchVal));
+            break;
+          case 'search':
+            filtered = filtered.filter(p => {
+              const searchFields = [
+                p.name, p.description, p.business_division, p.business_function,
+                p.current_status, p.usecase_type, p.platform, p.requester_name,
+                p.ai_spoc, p.usecase_identifier, p.demand_type
+              ];
+              return searchFields.some(field => field?.toLowerCase().includes(searchVal));
+            });
             break;
         }
       }
@@ -252,7 +263,7 @@ const executeFunction = (functionName, args, context) => {
 const buildSystemPrompt = (context) => {
   const { projects, doiStages } = context;
 
-  return `You are an AI assistant for the IT Project Management Portal. You have complete knowledge of all projects and can answer any question about them.
+  return `You are an AI assistant for KBase. You have complete knowledge of all projects and can answer any question about them.
 
 ## DOI Stages Reference
 ${JSON.stringify(doiStages, null, 2)}
@@ -261,14 +272,17 @@ ${JSON.stringify(doiStages, null, 2)}
 ${JSON.stringify(projects, null, 2)}
 
 ## Tools Available
-- show_projects: Display project cards (use for "show", "list", "display" requests)
-- show_statistics: Display analytics/charts (use for counts, summaries, overviews)
+- show_projects: Display project cards with visual UI
+- show_statistics: Display analytics/charts
 - show_project_detail: Show single project details
 
+## When to Use Tools vs Text
+USE TOOLS only when user explicitly asks to "show", "list", "display"
+USE TEXT for all other questions - analyze the JSON data directly
+
 ## Guidelines
-- Answer questions using the actual data above
-- Use tools for visual displays, text for direct questions
-- If data is null/empty, say "not specified" - don't make up information`;
+- Answer questions by analyzing the project data above
+- If data is null/empty, say "not specified"
 };
 
 router.post('/chat', async (req, res) => {
