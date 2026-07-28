@@ -2764,37 +2764,49 @@ body {
   border-bottom-left-radius: 4px;
 }
 
+.ai-chat-message.assistant > * {
+  margin: 0;
+}
+
 .ai-chat-message.assistant h1,
 .ai-chat-message.assistant h2,
 .ai-chat-message.assistant h3 {
   font-size: 0.95rem;
   font-weight: 600;
-  margin: 8px 0 4px;
+  margin: 6px 0 2px;
 }
 
 .ai-chat-message.assistant h1:first-child,
 .ai-chat-message.assistant h2:first-child,
 .ai-chat-message.assistant h3:first-child,
-.ai-chat-message.assistant p:first-child {
+.ai-chat-message.assistant p:first-child,
+.ai-chat-message.assistant ol:first-child,
+.ai-chat-message.assistant ul:first-child {
   margin-top: 0;
 }
 
 .ai-chat-message.assistant p {
-  margin: 4px 0;
-}
-
-.ai-chat-message.assistant p:last-child {
-  margin-bottom: 0;
+  margin: 2px 0;
 }
 
 .ai-chat-message.assistant ul,
 .ai-chat-message.assistant ol {
-  margin: 4px 0;
-  padding-left: 18px;
+  margin: 2px 0;
+  padding-left: 20px;
 }
 
 .ai-chat-message.assistant li {
-  margin: 2px 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ai-chat-message.assistant li > p {
+  margin: 0;
+}
+
+.ai-chat-message.assistant li > ul,
+.ai-chat-message.assistant li > ol {
+  margin: 0;
 }
 
 .ai-chat-message.assistant strong {
