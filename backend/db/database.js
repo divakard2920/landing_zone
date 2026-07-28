@@ -377,11 +377,11 @@ const initDb = async () => {
       WHERE table_name = 'apps' AND column_name = 'embedding'
     `);
     if (embeddingCheck.rows.length === 0) {
-      await client.query('ALTER TABLE apps ADD COLUMN embedding vector(3072)');
-      console.log('Migration: Added embedding column (3072 dims) to apps table');
+      await client.query('ALTER TABLE apps ADD COLUMN embedding vector(1536)');
+      console.log('Migration: Added embedding column (1536 dims) to apps table');
     }
 
-    // Create HNSW index for fast vector search (handles 100k+ projects efficiently)
+    // Create HNSW index for fast vector search
     const indexCheck = await client.query(`
       SELECT indexname FROM pg_indexes
       WHERE tablename = 'apps' AND indexname = 'apps_embedding_idx'

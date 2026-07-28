@@ -47,7 +47,8 @@ const generateEmbedding = async (text) => {
     const client = getEmbeddingClient();
     const response = await client.embeddings.create({
       model: AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-      input: text
+      input: text,
+      dimensions: 1536
     });
     return response.data[0].embedding;
   } catch (error) {
