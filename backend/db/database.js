@@ -364,6 +364,23 @@ const initDb = async () => {
       console.log('Migration: Added deleted_at column to apps table for soft delete');
     }
 
+    // Migration: Enable pgvector extension and add embedding column
+    try {
+      await client.query('CREATE EXTENSION IF NOT EXISTS vector');
+      console.log('pgvector extension enabled');
+    } catch (err) {
+      console.log('pgvector extension may already exist or not available:', err.message);
+    }
+
+    const embeddingCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_name = 'apps' AND column_name = 'embedding'
+    `);
+    if (embeddingCheck.rows.length === 0) {
+      await client.query('ALTER TABLE apps ADD COLUMN embedding vector(3072)');
+      console.log('Migration: Added embedding column (3072 dims) to apps table');
+    }
+
     console.log('Database initialized successfully');
   } finally {
     client.release();

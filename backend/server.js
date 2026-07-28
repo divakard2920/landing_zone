@@ -36,10 +36,18 @@ app.get('/{*path}', (req, res) => {
 
 // Initialize database and start server
 initDb()
-  .then(() => {
+  .then(async () => {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
     });
+
+    // Generate embeddings for projects without them (non-blocking)
+    if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_EMBEDDING_DEPLOYMENT) {
+      const { generateAllEmbeddings } = require('./services/embedding');
+      generateAllEmbeddings().catch(err => {
+        console.error('Error generating embeddings on startup:', err.message);
+      });
+    }
   })
   .catch((err) => {
     console.error('Failed to initialize database:', err);

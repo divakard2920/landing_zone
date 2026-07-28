@@ -2,6 +2,7 @@ const express = require('express');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { AzureOpenAI } = require('openai');
 const { queryAll } = require('../db/database');
+const { searchSimilarProjects } = require('../services/embedding');
 
 const router = express.Router();
 
@@ -27,25 +28,31 @@ const getOpenAIClient = () => {
   return openaiClient;
 };
 
-const getProjectsContext = async () => {
+const getAllProjects = async () => {
+  return queryAll(`
+    SELECT
+      id, name, description, usecase_type, doi_stage, current_status,
+      priority, business_division, business_function, platform,
+      demand_type, requester_name, ai_spoc, start_date, end_date,
+      usecase_identifier, icon
+    FROM apps
+    WHERE deleted_at IS NULL
+    ORDER BY created_at DESC
+  `);
+};
+
+const getDoiStages = async () => {
+  return queryAll('SELECT * FROM doi_stages ORDER BY id');
+};
+
+const getRelevantProjects = async (userQuery, limit = 10) => {
   try {
-    const projects = await queryAll(`
-      SELECT
-        id, name, description, usecase_type, doi_stage, current_status,
-        priority, business_division, business_function, platform,
-        demand_type, requester_name, ai_spoc, start_date, end_date,
-        usecase_identifier, icon
-      FROM apps
-      WHERE deleted_at IS NULL
-      ORDER BY created_at DESC
-    `);
-
-    const doiStages = await queryAll('SELECT * FROM doi_stages ORDER BY id');
-
-    return { projects, doiStages };
+    const results = await searchSimilarProjects(userQuery, limit);
+    return results;
   } catch (error) {
-    console.error('Error fetching projects context:', error);
-    return { projects: [], doiStages: [] };
+    console.error('RAG search failed, falling back to all projects:', error.message);
+    const all = await getAllProjects();
+    return all.slice(0, limit);
   }
 };
 
@@ -113,8 +120,9 @@ const tools = [
   }
 ];
 
-const executeFunction = (functionName, args, context) => {
-  const { projects, doiStages } = context;
+const executeFunction = async (functionName, args, context) => {
+  const { doiStages } = context;
+  const projects = await getAllProjects();
 
   switch (functionName) {
     case 'show_projects': {
@@ -260,29 +268,28 @@ const executeFunction = (functionName, args, context) => {
   }
 };
 
-const buildSystemPrompt = (context) => {
-  const { projects, doiStages } = context;
-
-  return `You are an AI assistant for KBase. You have complete knowledge of all projects and can answer any question about them.
+const buildSystemPrompt = (relevantProjects, doiStages, totalCount) => {
+  return `You are an AI assistant for KBase. You help users with project information.
 
 ## DOI Stages Reference
 ${JSON.stringify(doiStages, null, 2)}
 
-## Complete Project Data (${projects.length} projects)
-${JSON.stringify(projects, null, 2)}
+## Relevant Projects (${relevantProjects.length} of ${totalCount} total)
+${JSON.stringify(relevantProjects, null, 2)}
 
 ## Tools Available
-- show_projects: Display project cards with visual UI
-- show_statistics: Display analytics/charts
+- show_projects: Display project cards with visual UI (has access to ALL projects)
+- show_statistics: Display analytics/charts (has access to ALL projects)
 - show_project_detail: Show single project details
 
 ## When to Use Tools vs Text
 USE TOOLS only when user explicitly asks to "show", "list", "display"
-USE TEXT for all other questions - analyze the JSON data directly
+USE TEXT for all other questions - analyze the relevant projects above
 
 ## Guidelines
-- Answer questions by analyzing the project data above
-- If data is null/empty, say "not specified"
+- Answer questions using the relevant projects provided
+- Tools have access to all projects for filtering/stats
+- If data is null/empty, say "not specified"`;
 };
 
 router.post('/chat', async (req, res) => {
@@ -297,8 +304,12 @@ router.post('/chat', async (req, res) => {
       return res.status(500).json({ error: 'Azure OpenAI endpoint not configured' });
     }
 
-    const context = await getProjectsContext();
-    const systemPrompt = buildSystemPrompt(context);
+    const userQuery = messages[messages.length - 1]?.content || '';
+    const doiStages = await getDoiStages();
+    const allProjects = await getAllProjects();
+    const relevantProjects = await getRelevantProjects(userQuery, 10);
+
+    const systemPrompt = buildSystemPrompt(relevantProjects, doiStages, allProjects.length);
 
     const client = getOpenAIClient();
 
@@ -325,7 +336,7 @@ router.post('/chat', async (req, res) => {
       const functionName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
 
-      richContent = executeFunction(functionName, args, context);
+      richContent = await executeFunction(functionName, args, { doiStages });
 
       if (!textContent && richContent) {
         switch (richContent.type) {
@@ -372,6 +383,17 @@ router.get('/health', (req, res) => {
     configured: !!AZURE_OPENAI_ENDPOINT,
     deployment: AZURE_OPENAI_DEPLOYMENT
   });
+});
+
+router.post('/generate-embeddings', async (req, res) => {
+  try {
+    const { generateAllEmbeddings } = require('../services/embedding');
+    await generateAllEmbeddings();
+    res.json({ success: true, message: 'Embeddings generated for all projects' });
+  } catch (error) {
+    console.error('Error generating embeddings:', error);
+    res.status(500).json({ error: 'Failed to generate embeddings', details: error.message });
+  }
 });
 
 module.exports = router;
