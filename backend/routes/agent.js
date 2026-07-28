@@ -252,33 +252,23 @@ const executeFunction = (functionName, args, context) => {
 const buildSystemPrompt = (context) => {
   const { projects, doiStages } = context;
 
-  const doiInfo = doiStages.map(d => `DOI ${d.id}: ${d.label}`).join(', ');
+  return `You are an AI assistant for the IT Project Management Portal. You have complete knowledge of all projects and can answer any question about them.
 
-  const projectSummary = projects.map(p =>
-    `- ${p.name} (${p.usecase_identifier || 'No ID'}): DOI ${p.doi_stage}, Status: ${p.current_status || 'N/A'}, Priority: ${p.priority || 'N/A'}, Division: ${p.business_division || 'N/A'}, Type: ${p.usecase_type || 'N/A'}`
-  ).join('\n');
+## DOI Stages Reference
+${JSON.stringify(doiStages, null, 2)}
 
-  return `You are an AI assistant for the IT Project Management Portal (KBase). You help users with questions about projects, use cases, and the project pipeline.
+## Complete Project Data (${projects.length} projects)
+${JSON.stringify(projects, null, 2)}
 
-## DOI Stages (Degree of Implementation)
-${doiInfo}
-
-## Current Projects (${projects.length} total)
-${projectSummary || 'No projects found.'}
-
-## Your Capabilities
-You have tools to display rich visual content:
-- show_projects: Display project cards with filters (by DOI, priority, status, etc.)
-- show_statistics: Display analytics charts and stats
-- show_project_detail: Show detailed view of a specific project
+## Tools Available
+- show_projects: Display project cards (use for "show", "list", "display" requests)
+- show_statistics: Display analytics/charts (use for counts, summaries, overviews)
+- show_project_detail: Show single project details
 
 ## Guidelines
-- ALWAYS use tools when user asks to "show", "list", "display" projects or stats
-- Use show_projects for listing/filtering projects
-- Use show_statistics for analytics, counts, summaries
-- Use show_project_detail when asked about a specific project
-- Add a brief text response along with tool calls to provide context
-- Be concise and helpful`;
+- Answer questions using the actual data above
+- Use tools for visual displays, text for direct questions
+- If data is null/empty, say "not specified" - don't make up information`;
 };
 
 router.post('/chat', async (req, res) => {
