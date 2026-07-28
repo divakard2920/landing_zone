@@ -381,6 +381,20 @@ const initDb = async () => {
       console.log('Migration: Added embedding column (3072 dims) to apps table');
     }
 
+    // Create HNSW index for fast vector search (handles 100k+ projects efficiently)
+    const indexCheck = await client.query(`
+      SELECT indexname FROM pg_indexes
+      WHERE tablename = 'apps' AND indexname = 'apps_embedding_idx'
+    `);
+    if (indexCheck.rows.length === 0) {
+      try {
+        await client.query('CREATE INDEX apps_embedding_idx ON apps USING hnsw (embedding vector_cosine_ops)');
+        console.log('Migration: Created HNSW index for vector search');
+      } catch (err) {
+        console.log('HNSW index creation skipped:', err.message);
+      }
+    }
+
     console.log('Database initialized successfully');
   } finally {
     client.release();
