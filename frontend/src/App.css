@@ -2764,7 +2764,18 @@ body {
   border-bottom-left-radius: 4px;
 }
 
-.ai-chat-message.assistant * {
+.ai-chat-message.assistant {
+  line-height: 1.4;
+}
+
+.ai-chat-message.assistant p,
+.ai-chat-message.assistant li,
+.ai-chat-message.assistant ul,
+.ai-chat-message.assistant ol,
+.ai-chat-message.assistant h1,
+.ai-chat-message.assistant h2,
+.ai-chat-message.assistant h3,
+.ai-chat-message.assistant h4 {
   margin: 0 !important;
   padding: 0 !important;
 }
@@ -2774,18 +2785,24 @@ body {
 .ai-chat-message.assistant h3 {
   font-size: 0.95rem;
   font-weight: 600;
-  margin-top: 8px !important;
+  margin-top: 10px !important;
+  margin-bottom: 4px !important;
 }
 
-.ai-chat-message.assistant h1:first-child,
-.ai-chat-message.assistant h2:first-child,
-.ai-chat-message.assistant h3:first-child {
+.ai-chat-message.assistant > h1:first-child,
+.ai-chat-message.assistant > h2:first-child,
+.ai-chat-message.assistant > h3:first-child {
   margin-top: 0 !important;
 }
 
 .ai-chat-message.assistant ul,
 .ai-chat-message.assistant ol {
   padding-left: 20px !important;
+  margin-top: 4px !important;
+}
+
+.ai-chat-message.assistant li {
+  display: list-item;
 }
 
 .ai-chat-message.assistant strong {
