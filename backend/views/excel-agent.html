@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Excel Project Assistant</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: linear-gradient(145deg, #0066a8 0%, #00457e 100%);
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .header-status {
+      margin-left: auto;
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      gap: 24px;
+    }
+
+    .sidebar {
+      width: 300px;
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      height: fit-content;
+    }
+
+    .sidebar h2 {
+      font-size: 1rem;
+      color: #333;
+      margin-bottom: 16px;
+    }
+
+    .upload-area {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 32px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 16px;
+    }
+
+    .upload-area:hover {
+      border-color: #0066a8;
+      background: rgba(0, 102, 168, 0.05);
+    }
+
+    .upload-area.dragover {
+      border-color: #0066a8;
+      background: rgba(0, 102, 168, 0.1);
+    }
+
+    .upload-area svg {
+      width: 48px;
+      height: 48px;
+      color: #999;
+      margin-bottom: 12px;
+    }
+
+    .upload-area p {
+      color: #666;
+      font-size: 0.9rem;
+    }
+
+    .upload-area input {
+      display: none;
+    }
+
+    .data-info {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.85rem;
+      color: #555;
+    }
+
+    .data-info strong {
+      color: #0066a8;
+    }
+
+    .fields-list {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .field-tag {
+      background: #e8f4fc;
+      color: #0066a8;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+    }
+
+    .chat-container {
+      flex: 1;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 80%;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: linear-gradient(145deg, #0066a8 0%, #00457e 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: #f5f7fa;
+      color: #333;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.assistant.streaming::after {
+      content: '';
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: #0066a8;
+      margin-left: 2px;
+      animation: blink 0.8s infinite;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .empty-state h3 {
+      font-size: 1.2rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .chat-input-area {
+      padding: 20px 24px;
+      border-top: 1px solid #eee;
+      display: flex;
+      gap: 12px;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 14px 18px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .chat-input:focus {
+      border-color: #0066a8;
+    }
+
+    .chat-input:disabled {
+      background: #f5f5f5;
+    }
+
+    .send-btn {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(145deg, #0066a8 0%, #00457e 100%);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 69, 126, 0.3);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .rich-content {
+      margin-top: 12px;
+    }
+
+    .project-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .project-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 0.85rem;
+    }
+
+    .project-card h4 {
+      color: #0066a8;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+    }
+
+    .project-card p {
+      color: #666;
+      margin: 4px 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .stat-item {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+
+    .stat-item .count {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #0066a8;
+    }
+
+    .stat-item .label {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    .loading {
+      display: flex;
+      gap: 4px;
+      padding: 8px 0;
+    }
+
+    .loading span {
+      width: 8px;
+      height: 8px;
+      background: #0066a8;
+      border-radius: 50%;
+      animation: bounce 1.4s ease-in-out infinite;
+    }
+
+    .loading span:nth-child(2) { animation-delay: 0.2s; }
+    .loading span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+    <h1>Excel Project Assistant</h1>
+    <div class="header-status" id="headerStatus">No data loaded</div>
+  </div>
+
+  <div class="main-container">
+    <div class="sidebar">
+      <h2>Upload Excel File</h2>
+      <div class="upload-area" id="uploadArea">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>Drop Excel file here or click to upload</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+      </div>
+      <div class="data-info" id="dataInfo" style="display: none;">
+        <p><strong id="projectCount">0</strong> projects loaded</p>
+        <div class="fields-list" id="fieldsList"></div>
+      </div>
+    </div>
+
+    <div class="chat-container">
+      <div class="chat-messages" id="chatMessages">
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <h3>Upload an Excel file to get started</h3>
+          <p>I'll help you analyze and explore your project data</p>
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <input type="text" class="chat-input" id="chatInput" placeholder="Ask about your projects..." disabled>
+        <button class="send-btn" id="sendBtn" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const dataInfo = document.getElementById('dataInfo');
+    const projectCount = document.getElementById('projectCount');
+    const fieldsList = document.getElementById('fieldsList');
+    const headerStatus = document.getElementById('headerStatus');
+    const chatMessages = document.getElementById('chatMessages');
+    const emptyState = document.getElementById('emptyState');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    let messages = [];
+    let isLoading = false;
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) handleFile(e.target.files[0]);
+    });
+
+    async function handleFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      uploadArea.innerHTML = '<p>Processing...</p>';
+
+      try {
+        const response = await fetch('/api/excel-agent/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          projectCount.textContent = data.count;
+          fieldsList.innerHTML = data.fields.map(f => `<span class="field-tag">${f}</span>`).join('');
+          dataInfo.style.display = 'block';
+          headerStatus.textContent = `${data.count} projects loaded`;
+          chatInput.disabled = false;
+          sendBtn.disabled = false;
+          emptyState.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <h3>Ready to chat!</h3>
+            <p>Ask me anything about your ${data.count} projects</p>
+          `;
+          uploadArea.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;color:#10b981">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <p style="color:#10b981">${file.name} loaded</p>
+          `;
+        } else {
+          alert('Error: ' + data.error);
+          resetUploadArea();
+        }
+      } catch (err) {
+        alert('Upload failed: ' + err.message);
+        resetUploadArea();
+      }
+    }
+
+    function resetUploadArea() {
+      uploadArea.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;color:#999">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p>Drop Excel file here or click to upload</p>
+      `;
+    }
+
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) sendMessage();
+    });
+    sendBtn.addEventListener('click', sendMessage);
+
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text || isLoading) return;
+
+      isLoading = true;
+      chatInput.value = '';
+      sendBtn.disabled = true;
+
+      if (emptyState.parentNode) emptyState.remove();
+
+      // Add user message
+      messages.push({ role: 'user', content: text });
+      addMessageToUI('user', text);
+
+      // Add assistant placeholder
+      const assistantDiv = addMessageToUI('assistant', '', true);
+
+      try {
+        const response = await fetch('/api/excel-agent/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullContent = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === 'text') {
+                  fullContent += data.content;
+                  assistantDiv.querySelector('.message-text').textContent = fullContent;
+                } else if (data.type === 'rich') {
+                  renderRichContent(assistantDiv, data.content);
+                } else if (data.type === 'done') {
+                  assistantDiv.classList.remove('streaming');
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        messages.push({ role: 'assistant', content: fullContent });
+      } catch (err) {
+        assistantDiv.querySelector('.message-text').textContent = 'Error: ' + err.message;
+      }
+
+      assistantDiv.classList.remove('streaming');
+      isLoading = false;
+      sendBtn.disabled = false;
+    }
+
+    function addMessageToUI(role, content, streaming = false) {
+      const div = document.createElement('div');
+      div.className = `message ${role}${streaming ? ' streaming' : ''}`;
+      div.innerHTML = `<span class="message-text">${content}</span>`;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      return div;
+    }
+
+    function renderRichContent(container, richContent) {
+      const richDiv = document.createElement('div');
+      richDiv.className = 'rich-content';
+
+      if (richContent.type === 'projects') {
+        richDiv.innerHTML = `<div class="project-cards">${richContent.data.map(p => `
+          <div class="project-card">
+            <h4>${p.name || p.project_name || p.title || Object.values(p)[0]}</h4>
+            ${Object.entries(p).slice(1, 4).map(([k, v]) => `<p><strong>${k}:</strong> ${v || 'N/A'}</p>`).join('')}
+          </div>
+        `).join('')}</div>`;
+      } else if (richContent.type === 'stats') {
+        richDiv.innerHTML = `<div class="stats-grid">${richContent.data.map(s => `
+          <div class="stat-item">
+            <div class="count">${s.count}</div>
+            <div class="label">${s.label}</div>
+          </div>
+        `).join('')}</div>`;
+      }
+
+      container.appendChild(richDiv);
+    }
+  </script>
+</body>
+</html>
