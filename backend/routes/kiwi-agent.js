@@ -439,7 +439,7 @@ const executeFunction = async (functionName, args) => {
   }
 };
 
-const buildSystemPrompt = () => {
+const buildSystemPrompt = (relevantProjects = []) => {
   const projectCount = projects.length;
   const fields = projectCount > 0 ? Object.keys(projects[0]).join(', ') : 'No data loaded';
 
@@ -453,6 +453,12 @@ When users ask about existing projects (e.g., "show me projects", "how many", "l
 - Use show_statistics to show counts/breakdown by any field
 - Use search_similar_projects to find projects matching a description
 - Answer questions about the loaded data
+- ALWAYS use tools to show visual results, then provide a brief explanation
+
+${relevantProjects.length > 0 ? `
+## Relevant Projects for Current Query
+${JSON.stringify(relevantProjects.slice(0, 5), null, 2)}
+` : ''}
 
 ## MODE 2: New Use Case Intake (when user describes a new idea/problem)
 Guide users through a conversational intake process:
@@ -496,6 +502,7 @@ Gather scores (1-5, where 5 is best/easiest) for:
 - Don't ask all questions at once
 - Probe deeper on weak areas
 - Challenge assumptions constructively
+- ALWAYS respond with helpful text, never leave user without a response
 
 ## Scope
 - You help with AI/ML use case portfolio queries and new use case intake
@@ -582,7 +589,11 @@ router.post('/chat', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const systemPrompt = buildSystemPrompt();
+    // Get user query and search for relevant projects
+    const userQuery = messages[messages.length - 1]?.content || '';
+    const relevantProjects = projects.length > 0 ? await searchSimilarProjects(userQuery, 5, 0.5) : [];
+
+    const systemPrompt = buildSystemPrompt(relevantProjects);
     const client = getOpenAIClient();
 
     const stream = await client.chat.completions.create({
@@ -634,6 +645,27 @@ router.post('/chat', async (req, res) => {
           const richContent = await executeFunction(toolCall.function.name, args);
 
           if (richContent) {
+            // Add text explanation for tool results if no text content was streamed
+            if (!fullContent) {
+              let textMsg = '';
+              if (richContent.type === 'projects') {
+                textMsg = `Here are ${richContent.showing} of ${richContent.total} projects:`;
+              } else if (richContent.type === 'stats') {
+                textMsg = `Here's the breakdown by ${richContent.group_by}:`;
+              } else if (richContent.type === 'similar_projects') {
+                textMsg = richContent.found > 0
+                  ? `I found ${richContent.found} similar project(s) in the portfolio:`
+                  : 'No similar projects found in the current portfolio.';
+              } else if (richContent.type === 'sizing_result') {
+                textMsg = `Based on the assessment, here's the T-shirt sizing result:`;
+              } else if (richContent.type === 'ai_assessment') {
+                textMsg = `Let me help you evaluate if this is the right approach:`;
+              }
+              if (textMsg) {
+                res.write(`data: ${JSON.stringify({ type: 'text', content: textMsg })}\n\n`);
+                fullContent = textMsg;
+              }
+            }
             res.write(`data: ${JSON.stringify({ type: 'rich', content: richContent })}\n\n`);
           }
         } catch (e) {
@@ -643,7 +675,7 @@ router.post('/chat', async (req, res) => {
     }
 
     if (!fullContent && toolCalls.length === 0) {
-      const welcomeMsg = "Hello! I'm Kiwi, your AI Use Case Intake Consultant. Tell me about the idea or problem you're looking to solve with AI, and I'll help you assess it.";
+      const welcomeMsg = "Hello! I'm Kiwi, your AI Use Case Intake Consultant. Tell me about the idea or problem you're looking to solve with AI, and I'll help you assess it. You can also upload a portfolio Excel file to query existing projects.";
       res.write(`data: ${JSON.stringify({ type: 'text', content: welcomeMsg })}\n\n`);
     }
 
