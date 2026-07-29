@@ -304,29 +304,28 @@ const tools = [
     type: 'function',
     function: {
       name: 'calculate_sizing',
-      description: 'Calculate T-shirt sizing ONLY when the user has EXPLICITLY confirmed ALL required scores. Do NOT call this with inferred or estimated values. Ask user to confirm each score before calling.',
+      description: 'Calculate T-shirt sizing (effort, value, quadrant recommendation) for a use case based on collected scores.',
       parameters: {
         type: 'object',
         properties: {
-          efficiency_savings: { type: 'number', description: 'Efficiency & cost savings in EUR millions p.a. - MUST be confirmed by user' },
-          revenue_uplift: { type: 'number', description: 'Revenue & margin uplift in EUR millions p.a. - MUST be confirmed by user' },
-          cost_avoidance: { type: 'number', description: 'Quantified cost avoidance in EUR millions p.a. - MUST be confirmed by user' },
-          value_confidence: { type: 'number', description: 'Value confidence (1-5) - MUST be explicitly confirmed' },
-          tech_feasibility: { type: 'number', description: 'Technical feasibility (1-5) - MUST be explicitly confirmed' },
-          data_existence: { type: 'number', description: 'Data existence (1-5) - MUST be explicitly confirmed' },
-          data_access: { type: 'number', description: 'Data access (1-5) - MUST be explicitly confirmed' },
-          data_quality: { type: 'number', description: 'Data quality (1-5) - MUST be explicitly confirmed' },
-          data_ownership: { type: 'number', description: 'Data ownership (1-5) - MUST be explicitly confirmed' },
-          interfaces: { type: 'number', description: 'Interfaces complexity (1-5) - MUST be explicitly confirmed' },
-          delivery_dependencies: { type: 'number', description: 'Delivery dependencies (1-5) - MUST be explicitly confirmed' },
-          platform_fit: { type: 'number', description: 'Platform fit (1-5) - MUST be explicitly confirmed' },
-          time_to_value: { type: 'number', description: 'Time-to-value (1-5) - MUST be explicitly confirmed' },
-          build_effort: { type: 'number', description: 'Build effort (1-5) - MUST be explicitly confirmed' },
-          change_adoption: { type: 'number', description: 'Change & adoption (1-5) - MUST be explicitly confirmed' },
-          rollout_complexity: { type: 'number', description: 'Rollout complexity (1-5) - MUST be explicitly confirmed' },
-          risk_compliance: { type: 'number', description: 'Risk & compliance (1-5) - MUST be explicitly confirmed' }
-        },
-        required: ['efficiency_savings', 'value_confidence', 'tech_feasibility', 'data_existence', 'data_access', 'data_quality', 'data_ownership', 'interfaces', 'delivery_dependencies', 'platform_fit', 'time_to_value', 'build_effort', 'change_adoption', 'rollout_complexity', 'risk_compliance']
+          efficiency_savings: { type: 'number', description: 'Cost savings in EUR millions p.a.' },
+          revenue_uplift: { type: 'number', description: 'Revenue uplift in EUR millions p.a.' },
+          cost_avoidance: { type: 'number', description: 'Cost avoidance in EUR millions p.a.' },
+          value_confidence: { type: 'number', description: 'Confidence in value estimate (1-5)' },
+          tech_feasibility: { type: 'number', description: 'Technical feasibility (1-5)' },
+          data_existence: { type: 'number', description: 'Data exists and is complete (1-5)' },
+          data_access: { type: 'number', description: 'Data is accessible and legal to use (1-5)' },
+          data_quality: { type: 'number', description: 'Data quality (1-5)' },
+          data_ownership: { type: 'number', description: 'Clear data ownership (1-5)' },
+          interfaces: { type: 'number', description: 'Interface complexity - fewer is better (1-5)' },
+          delivery_dependencies: { type: 'number', description: 'Dependencies on other projects (1-5)' },
+          platform_fit: { type: 'number', description: 'Fits target architecture (1-5)' },
+          time_to_value: { type: 'number', description: 'Time to first value (1-5)' },
+          build_effort: { type: 'number', description: 'Build effort - less is better (1-5)' },
+          change_adoption: { type: 'number', description: 'Change management needed (1-5)' },
+          rollout_complexity: { type: 'number', description: 'Rollout complexity (1-5)' },
+          risk_compliance: { type: 'number', description: 'Risk and compliance concerns (1-5)' }
+        }
       }
     }
   },
@@ -427,47 +426,33 @@ const executeFunction = async (functionName, args) => {
 
 const buildSystemPrompt = (relevantProjects = []) => {
   const projectCount = projects.length;
-  const fields = projectCount > 0 ? Object.keys(projects[0]).join(', ') : 'No data loaded';
+  const fields = projectCount > 0 ? Object.keys(projects[0]).join(', ') : '';
 
-  return `You are Kiwi, a friendly AI assistant for project portfolio management.
+  let projectContext = '';
+  if (projectCount > 0) {
+    projectContext = `You have access to ${projectCount} projects in the portfolio (fields: ${fields}).`;
+    if (relevantProjects.length > 0) {
+      projectContext += `\n\nRelevant to this conversation:\n${JSON.stringify(relevantProjects, null, 2)}`;
+    }
+  }
 
-## Portfolio Data
-${projectCount > 0 ? `${projectCount} projects loaded. Fields: ${fields}` : 'No portfolio loaded yet.'}
-${relevantProjects.length > 0 ? `\nRelevant projects:\n${JSON.stringify(relevantProjects.slice(0, 3), null, 2)}` : ''}
+  return `You are Kiwi, an AI Use Case Consultant and Project Portfolio Expert.
 
-## Tools Available
-- show_projects: Display project cards. Use for "show", "list", "display" requests.
-- show_statistics: Show counts by field. Use for "how many", "breakdown", "by status" requests.
-- search_similar_projects: Find similar projects by description.
-- calculate_sizing: Calculate T-shirt size when you have all scoring data.
-- show_intake_summary: Show summary of intake data collected.
+${projectContext}
 
-## For New Use Case Intake
-When user describes a new idea:
-1. Understand the problem and expected value (EUR millions)
-2. EVALUATE AI SUITABILITY - Ask yourself and the user:
-   - Does this need pattern recognition, prediction, or learning from data?
-   - Could this be solved with: rule-based automation, RPA, simple thresholds, off-the-shelf tools, or process changes?
-   - If simpler approaches exist, suggest them and ask why AI is preferred
-3. Check for similar existing projects using search_similar_projects
-4. Ask user to rate EACH scoring field explicitly (1-5)
-5. ONLY call calculate_sizing after ALL 15 scores are CONFIRMED by user
-6. NEVER infer or estimate scores - always ask user to confirm
+You help with:
+1. Answering questions about existing projects - use show_projects, show_statistics, search_similar_projects
+2. Guiding new AI/ML use case proposals through intake and assessment
 
-## Required Scores to Collect (all 1-5, 5=best)
-- Value: efficiency_savings (EUR M), revenue_uplift (EUR M), cost_avoidance (EUR M), value_confidence
-- Data: data_existence, data_access, data_quality, data_ownership
-- Tech: tech_feasibility, interfaces, delivery_dependencies, platform_fit
-- Effort: time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance
+When someone proposes a new use case:
+- Understand their problem deeply - ask about the pain, frequency, current workarounds, affected users
+- Think critically: does this actually need AI/ML, or would simpler solutions work? (RPA, rules, thresholds, existing tools)
+- Check for similar projects that might already solve this or offer learnings
+- Help them quantify the business value (savings, revenue, cost avoidance in EUR millions)
+- Guide them through technical assessment - data availability, quality, integrations, dependencies, effort, risks
+- When you have enough information, calculate the T-shirt sizing to give them a recommendation
 
-## CRITICAL Guidelines
-- ALWAYS evaluate if AI/ML is truly needed before proceeding
-- Suggest simpler alternatives: RPA, rule-based logic, threshold alerts, off-the-shelf tools, process changes
-- If user's problem can be solved without AI, tell them constructively
-- Ask ONE scoring question at a time
-- Do NOT infer or assume scores - get explicit user confirmation
-- Do NOT call calculate_sizing until user has confirmed ALL required scores
-- For off-topic questions, politely redirect`;
+Be conversational and helpful. Ask clarifying questions. Challenge assumptions constructively. Help refine ideas.`;
 };
 
 router.get('/', (req, res) => {
