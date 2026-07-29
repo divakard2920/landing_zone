@@ -7,7 +7,7 @@ const publicRoutes = require('./routes/public');
 const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const agentRoutes = require('./routes/agent');
-const excelAgentRoutes = require('./routes/excel-agent');
+const kiwiAgentRoutes = require('./routes/kiwi-agent');
 const { requireAuth } = require('./middleware/auth');
 
 const app = express();
@@ -22,7 +22,7 @@ app.use('/api', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', requireAuth, adminRoutes);
 app.use('/api/agent', agentRoutes);
-app.use('/api/excel-agent', excelAgentRoutes);
+app.use('/api/kiwi', kiwiAgentRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
