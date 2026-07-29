@@ -529,6 +529,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 router.post('/chat', async (req, res) => {
   try {
     const { messages } = req.body;
+    console.log('Chat request received:', messages?.length, 'messages');
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Messages array is required' });
@@ -544,10 +545,14 @@ router.post('/chat', async (req, res) => {
 
     // Get user query and search for relevant projects
     const userQuery = messages[messages.length - 1]?.content || '';
-    const relevantProjects = projects.length > 0 ? await searchSimilarProjects(userQuery, 5, 0.5) : [];
+    console.log('User query:', userQuery);
+
+    const relevantProjects = projects.length > 0 ? await searchSimilarProjects(userQuery, 3, 0.5) : [];
+    console.log('Found', relevantProjects.length, 'relevant projects');
 
     const systemPrompt = buildSystemPrompt(relevantProjects);
     const client = getOpenAIClient();
+    console.log('Calling Azure OpenAI...');
 
     const stream = await client.chat.completions.create({
       model: AZURE_OPENAI_DEPLOYMENT,
@@ -564,6 +569,7 @@ router.post('/chat', async (req, res) => {
 
     let fullContent = '';
     let toolCalls = [];
+    console.log('Stream started');
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta;
@@ -589,6 +595,8 @@ router.post('/chat', async (req, res) => {
         }
       }
     }
+
+    console.log('Stream ended. Content length:', fullContent.length, 'Tool calls:', toolCalls.length);
 
     // Execute tool calls
     for (const toolCall of toolCalls) {
