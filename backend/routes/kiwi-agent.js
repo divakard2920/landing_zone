@@ -50,7 +50,7 @@ const CONFIG = {
     2: 0.5
   },
   quadrantThresholds: {
-    highValue: 3,
+    highValue: 3.5,
     lowEffort: 3.5
   }
 };
@@ -159,11 +159,32 @@ const calculateTShirtSize = (scores) => {
     (scores.rollout_complexity || 3) * CONFIG.effortWeights.rollout_complexity +
     (scores.risk_compliance || 3) * CONFIG.effortWeights.risk_compliance;
 
+  // Count how many scores are rated '1' (knock-out rule)
+  const allScores = [
+    scores.tech_feasibility, scores.data_existence, scores.data_access,
+    scores.data_quality, scores.data_ownership, scores.interfaces,
+    scores.delivery_dependencies, scores.platform_fit, scores.time_to_value,
+    scores.build_effort, scores.change_adoption, scores.rollout_complexity,
+    scores.risk_compliance, scores.value_confidence
+  ];
+  const countOfOnes = allScores.filter(s => s === 1).length;
+
+  // Base effort size from score
   let effortSize = 'XL';
   if (effortScore >= CONFIG.effortThresholds.XS) effortSize = 'XS';
   else if (effortScore >= CONFIG.effortThresholds.S) effortSize = 'S';
   else if (effortScore >= CONFIG.effortThresholds.M) effortSize = 'M';
   else if (effortScore >= CONFIG.effortThresholds.L) effortSize = 'L';
+
+  // Apply knock-out rule: any '1' bumps size up one step, 2+ '1's -> +2 steps (min L)
+  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL'];
+  let sizeIndex = sizeOrder.indexOf(effortSize);
+  if (countOfOnes >= 2) {
+    sizeIndex = Math.max(3, Math.min(4, sizeIndex + 2)); // +2 steps, minimum L
+  } else if (countOfOnes === 1) {
+    sizeIndex = Math.min(4, sizeIndex + 1); // +1 step
+  }
+  effortSize = sizeOrder[sizeIndex];
 
   const ebitTotal = (scores.efficiency_savings || 0) + (scores.revenue_uplift || 0) + (scores.cost_avoidance || 0);
 
@@ -227,7 +248,8 @@ const calculateTShirtSize = (scores) => {
     complianceGate,
     recommendation,
     dataBlock,
-    dependencyBlock
+    dependencyBlock,
+    knockOutCount: countOfOnes
   };
 };
 
@@ -282,28 +304,29 @@ const tools = [
     type: 'function',
     function: {
       name: 'calculate_sizing',
-      description: 'Calculate T-shirt sizing (effort, value, quadrant) for a use case. Only call this when you have gathered enough scoring information.',
+      description: 'Calculate T-shirt sizing ONLY when the user has EXPLICITLY confirmed ALL required scores. Do NOT call this with inferred or estimated values. Ask user to confirm each score before calling.',
       parameters: {
         type: 'object',
         properties: {
-          efficiency_savings: { type: 'number', description: 'Efficiency & cost savings in EUR millions p.a.' },
-          revenue_uplift: { type: 'number', description: 'Revenue & margin uplift in EUR millions p.a.' },
-          cost_avoidance: { type: 'number', description: 'Quantified cost avoidance in EUR millions p.a.' },
-          value_confidence: { type: 'number', description: 'Value confidence score (1-5)' },
-          tech_feasibility: { type: 'number', description: 'Technical feasibility score (1-5)' },
-          data_existence: { type: 'number', description: 'Data existence & completeness score (1-5)' },
-          data_access: { type: 'number', description: 'Data access & legal usability score (1-5)' },
-          data_quality: { type: 'number', description: 'Data quality score (1-5)' },
-          data_ownership: { type: 'number', description: 'Data ownership & governance score (1-5)' },
-          interfaces: { type: 'number', description: 'Technical interfaces complexity score (1-5)' },
-          delivery_dependencies: { type: 'number', description: 'Delivery dependencies score (1-5)' },
-          platform_fit: { type: 'number', description: 'Platform/architecture fit score (1-5)' },
-          time_to_value: { type: 'number', description: 'Time-to-value score (1-5)' },
-          build_effort: { type: 'number', description: 'Build effort score (1-5)' },
-          change_adoption: { type: 'number', description: 'Change & adoption score (1-5)' },
-          rollout_complexity: { type: 'number', description: 'Rollout complexity score (1-5)' },
-          risk_compliance: { type: 'number', description: 'Risk & compliance score (1-5)' }
-        }
+          efficiency_savings: { type: 'number', description: 'Efficiency & cost savings in EUR millions p.a. - MUST be confirmed by user' },
+          revenue_uplift: { type: 'number', description: 'Revenue & margin uplift in EUR millions p.a. - MUST be confirmed by user' },
+          cost_avoidance: { type: 'number', description: 'Quantified cost avoidance in EUR millions p.a. - MUST be confirmed by user' },
+          value_confidence: { type: 'number', description: 'Value confidence (1-5) - MUST be explicitly confirmed' },
+          tech_feasibility: { type: 'number', description: 'Technical feasibility (1-5) - MUST be explicitly confirmed' },
+          data_existence: { type: 'number', description: 'Data existence (1-5) - MUST be explicitly confirmed' },
+          data_access: { type: 'number', description: 'Data access (1-5) - MUST be explicitly confirmed' },
+          data_quality: { type: 'number', description: 'Data quality (1-5) - MUST be explicitly confirmed' },
+          data_ownership: { type: 'number', description: 'Data ownership (1-5) - MUST be explicitly confirmed' },
+          interfaces: { type: 'number', description: 'Interfaces complexity (1-5) - MUST be explicitly confirmed' },
+          delivery_dependencies: { type: 'number', description: 'Delivery dependencies (1-5) - MUST be explicitly confirmed' },
+          platform_fit: { type: 'number', description: 'Platform fit (1-5) - MUST be explicitly confirmed' },
+          time_to_value: { type: 'number', description: 'Time-to-value (1-5) - MUST be explicitly confirmed' },
+          build_effort: { type: 'number', description: 'Build effort (1-5) - MUST be explicitly confirmed' },
+          change_adoption: { type: 'number', description: 'Change & adoption (1-5) - MUST be explicitly confirmed' },
+          rollout_complexity: { type: 'number', description: 'Rollout complexity (1-5) - MUST be explicitly confirmed' },
+          risk_compliance: { type: 'number', description: 'Risk & compliance (1-5) - MUST be explicitly confirmed' }
+        },
+        required: ['efficiency_savings', 'value_confidence', 'tech_feasibility', 'data_existence', 'data_access', 'data_quality', 'data_ownership', 'interfaces', 'delivery_dependencies', 'platform_fit', 'time_to_value', 'build_effort', 'change_adoption', 'rollout_complexity', 'risk_compliance']
       }
     }
   },
@@ -420,17 +443,23 @@ ${relevantProjects.length > 0 ? `\nRelevant projects:\n${JSON.stringify(relevant
 - show_intake_summary: Show summary of intake data collected.
 
 ## For New Use Case Intake
-When user describes a new idea, have a natural conversation to understand:
-1. The problem and why it matters
-2. Expected value (savings/revenue in EUR millions)
-3. Technical aspects (data availability, complexity, dependencies)
-4. Then calculate sizing with the scores
+When user describes a new idea:
+1. Understand the problem and expected value (EUR millions)
+2. Ask user to rate EACH scoring field explicitly (1-5)
+3. ONLY call calculate_sizing after ALL 15 scores are CONFIRMED by user
+4. NEVER infer or estimate scores - always ask user to confirm each one
 
-## Guidelines
-- Be conversational and helpful
-- Ask ONE question at a time, don't overwhelm
-- Use tools only when appropriate for the request
-- For off-topic questions, politely redirect to project topics`;
+## Required Scores to Collect (all 1-5, 5=best)
+- Value: efficiency_savings (EUR M), revenue_uplift (EUR M), cost_avoidance (EUR M), value_confidence
+- Data: data_existence, data_access, data_quality, data_ownership
+- Tech: tech_feasibility, interfaces, delivery_dependencies, platform_fit
+- Effort: time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance
+
+## CRITICAL Guidelines
+- Ask ONE scoring question at a time
+- Do NOT infer or assume scores - get explicit user confirmation
+- Do NOT call calculate_sizing until user has confirmed ALL required scores
+- For off-topic questions, politely redirect`;
 };
 
 router.get('/', (req, res) => {
