@@ -310,6 +310,11 @@ router.post('/chat', async (req, res) => {
       return res.status(500).json({ error: 'Azure OpenAI endpoint not configured' });
     }
 
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
     const userQuery = messages[messages.length - 1]?.content || '';
     const doiStages = await getDoiStages();
     const allProjects = await getAllProjects();
@@ -319,7 +324,7 @@ router.post('/chat', async (req, res) => {
 
     const client = getOpenAIClient();
 
-    const response = await client.chat.completions.create({
+    const stream = await client.chat.completions.create({
       model: AZURE_OPENAI_DEPLOYMENT,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -328,58 +333,90 @@ router.post('/chat', async (req, res) => {
       tools,
       tool_choice: 'auto',
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 1000,
+      stream: true
     });
 
-    const choice = response.choices[0];
-    const assistantMessage = choice?.message;
+    let fullContent = '';
+    let toolCalls = [];
+    let currentToolCall = null;
 
-    let textContent = assistantMessage?.content || '';
-    let richContent = null;
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
 
-    if (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0) {
-      const toolCall = assistantMessage.tool_calls[0];
-      const functionName = toolCall.function.name;
-      const args = JSON.parse(toolCall.function.arguments);
+      if (delta?.content) {
+        fullContent += delta.content;
+        res.write(`data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`);
+      }
 
-      richContent = await executeFunction(functionName, args, { doiStages });
-
-      if (!textContent && richContent) {
-        switch (richContent.type) {
-          case 'projects':
-            textContent = `Found ${richContent.total} project${richContent.total !== 1 ? 's' : ''}${richContent.showing < richContent.total ? ` (showing ${richContent.showing})` : ''}.`;
-            break;
-          case 'stats':
-          case 'stats_overview':
-            textContent = 'Here are the statistics:';
-            break;
-          case 'project_detail':
-            textContent = `Here are the details for ${richContent.data.name}:`;
-            break;
-          case 'not_found':
-            textContent = `I couldn't find a project matching "${richContent.query}". Please check the name and try again.`;
-            richContent = null;
-            break;
+      if (delta?.tool_calls) {
+        for (const tc of delta.tool_calls) {
+          if (tc.index !== undefined) {
+            if (!toolCalls[tc.index]) {
+              toolCalls[tc.index] = { id: tc.id, function: { name: '', arguments: '' } };
+            }
+            if (tc.function?.name) {
+              toolCalls[tc.index].function.name = tc.function.name;
+            }
+            if (tc.function?.arguments) {
+              toolCalls[tc.index].function.arguments += tc.function.arguments;
+            }
+          }
         }
       }
     }
 
-    if (!textContent && !richContent) {
-      textContent = 'Sorry, I could not generate a response.';
+    // Process tool calls if any
+    if (toolCalls.length > 0) {
+      const toolCall = toolCalls[0];
+      if (toolCall.function.name && toolCall.function.arguments) {
+        try {
+          const args = JSON.parse(toolCall.function.arguments);
+          const richContent = await executeFunction(toolCall.function.name, args, { doiStages });
+
+          if (richContent) {
+            let textContent = '';
+            switch (richContent.type) {
+              case 'projects':
+                textContent = `Found ${richContent.total} project${richContent.total !== 1 ? 's' : ''}${richContent.showing < richContent.total ? ` (showing ${richContent.showing})` : ''}.`;
+                break;
+              case 'stats':
+              case 'stats_overview':
+                textContent = 'Here are the statistics:';
+                break;
+              case 'project_detail':
+                textContent = `Here are the details for ${richContent.data.name}:`;
+                break;
+              case 'not_found':
+                textContent = `I couldn't find a project matching "${richContent.query}". Please check the name and try again.`;
+                break;
+            }
+
+            if (textContent && !fullContent) {
+              res.write(`data: ${JSON.stringify({ type: 'text', content: textContent })}\n\n`);
+            }
+
+            if (richContent.type !== 'not_found') {
+              res.write(`data: ${JSON.stringify({ type: 'rich', content: richContent })}\n\n`);
+            }
+          }
+        } catch (e) {
+          console.error('Error parsing tool call:', e);
+        }
+      }
     }
 
-    res.json({
-      message: textContent,
-      richContent,
-      usage: response.usage
-    });
+    if (!fullContent && toolCalls.length === 0) {
+      res.write(`data: ${JSON.stringify({ type: 'text', content: 'Sorry, I could not generate a response.' })}\n\n`);
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+    res.end();
 
   } catch (error) {
     console.error('Agent chat error:', error);
-    res.status(500).json({
-      error: 'Failed to process chat request',
-      details: error.message
-    });
+    res.write(`data: ${JSON.stringify({ type: 'error', content: error.message })}\n\n`);
+    res.end();
   }
 });
 

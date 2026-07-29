@@ -401,16 +401,81 @@ function Landing() {
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
     setChatLoading(true);
+
+    // Add empty assistant message for streaming
+    const assistantIndex = chatMessages.length + 1;
+    setChatMessages(prev => [...prev, { role: 'assistant', content: '', richContent: null }]);
+
     try {
-      const response = await api.agent.chat([...chatMessages, userMessage]);
-      setChatMessages(prev => [...prev, {
-        role: 'assistant',
-        content: response.message,
-        richContent: response.richContent
-      }]);
+      const response = await fetch('/api/agent/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...chatMessages, userMessage] })
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (data.type === 'text') {
+                setChatMessages(prev => {
+                  const updated = [...prev];
+                  updated[assistantIndex] = {
+                    ...updated[assistantIndex],
+                    content: (updated[assistantIndex].content || '') + data.content
+                  };
+                  return updated;
+                });
+              } else if (data.type === 'rich') {
+                setChatMessages(prev => {
+                  const updated = [...prev];
+                  updated[assistantIndex] = {
+                    ...updated[assistantIndex],
+                    richContent: data.content
+                  };
+                  return updated;
+                });
+              } else if (data.type === 'error') {
+                setChatMessages(prev => {
+                  const updated = [...prev];
+                  updated[assistantIndex] = {
+                    role: 'assistant',
+                    content: 'Sorry, I encountered an error. Please try again.',
+                    isError: true
+                  };
+                  return updated;
+                });
+              }
+            } catch (e) {
+              console.error('Error parsing SSE:', e);
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Chat error:', error);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.', isError: true }]);
+      setChatMessages(prev => {
+        const updated = [...prev];
+        updated[assistantIndex] = {
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+          isError: true
+        };
+        return updated;
+      });
     } finally {
       setChatLoading(false);
     }
@@ -2368,7 +2433,7 @@ function Landing() {
 
       {/* Floating Action Button */}
       <button
-        className="support-fab"
+        className={`support-fab ${showFabMenu ? 'fab-open' : ''}`}
         onClick={() => {
           if (showChatPanel || showSupportModal) {
             setShowChatPanel(false);
@@ -2380,7 +2445,17 @@ function Landing() {
         }}
         title="Help"
       >
-        {showChatPanel || showSupportModal ? '×' : '?'}
+        {showChatPanel || showSupportModal ? (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        ) : (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <path d="M12 17h.01"/>
+          </svg>
+        )}
       </button>
 
       {/* FAB Menu */}
@@ -2388,21 +2463,21 @@ function Landing() {
         <div className="fab-menu">
           <button className="fab-menu-item" onClick={() => { setShowChatPanel(true); setShowFabMenu(false); }}>
             <div className="fab-menu-icon fab-menu-icon-blue">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
-                <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
               </svg>
+              <span className="fab-ai-badge">AI</span>
             </div>
             <div className="fab-menu-text">
               <div className="fab-menu-title">Project Assistant</div>
-              <div className="fab-menu-subtitle">Ask about projects</div>
+              <div className="fab-menu-subtitle">Ask anything about projects</div>
             </div>
             <svg className="fab-menu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
           </button>
           <button className="fab-menu-item" onClick={() => { setShowSupportModal(true); setShowFabMenu(false); }}>
             <div className="fab-menu-icon fab-menu-icon-green">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
               </svg>
             </div>
             <div className="fab-menu-text">
@@ -2419,38 +2494,84 @@ function Landing() {
         <div className="ai-chat-overlay" onClick={() => setShowChatPanel(false)}>
           <div className="ai-chat-panel" onClick={(e) => e.stopPropagation()}>
             <div className="ai-chat-header">
-              <div className="ai-chat-header-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
-                  <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
-                </svg>
+              <div className="ai-chat-header-left">
+                <div className="ai-chat-header-icon ai-chat-header-capybara">
+                  <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="50" cy="60" rx="35" ry="25" fill="#8B7355"/>
+                    <ellipse cx="50" cy="35" rx="28" ry="22" fill="#A0826D"/>
+                    <ellipse cx="50" cy="45" rx="18" ry="12" fill="#C4A484"/>
+                    <ellipse cx="50" cy="42" rx="6" ry="4" fill="#4A3728"/>
+                    <circle cx="38" cy="30" r="5" fill="#2C1810"/>
+                    <circle cx="39" cy="29" r="2" fill="#FFF"/>
+                    <circle cx="62" cy="30" r="5" fill="#2C1810"/>
+                    <circle cx="63" cy="29" r="2" fill="#FFF"/>
+                    <ellipse cx="28" cy="22" rx="8" ry="6" fill="#8B7355"/>
+                    <ellipse cx="72" cy="22" rx="8" ry="6" fill="#8B7355"/>
+                    <path d="M44 48 Q50 52 56 48" stroke="#4A3728" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div className="ai-chat-header-text">
+                  <h3>Project Assistant</h3>
+                  <p>Ask about projects, status, or analytics</p>
+                </div>
               </div>
-              <div className="ai-chat-header-text">
-                <h3>Project Assistant</h3>
-                <p>Ask about projects, status, or analytics</p>
+              <div className="ai-chat-header-actions">
+                {chatMessages.length > 0 && (
+                  <button onClick={() => setChatMessages([])} className="ai-chat-action-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                    </svg>
+                    Clear
+                  </button>
+                )}
+                <button onClick={() => setShowChatPanel(false)} className="ai-chat-close">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
               </div>
-              <button onClick={() => setChatMessages([])} className="btn btn-sm" style={{ marginLeft: 'auto', marginRight: '8px' }}>Clear Chat</button>
-              <button onClick={() => setShowChatPanel(false)} className="ai-chat-close">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-              </button>
             </div>
           <div className="ai-chat-messages">
             {chatMessages.length === 0 && (
               <div className="ai-chat-empty">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.4, marginBottom: '12px' }}>
-                  <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
-                  <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
-                </svg>
-                <p className="ai-chat-empty-title">Hi! I'm your Project Assistant</p>
-                <p className="ai-chat-empty-subtitle">Try asking me something:</p>
+                <div className="ai-chat-capybara">
+                  <svg width="140" height="140" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="50" cy="60" rx="35" ry="25" fill="#8B7355"/>
+                    <ellipse cx="50" cy="35" rx="28" ry="22" fill="#A0826D"/>
+                    <ellipse cx="50" cy="45" rx="18" ry="12" fill="#C4A484"/>
+                    <ellipse cx="50" cy="42" rx="6" ry="4" fill="#4A3728"/>
+                    <circle cx="38" cy="30" r="5" fill="#2C1810"/>
+                    <circle cx="39" cy="29" r="2" fill="#FFF"/>
+                    <circle cx="62" cy="30" r="5" fill="#2C1810"/>
+                    <circle cx="63" cy="29" r="2" fill="#FFF"/>
+                    <ellipse cx="30" cy="38" rx="5" ry="3" fill="#E8A0A0" opacity="0.5"/>
+                    <ellipse cx="70" cy="38" rx="5" ry="3" fill="#E8A0A0" opacity="0.5"/>
+                    <ellipse cx="28" cy="22" rx="8" ry="6" fill="#8B7355"/>
+                    <ellipse cx="72" cy="22" rx="8" ry="6" fill="#8B7355"/>
+                    <path d="M44 48 Q50 52 56 48" stroke="#4A3728" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    <path d="M30 44 L18 42" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M30 47 L18 49" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M70 44 L82 42" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M70 47 L82 49" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  <div className="ai-chat-capybara-badge">AI</div>
+                </div>
+                <h2 className="ai-chat-empty-title">Hello! I'm your AI Assistant</h2>
+                <p className="ai-chat-empty-subtitle">I can help you explore projects, view analytics, and find information quickly.</p>
                 <div className="ai-chat-suggestions">
                   {[
-                    'Show me project overview',
-                    'Show projects in DOI 0',
-                    'Show high priority projects',
-                    'What projects are in development?'
+                    { icon: 'chart', text: 'Show me project overview' },
+                    { icon: 'list', text: 'Show projects in DOI 0' },
+                    { icon: 'star', text: 'Show high priority projects' },
+                    { icon: 'search', text: 'What projects are in development?' }
                   ].map((q, i) => (
-                    <button key={i} onClick={() => setChatInput(q)} className="ai-chat-suggestion">{q}</button>
+                    <button key={i} onClick={() => setChatInput(q.text)} className="ai-chat-suggestion">
+                      <span className="ai-chat-suggestion-icon">
+                        {q.icon === 'chart' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>}
+                        {q.icon === 'list' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>}
+                        {q.icon === 'star' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>}
+                        {q.icon === 'search' && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>}
+                      </span>
+                      {q.text}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -2458,14 +2579,14 @@ function Landing() {
             {chatMessages.map((msg, idx) => (
               <div key={idx} className={`ai-chat-message-wrapper ${msg.role}`}>
                 {msg.content && (
-                  <div className={`ai-chat-message ${msg.role}${msg.isError ? ' error' : ''}`}>
+                  <div className={`ai-chat-message ${msg.role}${msg.isError ? ' error' : ''}${chatLoading && idx === chatMessages.length - 1 && msg.role === 'assistant' ? ' streaming' : ''}`}>
                     {msg.role === 'assistant' ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
                   </div>
                 )}
                 {msg.richContent && renderRichContent(msg.richContent)}
               </div>
             ))}
-            {chatLoading && (
+            {chatLoading && chatMessages.length > 0 && !chatMessages[chatMessages.length - 1]?.content && (
               <div className="ai-chat-message assistant">
                 <div className="ai-chat-typing">
                   <span></span>
@@ -2501,7 +2622,7 @@ function Landing() {
               <h3>Support & Feedback</h3>
               <button className="close-btn" onClick={() => setShowSupportModal(false)}>&times;</button>
             </div>
-            
+
             <form onSubmit={handleSupportSubmit}>
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div className="form-group" style={{ flex: 1 }}>
