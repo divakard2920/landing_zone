@@ -3,27 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Excel Project Assistant</title>
+  <title>Kiwi - AI Use Case Intake</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }
 
     .header {
-      background: linear-gradient(145deg, #0066a8 0%, #00457e 100%);
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
       color: white;
       padding: 16px 24px;
       display: flex;
       align-items: center;
       gap: 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .kiwi-logo {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(145deg, #7bed9f, #2ed573);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
     }
 
     .header h1 {
@@ -31,16 +43,30 @@
       font-weight: 600;
     }
 
+    .header h1 span {
+      color: #7bed9f;
+    }
+
     .header-status {
       margin-left: auto;
       font-size: 0.85rem;
-      opacity: 0.9;
+      opacity: 0.7;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #7bed9f;
     }
 
     .main-container {
       flex: 1;
       display: flex;
-      max-width: 1200px;
+      max-width: 1400px;
       width: 100%;
       margin: 0 auto;
       padding: 24px;
@@ -48,88 +74,154 @@
     }
 
     .sidebar {
-      width: 300px;
-      background: white;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-      height: fit-content;
+      width: 320px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .sidebar h2 {
-      font-size: 1rem;
-      color: #333;
-      margin-bottom: 16px;
+    .sidebar-card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 20px;
+      color: white;
+    }
+
+    .sidebar-card h2 {
+      font-size: 0.9rem;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .upload-area {
-      border: 2px dashed #ccc;
+      border: 2px dashed rgba(255,255,255,0.2);
       border-radius: 12px;
-      padding: 32px 16px;
+      padding: 24px 16px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
-      margin-bottom: 16px;
     }
 
     .upload-area:hover {
-      border-color: #0066a8;
-      background: rgba(0, 102, 168, 0.05);
+      border-color: #7bed9f;
+      background: rgba(123, 237, 159, 0.1);
     }
 
     .upload-area.dragover {
-      border-color: #0066a8;
-      background: rgba(0, 102, 168, 0.1);
+      border-color: #7bed9f;
+      background: rgba(123, 237, 159, 0.15);
     }
 
     .upload-area svg {
-      width: 48px;
-      height: 48px;
-      color: #999;
-      margin-bottom: 12px;
+      width: 40px;
+      height: 40px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 8px;
     }
 
     .upload-area p {
-      color: #666;
-      font-size: 0.9rem;
+      color: rgba(255,255,255,0.6);
+      font-size: 0.85rem;
     }
 
-    .upload-area input {
-      display: none;
+    .upload-area input { display: none; }
+
+    .upload-success {
+      color: #7bed9f;
+    }
+
+    .upload-success svg {
+      color: #7bed9f;
     }
 
     .data-info {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 0.85rem;
-      color: #555;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .data-info p {
+      color: rgba(255,255,255,0.8);
+      font-size: 0.9rem;
     }
 
     .data-info strong {
-      color: #0066a8;
+      color: #7bed9f;
     }
 
     .fields-list {
-      margin-top: 12px;
+      margin-top: 10px;
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
     }
 
     .field-tag {
-      background: #e8f4fc;
-      color: #0066a8;
+      background: rgba(123, 237, 159, 0.15);
+      color: #7bed9f;
       padding: 4px 10px;
       border-radius: 12px;
       font-size: 0.75rem;
     }
 
+    .intake-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.6);
+    }
+
+    .step.active {
+      background: rgba(123, 237, 159, 0.1);
+      color: #7bed9f;
+    }
+
+    .step.completed {
+      color: rgba(255,255,255,0.8);
+    }
+
+    .step-number {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .step.active .step-number {
+      background: #7bed9f;
+      color: #1a1a2e;
+    }
+
+    .step.completed .step-number {
+      background: rgba(123, 237, 159, 0.3);
+      color: #7bed9f;
+    }
+
     .chat-container {
       flex: 1;
-      background: white;
+      background: rgba(255,255,255,0.03);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
       border-radius: 16px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -145,24 +237,24 @@
     }
 
     .message {
-      max-width: 80%;
-      padding: 14px 18px;
+      max-width: 85%;
+      padding: 16px 20px;
       border-radius: 16px;
       font-size: 0.95rem;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .message.user {
       align-self: flex-end;
-      background: linear-gradient(145deg, #0066a8 0%, #00457e 100%);
-      color: white;
+      background: linear-gradient(145deg, #7bed9f, #2ed573);
+      color: #1a1a2e;
       border-bottom-right-radius: 4px;
     }
 
     .message.assistant {
       align-self: flex-start;
-      background: #f5f7fa;
-      color: #333;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.9);
       border-bottom-left-radius: 4px;
     }
 
@@ -171,7 +263,7 @@
       display: inline-block;
       width: 2px;
       height: 1em;
-      background: #0066a8;
+      background: #7bed9f;
       margin-left: 2px;
       animation: blink 0.8s infinite;
     }
@@ -181,33 +273,36 @@
       51%, 100% { opacity: 0; }
     }
 
-    .empty-state {
+    .welcome-state {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: #999;
       text-align: center;
       padding: 40px;
+      color: rgba(255,255,255,0.7);
     }
 
-    .empty-state svg {
-      width: 80px;
-      height: 80px;
+    .welcome-kiwi {
+      font-size: 64px;
       margin-bottom: 16px;
-      opacity: 0.5;
     }
 
-    .empty-state h3 {
-      font-size: 1.2rem;
-      color: #555;
+    .welcome-state h3 {
+      font-size: 1.4rem;
+      color: white;
       margin-bottom: 8px;
+    }
+
+    .welcome-state p {
+      max-width: 400px;
+      line-height: 1.6;
     }
 
     .chat-input-area {
       padding: 20px 24px;
-      border-top: 1px solid #eee;
+      border-top: 1px solid rgba(255,255,255,0.1);
       display: flex;
       gap: 12px;
     }
@@ -215,19 +310,22 @@
     .chat-input {
       flex: 1;
       padding: 14px 18px;
-      border: 2px solid #e2e8f0;
+      border: 1px solid rgba(255,255,255,0.2);
       border-radius: 12px;
       font-size: 0.95rem;
       outline: none;
-      transition: border-color 0.2s;
+      background: rgba(255,255,255,0.05);
+      color: white;
+      transition: all 0.2s;
+    }
+
+    .chat-input::placeholder {
+      color: rgba(255,255,255,0.4);
     }
 
     .chat-input:focus {
-      border-color: #0066a8;
-    }
-
-    .chat-input:disabled {
-      background: #f5f5f5;
+      border-color: #7bed9f;
+      background: rgba(255,255,255,0.08);
     }
 
     .send-btn {
@@ -235,8 +333,8 @@
       height: 48px;
       border-radius: 12px;
       border: none;
-      background: linear-gradient(145deg, #0066a8 0%, #00457e 100%);
-      color: white;
+      background: linear-gradient(145deg, #7bed9f, #2ed573);
+      color: #1a1a2e;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -246,7 +344,7 @@
 
     .send-btn:hover:not(:disabled) {
       transform: scale(1.05);
-      box-shadow: 0 4px 12px rgba(0, 69, 126, 0.3);
+      box-shadow: 0 4px 20px rgba(123, 237, 159, 0.4);
     }
 
     .send-btn:disabled {
@@ -254,115 +352,313 @@
       cursor: not-allowed;
     }
 
+    /* Rich Content Styles */
     .rich-content {
-      margin-top: 12px;
+      margin-top: 16px;
     }
 
-    .project-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .project-card {
-      background: white;
-      border: 1px solid #e2e8f0;
+    .similar-projects {
+      background: rgba(255,193,7,0.1);
+      border: 1px solid rgba(255,193,7,0.3);
       border-radius: 12px;
       padding: 16px;
-      font-size: 0.85rem;
-    }
-
-    .project-card h4 {
-      color: #0066a8;
-      margin-bottom: 8px;
-      font-size: 0.95rem;
-    }
-
-    .project-card p {
-      color: #666;
-      margin: 4px 0;
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 12px;
       margin-top: 12px;
     }
 
-    .stat-item {
-      background: white;
-      border: 1px solid #e2e8f0;
+    .similar-projects h4 {
+      color: #ffc107;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .similar-project-item {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+
+    .similar-project-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .similar-project-item .name {
+      font-weight: 600;
+      color: white;
+      margin-bottom: 4px;
+    }
+
+    .similar-project-item .similarity {
+      font-size: 0.8rem;
+      color: #ffc107;
+    }
+
+    .similar-project-item .details {
+      font-size: 0.85rem;
+      color: rgba(255,255,255,0.6);
+      margin-top: 6px;
+    }
+
+    .ai-assessment {
+      background: rgba(100,149,237,0.1);
+      border: 1px solid rgba(100,149,237,0.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .ai-assessment h4 {
+      color: #6495ed;
+      font-size: 0.9rem;
+      margin-bottom: 12px;
+    }
+
+    .ai-assessment ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .ai-assessment li {
+      padding: 6px 0;
+      color: rgba(255,255,255,0.8);
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ai-assessment li::before {
+      content: '→';
+      color: #6495ed;
+    }
+
+    .sizing-result {
+      background: linear-gradient(145deg, rgba(123,237,159,0.1), rgba(46,213,115,0.1));
+      border: 1px solid rgba(123,237,159,0.3);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 12px;
+    }
+
+    .sizing-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .quadrant-badge {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .quadrant-badge.quick-win {
+      background: linear-gradient(145deg, #7bed9f, #2ed573);
+      color: #1a1a2e;
+    }
+
+    .quadrant-badge.strategic-bet {
+      background: linear-gradient(145deg, #ffc107, #ff9800);
+      color: #1a1a2e;
+    }
+
+    .quadrant-badge.fill-in {
+      background: linear-gradient(145deg, #6495ed, #4169e1);
+      color: white;
+    }
+
+    .quadrant-badge.reconsider {
+      background: linear-gradient(145deg, #ff6b6b, #ee5a5a);
+      color: white;
+    }
+
+    .sizing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .sizing-item {
+      background: rgba(0,0,0,0.2);
       border-radius: 10px;
       padding: 14px;
       text-align: center;
     }
 
-    .stat-item .count {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #0066a8;
+    .sizing-item .label {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
     }
 
-    .stat-item .label {
+    .sizing-item .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #7bed9f;
+    }
+
+    .sizing-item .sub {
       font-size: 0.8rem;
-      color: #666;
+      color: rgba(255,255,255,0.6);
       margin-top: 4px;
     }
 
-    .loading {
+    .recommendation-box {
+      background: rgba(0,0,0,0.2);
+      border-radius: 10px;
+      padding: 14px;
+      color: rgba(255,255,255,0.9);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .compliance-warning {
+      background: rgba(255,107,107,0.2);
+      border: 1px solid rgba(255,107,107,0.4);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      color: #ff6b6b;
+      font-size: 0.85rem;
       display: flex;
-      gap: 4px;
-      padding: 8px 0;
+      align-items: center;
+      gap: 8px;
     }
 
-    .loading span {
-      width: 8px;
-      height: 8px;
-      background: #0066a8;
-      border-radius: 50%;
-      animation: bounce 1.4s ease-in-out infinite;
+    .intake-summary {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 20px;
+      margin-top: 12px;
     }
 
-    .loading span:nth-child(2) { animation-delay: 0.2s; }
-    .loading span:nth-child(3) { animation-delay: 0.4s; }
+    .intake-summary h4 {
+      color: #7bed9f;
+      font-size: 1rem;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
 
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
+    .summary-section {
+      margin-bottom: 14px;
+    }
+
+    .summary-section .label {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    .summary-section .content {
+      color: rgba(255,255,255,0.9);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    /* Project cards */
+    .project-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .project-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .project-card h4 {
+      color: #7bed9f;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .project-card p {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.8rem;
+      margin: 4px 0;
+    }
+
+    .project-card p strong {
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .stat-item {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-item .count {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #7bed9f;
+    }
+
+    .stat-item .label {
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.6);
+      margin-top: 4px;
+      word-break: break-word;
     }
 
     /* Markdown styles */
-    .message.assistant p { margin: 0 0 8px 0; }
+    .message.assistant p { margin: 0 0 10px 0; }
     .message.assistant p:last-child { margin-bottom: 0; }
     .message.assistant h1, .message.assistant h2, .message.assistant h3 {
       font-size: 1rem;
       font-weight: 600;
-      margin: 12px 0 6px 0;
+      margin: 14px 0 8px 0;
+      color: #7bed9f;
     }
     .message.assistant h1:first-child, .message.assistant h2:first-child, .message.assistant h3:first-child {
       margin-top: 0;
     }
     .message.assistant ul, .message.assistant ol {
-      margin: 8px 0;
+      margin: 10px 0;
       padding-left: 20px;
     }
-    .message.assistant li { margin: 4px 0; }
-    .message.assistant strong { font-weight: 600; }
+    .message.assistant li { margin: 6px 0; }
+    .message.assistant strong { font-weight: 600; color: white; }
     .message.assistant code {
-      background: rgba(0,0,0,0.06);
+      background: rgba(0,0,0,0.3);
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 0.85em;
       font-family: monospace;
     }
     .message.assistant pre {
-      background: rgba(0,0,0,0.06);
+      background: rgba(0,0,0,0.3);
       padding: 12px;
       border-radius: 8px;
       overflow-x: auto;
-      margin: 8px 0;
+      margin: 10px 0;
     }
     .message.assistant pre code {
       background: none;
@@ -370,64 +666,88 @@
     }
     .message.assistant table {
       border-collapse: collapse;
-      margin: 8px 0;
+      margin: 10px 0;
       font-size: 0.85rem;
       width: 100%;
     }
     .message.assistant th, .message.assistant td {
-      border: 1px solid #ddd;
-      padding: 6px 10px;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 8px 12px;
       text-align: left;
     }
     .message.assistant th {
-      background: rgba(0,0,0,0.04);
+      background: rgba(255,255,255,0.05);
       font-weight: 600;
     }
   </style>
 </head>
 <body>
   <div class="header">
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="16" y1="13" x2="8" y2="13"/>
-      <line x1="16" y1="17" x2="8" y2="17"/>
-    </svg>
-    <h1>Excel Project Assistant</h1>
-    <div class="header-status" id="headerStatus">No data loaded</div>
+    <div class="kiwi-logo">🥝</div>
+    <h1><span>Kiwi</span> - AI Use Case Intake</h1>
+    <div class="header-status" id="headerStatus">
+      <span class="status-dot"></span>
+      Ready to assist
+    </div>
   </div>
 
   <div class="main-container">
     <div class="sidebar">
-      <h2>Upload Excel File</h2>
-      <div class="upload-area" id="uploadArea">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        <p>Drop Excel file here or click to upload</p>
-        <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <div class="sidebar-card">
+        <h2>Portfolio Data (Optional)</h2>
+        <div class="upload-area" id="uploadArea">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p>Upload existing projects for duplicate detection</p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls">
+        </div>
+        <div class="data-info" id="dataInfo" style="display: none;">
+          <p><strong id="projectCount">0</strong> projects loaded for comparison</p>
+          <div class="fields-list" id="fieldsList"></div>
+        </div>
       </div>
-      <div class="data-info" id="dataInfo" style="display: none;">
-        <p><strong id="projectCount">0</strong> projects loaded</p>
-        <div class="fields-list" id="fieldsList"></div>
+
+      <div class="sidebar-card">
+        <h2>Intake Process</h2>
+        <div class="intake-steps">
+          <div class="step active">
+            <span class="step-number">1</span>
+            <span>Understand the Idea</span>
+          </div>
+          <div class="step">
+            <span class="step-number">2</span>
+            <span>Check for Duplicates</span>
+          </div>
+          <div class="step">
+            <span class="step-number">3</span>
+            <span>Validate AI Suitability</span>
+          </div>
+          <div class="step">
+            <span class="step-number">4</span>
+            <span>Assess Value & Effort</span>
+          </div>
+          <div class="step">
+            <span class="step-number">5</span>
+            <span>T-Shirt Sizing</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="chat-container">
       <div class="chat-messages" id="chatMessages">
-        <div class="empty-state" id="emptyState">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          <h3>Upload an Excel file to get started</h3>
-          <p>I'll help you analyze and explore your project data</p>
+        <div class="welcome-state" id="welcomeState">
+          <div class="welcome-kiwi">🥝</div>
+          <h3>Hi, I'm Kiwi!</h3>
+          <p>I'm your AI Use Case Intake Consultant. Tell me about the problem you're trying to solve or the idea you have in mind, and I'll help you assess it.</p>
         </div>
       </div>
       <div class="chat-input-area">
-        <input type="text" class="chat-input" id="chatInput" placeholder="Ask about your projects..." disabled>
-        <button class="send-btn" id="sendBtn" disabled>
+        <input type="text" class="chat-input" id="chatInput" placeholder="Describe your idea or problem...">
+        <button class="send-btn" id="sendBtn">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
           </svg>
@@ -444,7 +764,7 @@
     const fieldsList = document.getElementById('fieldsList');
     const headerStatus = document.getElementById('headerStatus');
     const chatMessages = document.getElementById('chatMessages');
-    const emptyState = document.getElementById('emptyState');
+    const welcomeState = document.getElementById('welcomeState');
     const chatInput = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
 
@@ -473,7 +793,7 @@
       uploadArea.innerHTML = '<p>Processing...</p>';
 
       try {
-        const response = await fetch('/api/excel-agent/upload', {
+        const response = await fetch('/api/kiwi/upload', {
           method: 'POST',
           body: formData
         });
@@ -481,24 +801,15 @@
 
         if (data.success) {
           projectCount.textContent = data.count;
-          fieldsList.innerHTML = data.fields.map(f => `<span class="field-tag">${f}</span>`).join('');
+          fieldsList.innerHTML = data.fields.slice(0, 6).map(f => `<span class="field-tag">${f}</span>`).join('');
           dataInfo.style.display = 'block';
-          headerStatus.textContent = `${data.count} projects loaded`;
-          chatInput.disabled = false;
-          sendBtn.disabled = false;
-          emptyState.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <h3>Ready to chat!</h3>
-            <p>Ask me anything about your ${data.count} projects</p>
-          `;
+          headerStatus.innerHTML = `<span class="status-dot"></span>${data.count} projects loaded`;
           uploadArea.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;color:#10b981">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="upload-success">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
-            <p style="color:#10b981">${file.name} loaded</p>
+            <p class="upload-success">${file.name}</p>
           `;
         } else {
           alert('Error: ' + data.error);
@@ -512,12 +823,12 @@
 
     function resetUploadArea() {
       uploadArea.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;color:#999">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="17 8 12 3 7 8"/>
           <line x1="12" y1="3" x2="12" y2="15"/>
         </svg>
-        <p>Drop Excel file here or click to upload</p>
+        <p>Upload existing projects for duplicate detection</p>
       `;
     }
 
@@ -534,17 +845,15 @@
       chatInput.value = '';
       sendBtn.disabled = true;
 
-      if (emptyState.parentNode) emptyState.remove();
+      if (welcomeState && welcomeState.parentNode) welcomeState.remove();
 
-      // Add user message
       messages.push({ role: 'user', content: text });
       addMessageToUI('user', text);
 
-      // Add assistant placeholder
       const assistantDiv = addMessageToUI('assistant', '', true);
 
       try {
-        const response = await fetch('/api/excel-agent/chat', {
+        const response = await fetch('/api/kiwi/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages })
@@ -582,19 +891,21 @@
 
         messages.push({ role: 'assistant', content: fullContent });
       } catch (err) {
-        assistantDiv.querySelector('.message-text').textContent = 'Error: ' + err.message;
+        const textEl = assistantDiv.querySelector('.message-text');
+        if (textEl) textEl.textContent = 'Error: ' + err.message;
       }
 
       assistantDiv.classList.remove('streaming');
       isLoading = false;
       sendBtn.disabled = false;
+      chatInput.focus();
     }
 
     function addMessageToUI(role, content, streaming = false) {
       const div = document.createElement('div');
       div.className = `message ${role}${streaming ? ' streaming' : ''}`;
-      if (role === 'assistant' && content) {
-        div.innerHTML = `<div class="message-text">${marked.parse(content)}</div>`;
+      if (role === 'assistant') {
+        div.innerHTML = `<div class="message-text">${content ? marked.parse(content) : ''}</div>`;
       } else {
         div.innerHTML = `<span class="message-text">${content}</span>`;
       }
@@ -605,10 +916,9 @@
 
     function updateMessageContent(element, content) {
       const textEl = element.querySelector('.message-text');
-      if (element.classList.contains('assistant')) {
+      if (textEl) {
         textEl.innerHTML = marked.parse(content);
-      } else {
-        textEl.textContent = content;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
       }
     }
 
@@ -617,22 +927,112 @@
       richDiv.className = 'rich-content';
 
       if (richContent.type === 'projects') {
-        richDiv.innerHTML = `<div class="project-cards">${richContent.data.map(p => `
-          <div class="project-card">
-            <h4>${p.name || p.project_name || p.title || Object.values(p)[0]}</h4>
-            ${Object.entries(p).slice(1, 4).map(([k, v]) => `<p><strong>${k}:</strong> ${v || 'N/A'}</p>`).join('')}
+        richDiv.innerHTML = `
+          <div class="project-cards">
+            ${richContent.data.map(p => `
+              <div class="project-card">
+                <h4>${p.name || p.project_name || p.use_case || p.title || Object.values(p)[0]}</h4>
+                ${Object.entries(p).slice(1, 4).map(([k, v]) => `<p><strong>${k}:</strong> ${v || 'N/A'}</p>`).join('')}
+              </div>
+            `).join('')}
           </div>
-        `).join('')}</div>`;
+        `;
       } else if (richContent.type === 'stats') {
-        richDiv.innerHTML = `<div class="stats-grid">${richContent.data.map(s => `
-          <div class="stat-item">
-            <div class="count">${s.count}</div>
-            <div class="label">${s.label}</div>
+        richDiv.innerHTML = `
+          <div class="stats-grid">
+            ${richContent.data.map(s => `
+              <div class="stat-item">
+                <div class="count">${s.count}</div>
+                <div class="label">${s.label}</div>
+              </div>
+            `).join('')}
           </div>
-        `).join('')}</div>`;
+        `;
+      } else if (richContent.type === 'similar_projects') {
+        if (richContent.found > 0) {
+          richDiv.innerHTML = `
+            <div class="similar-projects">
+              <h4>⚠️ Similar Projects Found (${richContent.found})</h4>
+              ${richContent.data.map(p => `
+                <div class="similar-project-item">
+                  <div class="name">${p.name || p.project_name || p.use_case || p.title || Object.values(p)[0]}</div>
+                  <div class="similarity">${p.similarity}% match</div>
+                  <div class="details">${Object.entries(p).slice(1, 3).map(([k, v]) => `${k}: ${v || 'N/A'}`).join(' • ')}</div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+      } else if (richContent.type === 'ai_assessment') {
+        richDiv.innerHTML = `
+          <div class="ai-assessment">
+            <h4>🤖 AI Suitability Check</h4>
+            <p style="color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 10px;">Consider these questions:</p>
+            <ul>
+              ${richContent.considerations.map(c => `<li>${c}</li>`).join('')}
+            </ul>
+            <p style="color: rgba(255,255,255,0.7); font-size: 0.85rem; margin: 12px 0 8px;">Alternative approaches to consider:</p>
+            <ul>
+              ${richContent.alternatives.map(a => `<li>${a}</li>`).join('')}
+            </ul>
+          </div>
+        `;
+      } else if (richContent.type === 'sizing_result') {
+        const quadrantClass = richContent.quadrant.toLowerCase().replace(' ', '-');
+        richDiv.innerHTML = `
+          <div class="sizing-result">
+            <div class="sizing-header">
+              <h4 style="color: #7bed9f; margin: 0;">T-Shirt Sizing Result</h4>
+              <span class="quadrant-badge ${quadrantClass}">${richContent.quadrant}</span>
+            </div>
+            ${richContent.complianceGate ? `
+              <div class="compliance-warning">
+                ⚠️ Compliance Gate Triggered - Clear regulatory requirements before proceeding
+              </div>
+            ` : ''}
+            <div class="sizing-grid">
+              <div class="sizing-item">
+                <div class="label">Effort Size</div>
+                <div class="value">${richContent.effortSize}</div>
+                <div class="sub">${richContent.effortBand?.duration || ''}</div>
+              </div>
+              <div class="sizing-item">
+                <div class="label">Value Size</div>
+                <div class="value">${richContent.valueSize}</div>
+                <div class="sub">EBIT: €${richContent.ebitTotal}M p.a.</div>
+              </div>
+              <div class="sizing-item">
+                <div class="label">Effort Score</div>
+                <div class="value">${richContent.effortScore}</div>
+                <div class="sub">of 5.0</div>
+              </div>
+              <div class="sizing-item">
+                <div class="label">Value Score</div>
+                <div class="value">${richContent.valueScore}</div>
+                <div class="sub">of 5</div>
+              </div>
+            </div>
+            <div class="recommendation-box">
+              <strong>Recommendation:</strong> ${richContent.recommendation}
+            </div>
+          </div>
+        `;
+      } else if (richContent.type === 'intake_summary') {
+        richDiv.innerHTML = `
+          <div class="intake-summary">
+            <h4>📋 Use Case Intake Summary</h4>
+            ${richContent.idea_name ? `<div class="summary-section"><div class="label">Idea Name</div><div class="content">${richContent.idea_name}</div></div>` : ''}
+            ${richContent.problem_statement ? `<div class="summary-section"><div class="label">Problem Statement</div><div class="content">${richContent.problem_statement}</div></div>` : ''}
+            ${richContent.value_proposition ? `<div class="summary-section"><div class="label">Value Proposition</div><div class="content">${richContent.value_proposition}</div></div>` : ''}
+            ${richContent.ai_suitability ? `<div class="summary-section"><div class="label">AI Suitability</div><div class="content">${richContent.ai_suitability}</div></div>` : ''}
+          </div>
+        `;
       }
 
-      container.appendChild(richDiv);
+      if (richDiv.innerHTML) {
+        container.appendChild(richDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
     }
   </script>
 </body>

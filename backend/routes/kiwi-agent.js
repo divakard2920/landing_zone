@@ -18,6 +18,43 @@ let embeddings = [];
 let openaiClient = null;
 let embeddingClient = null;
 
+// T-Shirt Sizing Configuration
+const CONFIG = {
+  effortWeights: {
+    tech_feasibility: 0.15,
+    data_block: 0.20,
+    dependency_block: 0.15,
+    time_to_value: 0.15,
+    build_effort: 0.10,
+    change_adoption: 0.12,
+    rollout_complexity: 0.08,
+    risk_compliance: 0.05
+  },
+  effortThresholds: {
+    XS: 4.5,
+    S: 3.5,
+    M: 2.5,
+    L: 1.75
+  },
+  effortBands: {
+    XS: { duration: '< 3 months', cost: '< 100k EUR', midpoint: 50 },
+    S: { duration: '3-6 months', cost: '100-250k EUR', midpoint: 175 },
+    M: { duration: '6-12 months', cost: '250-600k EUR', midpoint: 425 },
+    L: { duration: '12-18 months', cost: '600k - 1.2M EUR', midpoint: 900 },
+    XL: { duration: '> 18 months', cost: '> 1.2M EUR', midpoint: 1500 }
+  },
+  ebitThresholds: {
+    5: 5.0,
+    4: 3.5,
+    3: 2.0,
+    2: 0.5
+  },
+  quadrantThresholds: {
+    highValue: 3,
+    lowEffort: 3.5
+  }
+};
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 const getOpenAIClient = () => {
@@ -49,7 +86,6 @@ const getEmbeddingClient = () => {
   return embeddingClient;
 };
 
-// Generate embedding for text
 const generateEmbedding = async (text) => {
   if (!text || !AZURE_OPENAI_ENDPOINT) return null;
   try {
@@ -66,11 +102,8 @@ const generateEmbedding = async (text) => {
   }
 };
 
-// Cosine similarity
 const cosineSimilarity = (a, b) => {
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
+  let dotProduct = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
     dotProduct += a[i] * b[i];
     normA += a[i] * a[i];
@@ -79,16 +112,14 @@ const cosineSimilarity = (a, b) => {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 };
 
-// Build text for embedding
 const buildProjectText = (project) => {
   return Object.values(project).filter(v => v && typeof v === 'string').join(' | ');
 };
 
-// Search similar projects using in-memory embeddings
-const searchSimilarProjects = async (query, limit = 10) => {
+const searchSimilarProjects = async (query, limit = 5, threshold = 0.7) => {
   const queryEmbedding = await generateEmbedding(query);
   if (!queryEmbedding || embeddings.length === 0) {
-    return projects.slice(0, limit);
+    return [];
   }
 
   const scored = embeddings.map((emb, idx) => ({
@@ -97,7 +128,107 @@ const searchSimilarProjects = async (query, limit = 10) => {
   }));
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map(s => s.project);
+  return scored
+    .filter(s => s.score >= threshold)
+    .slice(0, limit)
+    .map(s => ({ ...s.project, similarity: Math.round(s.score * 100) }));
+};
+
+// Calculate T-shirt sizing
+const calculateTShirtSize = (scores) => {
+  const dataBlock = Math.min(
+    scores.data_existence || 5,
+    scores.data_access || 5,
+    scores.data_quality || 5,
+    scores.data_ownership || 5
+  );
+
+  const dependencyBlock = Math.min(
+    scores.interfaces || 5,
+    scores.delivery_dependencies || 5,
+    scores.platform_fit || 5
+  );
+
+  const effortScore =
+    (scores.tech_feasibility || 3) * CONFIG.effortWeights.tech_feasibility +
+    dataBlock * CONFIG.effortWeights.data_block +
+    dependencyBlock * CONFIG.effortWeights.dependency_block +
+    (scores.time_to_value || 3) * CONFIG.effortWeights.time_to_value +
+    (scores.build_effort || 3) * CONFIG.effortWeights.build_effort +
+    (scores.change_adoption || 3) * CONFIG.effortWeights.change_adoption +
+    (scores.rollout_complexity || 3) * CONFIG.effortWeights.rollout_complexity +
+    (scores.risk_compliance || 3) * CONFIG.effortWeights.risk_compliance;
+
+  let effortSize = 'XL';
+  if (effortScore >= CONFIG.effortThresholds.XS) effortSize = 'XS';
+  else if (effortScore >= CONFIG.effortThresholds.S) effortSize = 'S';
+  else if (effortScore >= CONFIG.effortThresholds.M) effortSize = 'M';
+  else if (effortScore >= CONFIG.effortThresholds.L) effortSize = 'L';
+
+  const ebitTotal = (scores.efficiency_savings || 0) + (scores.revenue_uplift || 0) + (scores.cost_avoidance || 0);
+
+  let impactScore = 1;
+  if (ebitTotal >= CONFIG.ebitThresholds[5]) impactScore = 5;
+  else if (ebitTotal >= CONFIG.ebitThresholds[4]) impactScore = 4;
+  else if (ebitTotal >= CONFIG.ebitThresholds[3]) impactScore = 3;
+  else if (ebitTotal >= CONFIG.ebitThresholds[2]) impactScore = 2;
+
+  const valueConfidence = scores.value_confidence || 3;
+  const valueScore = Math.min(impactScore, valueConfidence);
+
+  let valueSize = 'XS';
+  if (valueScore >= 5) valueSize = 'XL';
+  else if (valueScore >= 4) valueSize = 'L';
+  else if (valueScore >= 3) valueSize = 'M';
+  else if (valueScore >= 2) valueSize = 'S';
+
+  let quadrant;
+  const isHighValue = valueScore >= CONFIG.quadrantThresholds.highValue;
+  const isLowEffort = effortScore >= CONFIG.quadrantThresholds.lowEffort;
+
+  if (isHighValue && isLowEffort) quadrant = 'Quick Win';
+  else if (isHighValue && !isLowEffort) quadrant = 'Strategic Bet';
+  else if (!isHighValue && isLowEffort) quadrant = 'Fill-in';
+  else quadrant = 'Reconsider';
+
+  const complianceGate = (scores.risk_compliance || 5) <= 2;
+
+  let recommendation;
+  if (complianceGate) {
+    recommendation = `COMPLIANCE GATE: Risk & Compliance score is low - clear regulatory/legal requirements before proceeding. `;
+  } else {
+    recommendation = '';
+  }
+
+  switch (quadrant) {
+    case 'Quick Win':
+      recommendation += 'Start now - high value, low effort.';
+      break;
+    case 'Strategic Bet':
+      recommendation += 'Invest selectively - high value but requires de-risking first.';
+      break;
+    case 'Fill-in':
+      recommendation += 'Opportunistic only - proceed with spare capacity.';
+      break;
+    case 'Reconsider':
+      recommendation += 'Stop or rescope - value does not justify effort.';
+      break;
+  }
+
+  return {
+    effortScore: Math.round(effortScore * 100) / 100,
+    effortSize,
+    effortBand: CONFIG.effortBands[effortSize],
+    valueScore,
+    valueSize,
+    ebitTotal: Math.round(ebitTotal * 100) / 100,
+    impactScore,
+    quadrant,
+    complianceGate,
+    recommendation,
+    dataBlock,
+    dependencyBlock
+  };
 };
 
 const tools = [
@@ -105,13 +236,13 @@ const tools = [
     type: 'function',
     function: {
       name: 'show_projects',
-      description: 'Display projects as visual cards.',
+      description: 'Display projects as visual cards. Use when user asks to show, list, or display projects.',
       parameters: {
         type: 'object',
         properties: {
-          filter_field: { type: 'string', description: 'Field to filter by' },
+          filter_field: { type: 'string', description: 'Field to filter by (e.g., status, division, quadrant)' },
           filter_value: { type: 'string', description: 'Value to filter' },
-          limit: { type: 'number', description: 'Max projects to show' }
+          limit: { type: 'number', description: 'Max projects to show (default 10)' }
         }
       }
     }
@@ -120,19 +251,105 @@ const tools = [
     type: 'function',
     function: {
       name: 'show_statistics',
-      description: 'Display statistics/analytics.',
+      description: 'Display statistics/analytics grouped by a field. Use when user asks for counts, summary, breakdown, or distribution.',
       parameters: {
         type: 'object',
         properties: {
-          group_by: { type: 'string', description: 'Field to group by for statistics' }
+          group_by: { type: 'string', description: 'Field to group by for statistics (e.g., status, quadrant, division)' }
         },
         required: ['group_by']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_similar_projects',
+      description: 'Search for similar existing projects/use cases in the portfolio using semantic search. Use this when user describes a new idea to check for duplicates, or when searching for related projects.',
+      parameters: {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            description: 'Description of the use case to search for similar projects'
+          }
+        },
+        required: ['description']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'assess_ai_suitability',
+      description: 'Analyze whether the proposed use case truly requires AI/ML or could be solved with simpler approaches. Call this after understanding the problem.',
+      parameters: {
+        type: 'object',
+        properties: {
+          problem_description: { type: 'string', description: 'The problem being solved' },
+          current_approach: { type: 'string', description: 'How the problem is solved today' },
+          data_available: { type: 'string', description: 'What data is available' },
+          expected_outcome: { type: 'string', description: 'What outcome is expected' }
+        },
+        required: ['problem_description']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'calculate_sizing',
+      description: 'Calculate T-shirt sizing (effort, value, quadrant) for a use case. Only call this when you have gathered enough scoring information.',
+      parameters: {
+        type: 'object',
+        properties: {
+          efficiency_savings: { type: 'number', description: 'Efficiency & cost savings in EUR millions p.a.' },
+          revenue_uplift: { type: 'number', description: 'Revenue & margin uplift in EUR millions p.a.' },
+          cost_avoidance: { type: 'number', description: 'Quantified cost avoidance in EUR millions p.a.' },
+          value_confidence: { type: 'number', description: 'Value confidence score (1-5)' },
+          tech_feasibility: { type: 'number', description: 'Technical feasibility score (1-5)' },
+          data_existence: { type: 'number', description: 'Data existence & completeness score (1-5)' },
+          data_access: { type: 'number', description: 'Data access & legal usability score (1-5)' },
+          data_quality: { type: 'number', description: 'Data quality score (1-5)' },
+          data_ownership: { type: 'number', description: 'Data ownership & governance score (1-5)' },
+          interfaces: { type: 'number', description: 'Technical interfaces complexity score (1-5)' },
+          delivery_dependencies: { type: 'number', description: 'Delivery dependencies score (1-5)' },
+          platform_fit: { type: 'number', description: 'Platform/architecture fit score (1-5)' },
+          time_to_value: { type: 'number', description: 'Time-to-value score (1-5)' },
+          build_effort: { type: 'number', description: 'Build effort score (1-5)' },
+          change_adoption: { type: 'number', description: 'Change & adoption score (1-5)' },
+          rollout_complexity: { type: 'number', description: 'Rollout complexity score (1-5)' },
+          risk_compliance: { type: 'number', description: 'Risk & compliance score (1-5)' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'show_intake_summary',
+      description: 'Display a summary of all collected information about the use case intake.',
+      parameters: {
+        type: 'object',
+        properties: {
+          idea_name: { type: 'string' },
+          problem_statement: { type: 'string' },
+          target_description: { type: 'string' },
+          value_proposition: { type: 'string' },
+          problem_evidence: { type: 'string' },
+          solution_maturity: { type: 'string' },
+          business_case: { type: 'string' },
+          dependencies_risks: { type: 'string' },
+          similar_projects: { type: 'array', items: { type: 'string' } },
+          ai_suitability: { type: 'string' },
+          sizing_result: { type: 'object' }
+        }
       }
     }
   }
 ];
 
-const executeFunction = (functionName, args) => {
+const executeFunction = async (functionName, args) => {
   switch (functionName) {
     case 'show_projects': {
       let filtered = [...projects];
@@ -170,42 +387,125 @@ const executeFunction = (functionName, args) => {
       };
     }
 
+    case 'search_similar_projects': {
+      const similar = await searchSimilarProjects(args.description, 5, 0.65);
+      return {
+        type: 'similar_projects',
+        data: similar,
+        found: similar.length,
+        message: similar.length > 0
+          ? `Found ${similar.length} similar project(s) in the portfolio.`
+          : 'No similar projects found in the current portfolio.'
+      };
+    }
+
+    case 'assess_ai_suitability': {
+      return {
+        type: 'ai_assessment',
+        problem: args.problem_description,
+        considerations: [
+          'Pattern recognition or prediction required?',
+          'Large volumes of unstructured data?',
+          'Dynamic/changing rules that are hard to codify?',
+          'Human-like decision making needed?'
+        ],
+        alternatives: [
+          'Rule-based automation / RPA',
+          'Simple threshold-based alerts',
+          'Process optimization without IT',
+          'Off-the-shelf tools',
+          'Standard reporting/dashboards'
+        ]
+      };
+    }
+
+    case 'calculate_sizing': {
+      const result = calculateTShirtSize(args);
+      return {
+        type: 'sizing_result',
+        ...result
+      };
+    }
+
+    case 'show_intake_summary': {
+      return {
+        type: 'intake_summary',
+        ...args
+      };
+    }
+
     default:
       return null;
   }
 };
 
-const buildSystemPrompt = (relevantProjects) => {
-  const fields = projects.length > 0 ? Object.keys(projects[0]).join(', ') : 'No data loaded';
+const buildSystemPrompt = () => {
+  const projectCount = projects.length;
+  const fields = projectCount > 0 ? Object.keys(projects[0]).join(', ') : 'No data loaded';
 
-  return `You are an AI assistant for analyzing project data from an Excel file. You ONLY help with project-related questions.
+  return `You are Kiwi, an AI-powered assistant for AI/ML use case portfolio management. You have TWO modes:
 
-## IMPORTANT: Scope Restriction
-- You ONLY answer questions about the loaded projects
-- For off-topic questions, politely decline and redirect to project topics
+## MODE 1: Portfolio Query (when user asks about existing projects)
+${projectCount > 0 ? `You have ${projectCount} projects loaded with fields: ${fields}` : 'No portfolio data loaded yet.'}
 
-## Available Fields
-${fields}
+When users ask about existing projects (e.g., "show me projects", "how many", "list", "what projects"):
+- Use show_projects to display project cards (can filter by any field)
+- Use show_statistics to show counts/breakdown by any field
+- Use search_similar_projects to find projects matching a description
+- Answer questions about the loaded data
 
-## Relevant Projects (${relevantProjects.length} of ${projects.length} total)
-${JSON.stringify(relevantProjects, null, 2)}
+## MODE 2: New Use Case Intake (when user describes a new idea/problem)
+Guide users through a conversational intake process:
 
-## Tools Available
-- show_projects: Display project cards (can filter by any field)
-- show_statistics: Show statistics grouped by any field
+### 1. Understand the Idea
+- What problem are they solving? Why now?
+- What's the target outcome? Who benefits?
 
-## Guidelines
-- Answer questions using the project data provided
-- Use tools when user asks to "show", "list", or "display"
-- Use show_statistics when user asks for counts, summary, or breakdown`;
+### 2. Check for Duplicates
+- Use search_similar_projects when you understand their idea
+- If similar projects exist, discuss synergies or learnings
+
+### 3. Validate AI Suitability
+- Is this truly an AI/ML problem?
+- Could it be solved with simpler approaches?
+- Use assess_ai_suitability tool to structure this analysis
+
+### 4. Gather Value Information
+- Business value: savings, revenue, cost avoidance (in EUR millions p.a.)
+- How confident are they? What's the evidence?
+
+### 5. Assess Technical Complexity
+Gather scores (1-5, where 5 is best/easiest) for:
+- Tech Feasibility, Data (existence, access, quality, ownership)
+- Dependencies (interfaces, other projects, platform fit)
+- Effort (time-to-value, build, change management, rollout)
+- Risk & Compliance
+
+### 6. Calculate & Recommend
+- Use calculate_sizing when you have enough information
+- Explain the quadrant (Quick Win/Strategic Bet/Fill-in/Reconsider)
+- Use show_intake_summary to display the full picture
+
+## Scoring Scale (5 = best)
+- 5: Ideal, no concerns | 4: Good, minor gaps | 3: Moderate challenges
+- 2: Significant issues | 1: Critical blockers
+
+## Your Personality
+- Friendly, consultative, helpful
+- Be conversational, not procedural
+- Don't ask all questions at once
+- Probe deeper on weak areas
+- Challenge assumptions constructively
+
+## Scope
+- You help with AI/ML use case portfolio queries and new use case intake
+- For off-topic questions, politely redirect`;
 };
 
-// Serve the standalone UI
 router.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../views/excel-agent.html'));
+  res.sendFile(path.join(__dirname, '../views/kiwi-agent.html'));
 });
 
-// Upload Excel file
 router.post('/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -241,7 +541,6 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     projects = data;
     embeddings = [];
 
-    // Generate embeddings for all projects
     console.log(`Generating embeddings for ${projects.length} projects...`);
     for (let i = 0; i < projects.length; i++) {
       const text = buildProjectText(projects[i]);
@@ -267,17 +566,12 @@ router.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// Chat endpoint with streaming
 router.post('/chat', async (req, res) => {
   try {
     const { messages } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Messages array is required' });
-    }
-
-    if (projects.length === 0) {
-      return res.status(400).json({ error: 'No data loaded. Please upload an Excel file first.' });
     }
 
     if (!AZURE_OPENAI_ENDPOINT) {
@@ -288,10 +582,7 @@ router.post('/chat', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const userQuery = messages[messages.length - 1]?.content || '';
-    const relevantProjects = await searchSimilarProjects(userQuery, 10);
-    const systemPrompt = buildSystemPrompt(relevantProjects);
-
+    const systemPrompt = buildSystemPrompt();
     const client = getOpenAIClient();
 
     const stream = await client.chat.completions.create({
@@ -303,7 +594,7 @@ router.post('/chat', async (req, res) => {
       tools,
       tool_choice: 'auto',
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1500,
       stream: true
     });
 
@@ -335,34 +626,25 @@ router.post('/chat', async (req, res) => {
       }
     }
 
-    if (toolCalls.length > 0) {
-      const toolCall = toolCalls[0];
-      if (toolCall.function.name && toolCall.function.arguments) {
+    // Execute tool calls
+    for (const toolCall of toolCalls) {
+      if (toolCall?.function?.name && toolCall?.function?.arguments) {
         try {
           const args = JSON.parse(toolCall.function.arguments);
-          const richContent = executeFunction(toolCall.function.name, args);
+          const richContent = await executeFunction(toolCall.function.name, args);
 
           if (richContent) {
-            let textContent = '';
-            if (richContent.type === 'projects') {
-              textContent = `Found ${richContent.total} project${richContent.total !== 1 ? 's' : ''}${richContent.showing < richContent.total ? ` (showing ${richContent.showing})` : ''}.`;
-            } else if (richContent.type === 'stats') {
-              textContent = `Here are the statistics by ${richContent.group_by}:`;
-            }
-
-            if (textContent && !fullContent) {
-              res.write(`data: ${JSON.stringify({ type: 'text', content: textContent })}\n\n`);
-            }
             res.write(`data: ${JSON.stringify({ type: 'rich', content: richContent })}\n\n`);
           }
         } catch (e) {
-          console.error('Error parsing tool call:', e);
+          console.error('Error executing tool:', e);
         }
       }
     }
 
     if (!fullContent && toolCalls.length === 0) {
-      res.write(`data: ${JSON.stringify({ type: 'text', content: 'Sorry, I could not generate a response.' })}\n\n`);
+      const welcomeMsg = "Hello! I'm Kiwi, your AI Use Case Intake Consultant. Tell me about the idea or problem you're looking to solve with AI, and I'll help you assess it.";
+      res.write(`data: ${JSON.stringify({ type: 'text', content: welcomeMsg })}\n\n`);
     }
 
     res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
@@ -375,12 +657,12 @@ router.post('/chat', async (req, res) => {
   }
 });
 
-// Get current data status
 router.get('/status', (req, res) => {
   res.json({
     projectsLoaded: projects.length,
     embeddingsGenerated: embeddings.length,
-    fields: projects.length > 0 ? Object.keys(projects[0]) : []
+    fields: projects.length > 0 ? Object.keys(projects[0]) : [],
+    configLoaded: true
   });
 });
 
