@@ -353,6 +353,15 @@ function Landing() {
     }
   }, [selectedApp]);
 
+  useEffect(() => {
+    if (showChatPanel) {
+      document.body.classList.add('chat-panel-open');
+    } else {
+      document.body.classList.remove('chat-panel-open');
+    }
+    return () => document.body.classList.remove('chat-panel-open');
+  }, [showChatPanel]);
+
   const loadData = async () => {
     try {
       const [appsRes, announcementsRes, widgetsRes, doiRes, allDoiHistoryRes] = await Promise.all([
@@ -2534,23 +2543,61 @@ function Landing() {
               <div className="ai-chat-empty">
                 <div className="ai-chat-capybara">
                   <svg width="140" height="140" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <ellipse cx="50" cy="60" rx="35" ry="25" fill="#8B7355"/>
-                    <ellipse cx="50" cy="35" rx="28" ry="22" fill="#A0826D"/>
-                    <ellipse cx="50" cy="45" rx="18" ry="12" fill="#C4A484"/>
-                    <ellipse cx="50" cy="42" rx="6" ry="4" fill="#4A3728"/>
-                    <circle cx="38" cy="30" r="5" fill="#2C1810"/>
-                    <circle cx="39" cy="29" r="2" fill="#FFF"/>
-                    <circle cx="62" cy="30" r="5" fill="#2C1810"/>
-                    <circle cx="63" cy="29" r="2" fill="#FFF"/>
-                    <ellipse cx="30" cy="38" rx="5" ry="3" fill="#E8A0A0" opacity="0.5"/>
-                    <ellipse cx="70" cy="38" rx="5" ry="3" fill="#E8A0A0" opacity="0.5"/>
-                    <ellipse cx="28" cy="22" rx="8" ry="6" fill="#8B7355"/>
-                    <ellipse cx="72" cy="22" rx="8" ry="6" fill="#8B7355"/>
-                    <path d="M44 48 Q50 52 56 48" stroke="#4A3728" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                    <path d="M30 44 L18 42" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
-                    <path d="M30 47 L18 49" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
-                    <path d="M70 44 L82 42" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
-                    <path d="M70 47 L82 49" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <defs>
+                      <linearGradient id="brainGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#ff6b9d"/>
+                        <stop offset="50%" stopColor="#c44cff"/>
+                        <stop offset="100%" stopColor="#6b5cff"/>
+                      </linearGradient>
+                      <filter id="brainPulse">
+                        <feGaussianBlur stdDeviation="1.5" result="blur"/>
+                        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                      </filter>
+                    </defs>
+                    {/* Body */}
+                    <ellipse cx="50" cy="65" rx="32" ry="22" fill="#8B7355"/>
+                    {/* Head - transparent top to show brain */}
+                    <ellipse cx="50" cy="40" rx="28" ry="24" fill="#A0826D"/>
+                    {/* Brain dome (glass effect) */}
+                    <ellipse cx="50" cy="28" rx="18" ry="14" fill="#e8e0d8" opacity="0.3"/>
+                    <ellipse cx="50" cy="28" rx="18" ry="14" fill="none" stroke="#c4b8ac" strokeWidth="1.5"/>
+                    {/* Brain */}
+                    <g filter="url(#brainPulse)">
+                      <path d="M38 28 Q42 22 50 24 Q58 22 62 28 Q60 34 50 32 Q40 34 38 28" fill="url(#brainGlow)">
+                        <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+                      </path>
+                      <path d="M42 26 Q46 30 50 28 Q54 30 58 26" stroke="#fff" strokeWidth="1" fill="none" opacity="0.5"/>
+                      <path d="M44 30 L46 28 M54 28 L56 30" stroke="#fff" strokeWidth="0.8" opacity="0.4"/>
+                    </g>
+                    {/* Neural sparks */}
+                    <circle cx="44" cy="25" r="1" fill="#fff">
+                      <animate attributeName="opacity" values="0;1;0" dur="1.5s" repeatCount="indefinite"/>
+                    </circle>
+                    <circle cx="56" cy="27" r="1" fill="#fff">
+                      <animate attributeName="opacity" values="0;1;0" dur="1.8s" repeatCount="indefinite" begin="0.5s"/>
+                    </circle>
+                    {/* Snout */}
+                    <ellipse cx="50" cy="50" rx="16" ry="10" fill="#C4A484"/>
+                    {/* Nose */}
+                    <ellipse cx="50" cy="47" rx="5" ry="3.5" fill="#4A3728"/>
+                    {/* Eyes - awake and happy */}
+                    <circle cx="38" cy="38" r="5" fill="#2C1810"/>
+                    <circle cx="39" cy="37" r="2" fill="#FFF"/>
+                    <circle cx="62" cy="38" r="5" fill="#2C1810"/>
+                    <circle cx="63" cy="37" r="2" fill="#FFF"/>
+                    {/* Blush */}
+                    <ellipse cx="30" cy="44" rx="5" ry="3" fill="#E8A0A0" opacity="0.5"/>
+                    <ellipse cx="70" cy="44" rx="5" ry="3" fill="#E8A0A0" opacity="0.5"/>
+                    {/* Ears */}
+                    <ellipse cx="28" cy="30" rx="8" ry="6" fill="#8B7355"/>
+                    <ellipse cx="72" cy="30" rx="8" ry="6" fill="#8B7355"/>
+                    {/* Mouth - happy */}
+                    <path d="M44 54 Q50 58 56 54" stroke="#4A3728" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                    {/* Whiskers */}
+                    <path d="M32 48 L20 46" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M32 51 L20 53" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M68 48 L80 46" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M68 51 L80 53" stroke="#4A3728" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
                   <div className="ai-chat-capybara-badge">AI</div>
                 </div>

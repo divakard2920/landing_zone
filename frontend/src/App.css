@@ -461,6 +461,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+body.chat-panel-open .capybara-avatar {
+  opacity: 0;
+  transform: translateY(-20px);
+  pointer-events: none;
 }
 
 .capybara-avatar svg {
