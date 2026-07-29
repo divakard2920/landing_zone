@@ -281,23 +281,6 @@ const tools = [
   {
     type: 'function',
     function: {
-      name: 'assess_ai_suitability',
-      description: 'Analyze whether the proposed use case truly requires AI/ML or could be solved with simpler approaches. Call this after understanding the problem.',
-      parameters: {
-        type: 'object',
-        properties: {
-          problem_description: { type: 'string', description: 'The problem being solved' },
-          current_approach: { type: 'string', description: 'How the problem is solved today' },
-          data_available: { type: 'string', description: 'What data is available' },
-          expected_outcome: { type: 'string', description: 'What outcome is expected' }
-        },
-        required: ['problem_description']
-      }
-    }
-  },
-  {
-    type: 'function',
-    function: {
       name: 'calculate_sizing',
       description: 'Calculate T-shirt sizing (effort, value, quadrant) for a use case. Only call this when you have gathered enough scoring information.',
       parameters: {
@@ -399,26 +382,6 @@ const executeFunction = async (functionName, args) => {
       };
     }
 
-    case 'assess_ai_suitability': {
-      return {
-        type: 'ai_assessment',
-        problem: args.problem_description,
-        considerations: [
-          'Pattern recognition or prediction required?',
-          'Large volumes of unstructured data?',
-          'Dynamic/changing rules that are hard to codify?',
-          'Human-like decision making needed?'
-        ],
-        alternatives: [
-          'Rule-based automation / RPA',
-          'Simple threshold-based alerts',
-          'Process optimization without IT',
-          'Off-the-shelf tools',
-          'Standard reporting/dashboards'
-        ]
-      };
-    }
-
     case 'calculate_sizing': {
       const result = calculateTShirtSize(args);
       return {
@@ -443,70 +406,31 @@ const buildSystemPrompt = (relevantProjects = []) => {
   const projectCount = projects.length;
   const fields = projectCount > 0 ? Object.keys(projects[0]).join(', ') : 'No data loaded';
 
-  return `You are Kiwi, an AI-powered assistant for AI/ML use case portfolio management. You have TWO modes:
+  return `You are Kiwi, a friendly AI assistant for project portfolio management.
 
-## MODE 1: Portfolio Query (when user asks about existing projects)
-${projectCount > 0 ? `You have ${projectCount} projects loaded with fields: ${fields}` : 'No portfolio data loaded yet.'}
+## Portfolio Data
+${projectCount > 0 ? `${projectCount} projects loaded. Fields: ${fields}` : 'No portfolio loaded yet.'}
+${relevantProjects.length > 0 ? `\nRelevant projects:\n${JSON.stringify(relevantProjects.slice(0, 3), null, 2)}` : ''}
 
-When users ask about existing projects (e.g., "show me projects", "how many", "list", "what projects"):
-- Use show_projects to display project cards (can filter by any field)
-- Use show_statistics to show counts/breakdown by any field
-- Use search_similar_projects to find projects matching a description
-- Answer questions about the loaded data
-- ALWAYS use tools to show visual results, then provide a brief explanation
+## Tools Available
+- show_projects: Display project cards. Use for "show", "list", "display" requests.
+- show_statistics: Show counts by field. Use for "how many", "breakdown", "by status" requests.
+- search_similar_projects: Find similar projects by description.
+- calculate_sizing: Calculate T-shirt size when you have all scoring data.
+- show_intake_summary: Show summary of intake data collected.
 
-${relevantProjects.length > 0 ? `
-## Relevant Projects for Current Query
-${JSON.stringify(relevantProjects.slice(0, 5), null, 2)}
-` : ''}
+## For New Use Case Intake
+When user describes a new idea, have a natural conversation to understand:
+1. The problem and why it matters
+2. Expected value (savings/revenue in EUR millions)
+3. Technical aspects (data availability, complexity, dependencies)
+4. Then calculate sizing with the scores
 
-## MODE 2: New Use Case Intake (when user describes a new idea/problem)
-Guide users through a conversational intake process:
-
-### 1. Understand the Idea
-- What problem are they solving? Why now?
-- What's the target outcome? Who benefits?
-
-### 2. Check for Duplicates
-- Use search_similar_projects when you understand their idea
-- If similar projects exist, discuss synergies or learnings
-
-### 3. Validate AI Suitability
-- Is this truly an AI/ML problem?
-- Could it be solved with simpler approaches?
-- Use assess_ai_suitability tool to structure this analysis
-
-### 4. Gather Value Information
-- Business value: savings, revenue, cost avoidance (in EUR millions p.a.)
-- How confident are they? What's the evidence?
-
-### 5. Assess Technical Complexity
-Gather scores (1-5, where 5 is best/easiest) for:
-- Tech Feasibility, Data (existence, access, quality, ownership)
-- Dependencies (interfaces, other projects, platform fit)
-- Effort (time-to-value, build, change management, rollout)
-- Risk & Compliance
-
-### 6. Calculate & Recommend
-- Use calculate_sizing when you have enough information
-- Explain the quadrant (Quick Win/Strategic Bet/Fill-in/Reconsider)
-- Use show_intake_summary to display the full picture
-
-## Scoring Scale (5 = best)
-- 5: Ideal, no concerns | 4: Good, minor gaps | 3: Moderate challenges
-- 2: Significant issues | 1: Critical blockers
-
-## Your Personality
-- Friendly, consultative, helpful
-- Be conversational, not procedural
-- Don't ask all questions at once
-- Probe deeper on weak areas
-- Challenge assumptions constructively
-- ALWAYS respond with helpful text, never leave user without a response
-
-## Scope
-- You help with AI/ML use case portfolio queries and new use case intake
-- For off-topic questions, politely redirect`;
+## Guidelines
+- Be conversational and helpful
+- Ask ONE question at a time, don't overwhelm
+- Use tools only when appropriate for the request
+- For off-topic questions, politely redirect to project topics`;
 };
 
 router.get('/', (req, res) => {
@@ -658,8 +582,6 @@ router.post('/chat', async (req, res) => {
                   : 'No similar projects found in the current portfolio.';
               } else if (richContent.type === 'sizing_result') {
                 textMsg = `Based on the assessment, here's the T-shirt sizing result:`;
-              } else if (richContent.type === 'ai_assessment') {
-                textMsg = `Let me help you evaluate if this is the right approach:`;
               }
               if (textMsg) {
                 res.write(`data: ${JSON.stringify({ type: 'text', content: textMsg })}\n\n`);
