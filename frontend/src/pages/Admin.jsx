@@ -127,14 +127,18 @@ function Admin() {
   // Use Case Intake
   const [useCaseIntakes, setUseCaseIntakes] = useState([]);
   const [useCaseForm, setUseCaseForm] = useState({
-    idea_name: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
+    idea_name: '', usecase_type: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
     product_owner: '', line_of_business: '', motivation: '',
     description_target: '', value_add: '', problem_evidence: '', solution_maturity: '',
-    value_proof: '', dependencies_risks: '',
-    complexity_integration: 1, complexity_data_security: 1, complexity_solution_type: 1,
-    complexity_users: 1, complexity_process_change: 1, complexity_stakeholder: 1, complexity_effort_cost: 1,
-    benefit_availability: 1, benefit_time_saving: 1, benefit_cost_reduction: 1,
-    benefit_legacy_consolidation: 1, benefit_automation: 1, benefit_data_quality: 1, benefit_compliance: 1,
+    value_proof: '', dependencies_risks: '', solution_approach: '',
+    // Value parameters (€ amounts)
+    efficiency_savings: 0, revenue_uplift: 0, cost_avoidance: 0, value_confidence: 3,
+    // Data parameters (1-5)
+    data_existence: 3, data_access: 3, data_quality: 3, data_ownership: 3,
+    // Technical parameters (1-5)
+    tech_feasibility: 3, interfaces: 3, delivery_dependencies: 3, platform_fit: 3,
+    // Effort parameters (1-5)
+    time_to_value: 3, build_effort: 3, change_adoption: 3, rollout_complexity: 3, risk_compliance: 3,
     status: 'Draft'
   });
   const [editingUseCase, setEditingUseCase] = useState(null);
@@ -716,47 +720,152 @@ function Admin() {
     idea_name: '', usecase_type: '', idea_owner: '', submission_date: '', sponsor: '', division: '',
     product_owner: '', line_of_business: '', motivation: '',
     description_target: '', value_add: '', problem_evidence: '', solution_maturity: '',
-    value_proof: '', dependencies_risks: '',
-    complexity_integration: 1, complexity_data_security: 1, complexity_solution_type: 1,
-    complexity_users: 1, complexity_process_change: 1, complexity_stakeholder: 1, complexity_effort_cost: 1,
-    benefit_availability: 1, benefit_time_saving: 1, benefit_cost_reduction: 1,
-    benefit_legacy_consolidation: 1, benefit_automation: 1, benefit_data_quality: 1, benefit_compliance: 1,
+    value_proof: '', dependencies_risks: '', solution_approach: '',
+    // Value parameters (€ amounts)
+    efficiency_savings: 0, revenue_uplift: 0, cost_avoidance: 0, value_confidence: 3,
+    // Data parameters (1-5)
+    data_existence: 3, data_access: 3, data_quality: 3, data_ownership: 3,
+    // Technical parameters (1-5)
+    tech_feasibility: 3, interfaces: 3, delivery_dependencies: 3, platform_fit: 3,
+    // Effort parameters (1-5)
+    time_to_value: 3, build_effort: 3, change_adoption: 3, rollout_complexity: 3, risk_compliance: 3,
     status: 'Draft',
     attachments: []
   };
 
+  // T-Shirt Sizing configuration matching backend/Excel
+  const SIZING_CONFIG = {
+    effortWeights: {
+      tech_feasibility: 0.15,
+      data_block: 0.20,
+      dependency_block: 0.15,
+      time_to_value: 0.15,
+      build_effort: 0.10,
+      change_adoption: 0.12,
+      rollout_complexity: 0.08,
+      risk_compliance: 0.05
+    },
+    effortThresholds: { XS: 4.5, S: 3.5, M: 2.5, L: 1.75 },
+    ebitThresholds: { 5: 5.0, 4: 3.5, 3: 2.0, 2: 0.5 },
+    quadrantThresholds: { highValue: 3.5, lowEffort: 3.5 }
+  };
+
   const calculateUseCaseScores = (form) => {
-    const complexityScore = (form.complexity_integration || 1) + (form.complexity_data_security || 1) +
-      (form.complexity_solution_type || 1) + (form.complexity_users || 1) + (form.complexity_process_change || 1) +
-      (form.complexity_stakeholder || 1) + (form.complexity_effort_cost || 1);
+    // Calculate EBIT total (in millions)
+    const ebitTotal = (parseFloat(form.efficiency_savings) || 0) +
+                      (parseFloat(form.revenue_uplift) || 0) +
+                      (parseFloat(form.cost_avoidance) || 0);
 
-    const benefitScore = (form.benefit_availability || 1) + (form.benefit_time_saving || 1) +
-      (form.benefit_cost_reduction || 1) + (form.benefit_legacy_consolidation || 1) +
-      (form.benefit_automation || 1) + (form.benefit_data_quality || 1) + (form.benefit_compliance || 1);
+    // Calculate Impact Score (1-5 based on EBIT thresholds)
+    let impactScore = 1;
+    if (ebitTotal >= SIZING_CONFIG.ebitThresholds[5]) impactScore = 5;
+    else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[4]) impactScore = 4;
+    else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[3]) impactScore = 3;
+    else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[2]) impactScore = 2;
 
-    const priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
+    // Value Score = MIN(Impact Score, Value Confidence)
+    const valueConfidence = parseInt(form.value_confidence) || 3;
+    const valueScore = Math.min(impactScore, valueConfidence);
 
-    let priorityCluster;
-    if (complexityScore > 16 && benefitScore < 18) priorityCluster = 'Rework';
-    else if (complexityScore <= 16 && benefitScore >= 18) priorityCluster = 'High Priority / Quick Win';
-    else if (complexityScore <= 16 && benefitScore < 18) priorityCluster = 'Low Priority';
-    else priorityCluster = 'Medium Priority';
+    // Data Block = MIN(data_existence, data_access, data_quality, data_ownership)
+    const dataBlock = Math.min(
+      parseInt(form.data_existence) || 3,
+      parseInt(form.data_access) || 3,
+      parseInt(form.data_quality) || 3,
+      parseInt(form.data_ownership) || 3
+    );
 
+    // Dependency Block = MIN(interfaces, delivery_dependencies, platform_fit)
+    const dependencyBlock = Math.min(
+      parseInt(form.interfaces) || 3,
+      parseInt(form.delivery_dependencies) || 3,
+      parseInt(form.platform_fit) || 3
+    );
+
+    // Calculate weighted effort score
+    const weights = SIZING_CONFIG.effortWeights;
+    const rawEffortScore =
+      (parseInt(form.tech_feasibility) || 3) * weights.tech_feasibility +
+      dataBlock * weights.data_block +
+      dependencyBlock * weights.dependency_block +
+      (parseInt(form.time_to_value) || 3) * weights.time_to_value +
+      (parseInt(form.build_effort) || 3) * weights.build_effort +
+      (parseInt(form.change_adoption) || 3) * weights.change_adoption +
+      (parseInt(form.rollout_complexity) || 3) * weights.rollout_complexity +
+      (parseInt(form.risk_compliance) || 3) * weights.risk_compliance;
+
+    // Count knockouts (ratings of 1)
+    const effortFields = ['tech_feasibility', 'time_to_value', 'build_effort', 'change_adoption', 'rollout_complexity', 'risk_compliance'];
+    const allRatings = [
+      ...effortFields.map(f => parseInt(form[f]) || 3),
+      dataBlock,
+      dependencyBlock
+    ];
+    const knockoutCount = allRatings.filter(r => r === 1).length;
+
+    // Determine base effort size
+    const thresholds = SIZING_CONFIG.effortThresholds;
+    let effortSize;
+    if (rawEffortScore >= thresholds.XS) effortSize = 'XS';
+    else if (rawEffortScore >= thresholds.S) effortSize = 'S';
+    else if (rawEffortScore >= thresholds.M) effortSize = 'M';
+    else if (rawEffortScore >= thresholds.L) effortSize = 'L';
+    else effortSize = 'XL';
+
+    // Apply knockout rule: 1 knockout = +1 size, 2+ knockouts = +2 sizes (min L)
+    const sizeOrder = ['XS', 'S', 'M', 'L', 'XL'];
+    let sizeIdx = sizeOrder.indexOf(effortSize);
+    if (knockoutCount === 1) sizeIdx = Math.min(sizeIdx + 1, 4);
+    else if (knockoutCount >= 2) sizeIdx = Math.max(3, Math.min(sizeIdx + 2, 4)); // Min L
+    effortSize = sizeOrder[sizeIdx];
+
+    // Calculate value size
+    let valueSize;
+    if (valueScore >= 4.5) valueSize = 'XL';
+    else if (valueScore >= 3.5) valueSize = 'L';
+    else if (valueScore >= 2.5) valueSize = 'M';
+    else if (valueScore >= 1.5) valueSize = 'S';
+    else valueSize = 'XS';
+
+    // Determine quadrant
+    const highValue = valueScore >= SIZING_CONFIG.quadrantThresholds.highValue;
+    const lowEffort = rawEffortScore >= SIZING_CONFIG.quadrantThresholds.lowEffort;
+    let quadrant;
+    if (highValue && lowEffort) quadrant = 'Quick Win';
+    else if (highValue && !lowEffort) quadrant = 'Strategic Bet';
+    else if (!highValue && lowEffort) quadrant = 'Fill-in';
+    else quadrant = 'Reconsider';
+
+    // Check compliance gate
+    const complianceGate = (parseInt(form.risk_compliance) || 3) <= 2;
+
+    // Generate recommendation
     let recommendedAction;
-    if (priorityCluster === 'High Priority / Quick Win') recommendedAction = 'Start with DOI1';
-    else if (priorityCluster === 'Medium Priority') recommendedAction = 'Approval for DOI1 necessary';
-    else if (priorityCluster === 'Low Priority') recommendedAction = 'Park in Backlog; Benefit not sufficient';
-    else recommendedAction = 'Decline and rework';
+    if (complianceGate) {
+      const compliancePrefix = 'COMPLIANCE GATE: sensitive/regulated - clear before proceeding. ';
+      if (quadrant === 'Quick Win') recommendedAction = compliancePrefix + 'Otherwise start now.';
+      else if (quadrant === 'Strategic Bet') recommendedAction = compliancePrefix + 'Otherwise invest selectively.';
+      else if (quadrant === 'Fill-in') recommendedAction = compliancePrefix + 'Otherwise opportunistic only.';
+      else recommendedAction = compliancePrefix + 'Otherwise stop or rescope.';
+    } else {
+      if (quadrant === 'Quick Win') recommendedAction = 'Start now - high value, low effort.';
+      else if (quadrant === 'Strategic Bet') recommendedAction = 'Invest selectively - high value; de-risk first.';
+      else if (quadrant === 'Fill-in') recommendedAction = 'Opportunistic - only with spare capacity.';
+      else recommendedAction = 'Stop or rescope - value does not justify effort.';
+    }
 
-    const totalScore = complexityScore + benefitScore;
-    let tshirtSize;
-    if (totalScore < 16) tshirtSize = 'XS';
-    else if (totalScore <= 20) tshirtSize = 'S';
-    else if (totalScore <= 28) tshirtSize = 'M';
-    else if (totalScore <= 42) tshirtSize = 'L';
-    else tshirtSize = 'XL';
-
-    return { complexityScore, benefitScore, priorityIndex, priorityCluster, recommendedAction, tshirtSize };
+    return {
+      effortScore: Math.round(rawEffortScore * 100) / 100,
+      effortSize,
+      valueScore: Math.round(valueScore * 100) / 100,
+      valueSize,
+      ebitTotal: Math.round(ebitTotal * 100) / 100,
+      quadrant,
+      complianceGate,
+      knockoutCount,
+      recommendedAction,
+      tshirtSize: effortSize
+    };
   };
 
   const handleUseCaseSubmit = async (e) => {
@@ -812,20 +921,28 @@ function Admin() {
       solution_maturity: useCase.solution_maturity || '',
       value_proof: useCase.value_proof || '',
       dependencies_risks: useCase.dependencies_risks || '',
-      complexity_integration: useCase.complexity_integration || 1,
-      complexity_data_security: useCase.complexity_data_security || 1,
-      complexity_solution_type: useCase.complexity_solution_type || 1,
-      complexity_users: useCase.complexity_users || 1,
-      complexity_process_change: useCase.complexity_process_change || 1,
-      complexity_stakeholder: useCase.complexity_stakeholder || 1,
-      complexity_effort_cost: useCase.complexity_effort_cost || 1,
-      benefit_availability: useCase.benefit_availability || 1,
-      benefit_time_saving: useCase.benefit_time_saving || 1,
-      benefit_cost_reduction: useCase.benefit_cost_reduction || 1,
-      benefit_legacy_consolidation: useCase.benefit_legacy_consolidation || 1,
-      benefit_automation: useCase.benefit_automation || 1,
-      benefit_data_quality: useCase.benefit_data_quality || 1,
-      benefit_compliance: useCase.benefit_compliance || 1,
+      solution_approach: useCase.solution_approach || '',
+      // Value parameters
+      efficiency_savings: useCase.efficiency_savings || 0,
+      revenue_uplift: useCase.revenue_uplift || 0,
+      cost_avoidance: useCase.cost_avoidance || 0,
+      value_confidence: useCase.value_confidence || 3,
+      // Data parameters
+      data_existence: useCase.data_existence || 3,
+      data_access: useCase.data_access || 3,
+      data_quality: useCase.data_quality || 3,
+      data_ownership: useCase.data_ownership || 3,
+      // Technical parameters
+      tech_feasibility: useCase.tech_feasibility || 3,
+      interfaces: useCase.interfaces || 3,
+      delivery_dependencies: useCase.delivery_dependencies || 3,
+      platform_fit: useCase.platform_fit || 3,
+      // Effort parameters
+      time_to_value: useCase.time_to_value || 3,
+      build_effort: useCase.build_effort || 3,
+      change_adoption: useCase.change_adoption || 3,
+      rollout_complexity: useCase.rollout_complexity || 3,
+      risk_compliance: useCase.risk_compliance || 3,
       status: useCase.status || 'Draft',
       attachments: useCase.attachments ? (typeof useCase.attachments === 'string' ? JSON.parse(useCase.attachments) : useCase.attachments) : []
     });
@@ -854,18 +971,34 @@ function Admin() {
         { header: 'Idea Owner', key: 'idea_owner', width: 20 },
         { header: 'Sponsor', key: 'sponsor', width: 20 },
         { header: 'Division', key: 'division', width: 15 },
-        { header: 'Product Owner', key: 'product_owner', width: 20 },
-        { header: 'Line of Business', key: 'line_of_business', width: 20 },
-        { header: 'Priority Index', key: 'priority_index', width: 12 },
-        { header: 'Priority Cluster', key: 'priority_cluster', width: 20 },
-        { header: 'T-Shirt Size', key: 'tshirt_size', width: 12 },
-        { header: 'Recommended Action', key: 'recommended_action', width: 25 },
+        { header: 'Solution Approach', key: 'solution_approach', width: 15 },
+        { header: 'EBIT Total (M€)', key: 'ebit_total', width: 15 },
+        { header: 'Effort Size', key: 'effort_size', width: 12 },
+        { header: 'Value Size', key: 'value_size', width: 12 },
+        { header: 'Quadrant', key: 'quadrant', width: 15 },
+        { header: 'Effort Score', key: 'effort_score', width: 12 },
+        { header: 'Value Score', key: 'value_score', width: 12 },
+        { header: 'Knockouts', key: 'knockout_count', width: 10 },
+        { header: 'Compliance Gate', key: 'compliance_gate', width: 15 },
+        { header: 'Recommended Action', key: 'recommended_action', width: 35 },
         { header: 'Status', key: 'status', width: 15 },
-        { header: 'Complexity Score', key: 'complexity_score', width: 15 },
-        { header: 'Benefit Score', key: 'benefit_score', width: 12 },
-        { header: 'Motivation', key: 'motivation', width: 40 },
-        { header: 'Description & Target', key: 'description_target', width: 40 },
-        { header: 'Value Add', key: 'value_add', width: 40 },
+        { header: 'Efficiency Savings', key: 'efficiency_savings', width: 15 },
+        { header: 'Revenue Uplift', key: 'revenue_uplift', width: 15 },
+        { header: 'Cost Avoidance', key: 'cost_avoidance', width: 15 },
+        { header: 'Value Confidence', key: 'value_confidence', width: 15 },
+        { header: 'Data Existence', key: 'data_existence', width: 12 },
+        { header: 'Data Access', key: 'data_access', width: 12 },
+        { header: 'Data Quality', key: 'data_quality', width: 12 },
+        { header: 'Data Ownership', key: 'data_ownership', width: 12 },
+        { header: 'Tech Feasibility', key: 'tech_feasibility', width: 15 },
+        { header: 'Interfaces', key: 'interfaces', width: 12 },
+        { header: 'Dependencies', key: 'delivery_dependencies', width: 12 },
+        { header: 'Platform Fit', key: 'platform_fit', width: 12 },
+        { header: 'Time to Value', key: 'time_to_value', width: 12 },
+        { header: 'Build Effort', key: 'build_effort', width: 12 },
+        { header: 'Change Adoption', key: 'change_adoption', width: 15 },
+        { header: 'Rollout Complexity', key: 'rollout_complexity', width: 15 },
+        { header: 'Risk Compliance', key: 'risk_compliance', width: 15 },
       ];
 
       worksheet.getRow(1).font = { bold: true };
@@ -880,18 +1013,34 @@ function Admin() {
           idea_owner: uc.idea_owner,
           sponsor: uc.sponsor,
           division: uc.division,
-          product_owner: uc.product_owner,
-          line_of_business: uc.line_of_business,
-          priority_index: uc.priority_index,
-          priority_cluster: uc.priority_cluster,
-          tshirt_size: uc.tshirt_size,
+          solution_approach: uc.solution_approach,
+          ebit_total: uc.ebit_total,
+          effort_size: uc.effort_size || uc.tshirt_size,
+          value_size: uc.value_size,
+          quadrant: uc.quadrant,
+          effort_score: uc.effort_score,
+          value_score: uc.value_score,
+          knockout_count: uc.knockout_count,
+          compliance_gate: uc.compliance_gate ? 'Yes' : 'No',
           recommended_action: uc.recommended_action,
           status: uc.status,
-          complexity_score: uc.complexity_score,
-          benefit_score: uc.benefit_score,
-          motivation: uc.motivation,
-          description_target: uc.description_target,
-          value_add: uc.value_add,
+          efficiency_savings: uc.efficiency_savings,
+          revenue_uplift: uc.revenue_uplift,
+          cost_avoidance: uc.cost_avoidance,
+          value_confidence: uc.value_confidence,
+          data_existence: uc.data_existence,
+          data_access: uc.data_access,
+          data_quality: uc.data_quality,
+          data_ownership: uc.data_ownership,
+          tech_feasibility: uc.tech_feasibility,
+          interfaces: uc.interfaces,
+          delivery_dependencies: uc.delivery_dependencies,
+          platform_fit: uc.platform_fit,
+          time_to_value: uc.time_to_value,
+          build_effort: uc.build_effort,
+          change_adoption: uc.change_adoption,
+          rollout_complexity: uc.rollout_complexity,
+          risk_compliance: uc.risk_compliance,
         });
       });
 
@@ -1912,28 +2061,14 @@ function Admin() {
                 </div>
                 <select
                   className="filter-select"
-                  value={useCaseStatusFilter}
-                  onChange={(e) => setUseCaseStatusFilter(e.target.value)}
-                >
-                  <option value="all">All Status</option>
-                  <option value="Submitted">Submitted</option>
-                  <option value="Resubmitted">Resubmitted</option>
-                  <option value="Approved">Approved</option>
-                  <option value="In Progress">In Progress</option>
-                  <option value="Parked">Parked</option>
-                  <option value="Declined">Declined</option>
-                  <option value="Rework Required">Rework Required</option>
-                </select>
-                <select
-                  className="filter-select"
                   value={useCaseClusterFilter}
                   onChange={(e) => setUseCaseClusterFilter(e.target.value)}
                 >
-                  <option value="all">All Clusters</option>
-                  <option value="High Priority / Quick Win">High Priority / Quick Win</option>
-                  <option value="Medium Priority">Medium Priority</option>
-                  <option value="Low Priority">Low Priority</option>
-                  <option value="Rework">Rework</option>
+                  <option value="all">All Quadrants</option>
+                  <option value="Quick Win">Quick Win</option>
+                  <option value="Strategic Bet">Strategic Bet</option>
+                  <option value="Fill-in">Fill-in</option>
+                  <option value="Reconsider">Reconsider</option>
                 </select>
                 <select
                   className="filter-select"
@@ -1965,31 +2100,22 @@ function Admin() {
                   <th onClick={() => { setUseCaseSortColumn('idea_name'); setUseCaseSortDirection(useCaseSortColumn === 'idea_name' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
                     Idea Name {useCaseSortColumn === 'idea_name' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th onClick={() => { setUseCaseSortColumn('usecase_type'); setUseCaseSortDirection(useCaseSortColumn === 'usecase_type' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
-                    Type {useCaseSortColumn === 'usecase_type' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
                   <th onClick={() => { setUseCaseSortColumn('submission_date'); setUseCaseSortDirection(useCaseSortColumn === 'submission_date' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
                     Submitted {useCaseSortColumn === 'submission_date' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => { setUseCaseSortColumn('idea_owner'); setUseCaseSortDirection(useCaseSortColumn === 'idea_owner' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
-                    Owner {useCaseSortColumn === 'idea_owner' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th onClick={() => { setUseCaseSortColumn('division'); setUseCaseSortDirection(useCaseSortColumn === 'division' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
                     Division {useCaseSortColumn === 'division' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th onClick={() => { setUseCaseSortColumn('priority_index'); setUseCaseSortDirection(useCaseSortColumn === 'priority_index' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
-                    Priority Index {useCaseSortColumn === 'priority_index' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => { setUseCaseSortColumn('ebit_total'); setUseCaseSortDirection(useCaseSortColumn === 'ebit_total' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    EBIT {useCaseSortColumn === 'ebit_total' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th onClick={() => { setUseCaseSortColumn('priority_cluster'); setUseCaseSortDirection(useCaseSortColumn === 'priority_cluster' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
-                    Cluster {useCaseSortColumn === 'priority_cluster' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => { setUseCaseSortColumn('quadrant'); setUseCaseSortDirection(useCaseSortColumn === 'quadrant' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Quadrant {useCaseSortColumn === 'quadrant' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
                   </th>
-                  <th onClick={() => { setUseCaseSortColumn('tshirt_size'); setUseCaseSortDirection(useCaseSortColumn === 'tshirt_size' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
-                    T-Shirt {useCaseSortColumn === 'tshirt_size' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
+                  <th onClick={() => { setUseCaseSortColumn('effort_size'); setUseCaseSortDirection(useCaseSortColumn === 'effort_size' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
+                    Effort {useCaseSortColumn === 'effort_size' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th>Recommendation</th>
-                  <th onClick={() => { setUseCaseSortColumn('status'); setUseCaseSortDirection(useCaseSortColumn === 'status' && useCaseSortDirection === 'asc' ? 'desc' : 'asc'); }} style={{ cursor: 'pointer' }}>
-                    Status {useCaseSortColumn === 'status' && (useCaseSortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
                   <th></th>
                 </tr>
               </thead>
@@ -2000,19 +2126,19 @@ function Admin() {
                     uc.idea_owner?.toLowerCase().includes(useCaseSearchQuery.toLowerCase()) ||
                     uc.division?.toLowerCase().includes(useCaseSearchQuery.toLowerCase());
                   const matchesStatus = useCaseStatusFilter === 'all' || uc.status === useCaseStatusFilter;
-                  const matchesCluster = useCaseClusterFilter === 'all' || uc.priority_cluster === useCaseClusterFilter;
-                  const matchesTshirt = useCaseTshirtFilter === 'all' || uc.tshirt_size === useCaseTshirtFilter;
+                  const matchesCluster = useCaseClusterFilter === 'all' || uc.quadrant === useCaseClusterFilter;
+                  const matchesTshirt = useCaseTshirtFilter === 'all' || (uc.effort_size || uc.tshirt_size) === useCaseTshirtFilter;
                   return matchesSearch && matchesStatus && matchesCluster && matchesTshirt;
                 }).sort((a, b) => {
                   const tshirtOrder = { 'XS': 1, 'S': 2, 'M': 3, 'L': 4, 'XL': 5 };
                   let aVal = a[useCaseSortColumn];
                   let bVal = b[useCaseSortColumn];
-                  if (useCaseSortColumn === 'tshirt_size') {
+                  if (useCaseSortColumn === 'effort_size' || useCaseSortColumn === 'tshirt_size') {
                     aVal = tshirtOrder[aVal] || 0;
                     bVal = tshirtOrder[bVal] || 0;
-                  } else if (useCaseSortColumn === 'priority_index') {
-                    aVal = aVal || 0;
-                    bVal = bVal || 0;
+                  } else if (useCaseSortColumn === 'ebit_total') {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
                   } else if (useCaseSortColumn === 'submission_date') {
                     aVal = aVal ? new Date(aVal).getTime() : 0;
                     bVal = bVal ? new Date(bVal).getTime() : 0;
@@ -2026,26 +2152,32 @@ function Admin() {
                 }).map(uc => (
                   <tr key={uc.id}>
                     <td style={{ fontWeight: 600 }}>{uc.idea_name}</td>
-                    <td><span style={{ fontSize: '0.8rem', padding: '2px 8px', borderRadius: '4px', background: uc.usecase_type === 'AI Usecase' ? '#dbeafe' : '#f3e8ff', color: uc.usecase_type === 'AI Usecase' ? '#1e40af' : '#7c3aed' }}>{uc.usecase_type || '-'}</span></td>
                     <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{uc.submission_date ? new Date(uc.submission_date).toLocaleDateString() : '-'}</td>
-                    <td>{uc.idea_owner || '-'}</td>
                     <td>{uc.division || '-'}</td>
                     <td>
                       <span style={{
                         display: 'inline-block',
-                        padding: '4px 12px',
-                        borderRadius: '12px',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
                         fontWeight: 700,
-                        fontSize: '0.9rem',
-                        background: uc.priority_index >= 70 ? '#dcfce7' : uc.priority_index >= 50 ? '#fef3c7' : '#fee2e2',
-                        color: uc.priority_index >= 70 ? '#166534' : uc.priority_index >= 50 ? '#92400e' : '#991b1b'
+                        fontSize: '0.85rem',
+                        background: 'var(--bg-muted)',
+                        color: 'var(--brand-primary)'
                       }}>
-                        {uc.priority_index}
+                        {uc.ebit_total ? `${parseFloat(uc.ebit_total).toFixed(1)}M€` : '-'}
                       </span>
                     </td>
                     <td>
-                      <span className={`status-badge ${uc.priority_cluster === 'High Priority / Quick Win' ? 'active' : uc.priority_cluster === 'Medium Priority' ? 'on-hold' : uc.priority_cluster === 'Low Priority' ? 'cancelled' : 'in-review'}`}>
-                        {uc.priority_cluster}
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        background: uc.quadrant === 'Quick Win' ? '#dcfce7' : uc.quadrant === 'Strategic Bet' ? '#dbeafe' : uc.quadrant === 'Fill-in' ? '#fef3c7' : '#fee2e2',
+                        color: uc.quadrant === 'Quick Win' ? '#166534' : uc.quadrant === 'Strategic Bet' ? '#1e40af' : uc.quadrant === 'Fill-in' ? '#92400e' : '#991b1b'
+                      }}>
+                        {uc.quadrant || '-'}
                       </span>
                     </td>
                     <td>
@@ -2058,92 +2190,40 @@ function Admin() {
                         background: '#e0e7ff',
                         color: '#3730a3'
                       }}>
-                        {uc.tshirt_size}
+                        {uc.effort_size || uc.tshirt_size || '-'}
                       </span>
                     </td>
                     <td>
                       <span style={{
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        color: uc.priority_cluster === 'High Priority / Quick Win' ? '#166534' :
-                               uc.priority_cluster === 'Rework' ? '#991b1b' : 'var(--text-primary)'
+                        fontSize: '0.75rem',
+                        fontWeight: 500,
+                        color: uc.quadrant === 'Quick Win' ? '#166534' :
+                               uc.quadrant === 'Reconsider' ? '#991b1b' : 'var(--text-primary)',
+                        display: 'block',
+                        maxWidth: '200px',
+                        lineHeight: 1.3
                       }}>
-                        {uc.recommended_action?.replace('; Benefit not sufficient', '')}
+                        {uc.recommended_action || '-'}
                       </span>
                     </td>
                     <td>
-                      <span className={`status-badge ${
-                        uc.status === 'Submitted' || uc.status === 'Resubmitted' ? 'active' :
-                        uc.status === 'Approved' || uc.status === 'In Progress' ? 'completed' :
-                        uc.status === 'Parked' ? 'on-hold' :
-                        uc.status === 'Declined' ? 'cancelled' :
-                        uc.status === 'Rework Required' ? 'in-review' : 'in-review'
-                      }`}>{uc.status}</span>
-                    </td>
-                    <td>
                       <div className="action-buttons">
-                        {(uc.status === 'Submitted' || uc.status === 'Resubmitted') && (
-                          <>
-                            {uc.priority_cluster === 'High Priority / Quick Win' && (
-                              <button className="btn btn-sm btn-success" onClick={() => handleUseCaseAction(uc, 'start_doi1')}>Start DOI1</button>
-                            )}
-                            {uc.priority_cluster === 'Medium Priority' && (
-                              <>
-                                <button className="btn btn-sm btn-success" onClick={() => handleUseCaseAction(uc, 'approve')}>Approve</button>
-                                <button className="btn btn-sm" onClick={() => handleUseCaseAction(uc, 'park')}>Park</button>
-                              </>
-                            )}
-                            {uc.priority_cluster === 'Low Priority' && (
-                              <button className="btn btn-sm" onClick={() => handleUseCaseAction(uc, 'park')}>Park</button>
-                            )}
-                            {uc.priority_cluster === 'Rework' && (
-                              <>
-                                <button className="btn btn-sm btn-warning" onClick={() => handleUseCaseAction(uc, 'rework')}>Rework</button>
-                                <button className="btn btn-sm btn-danger" onClick={() => handleUseCaseAction(uc, 'decline')}>Decline</button>
-                              </>
-                            )}
-                          </>
-                        )}
-                        {uc.status === 'Parked' && (
-                          <>
-                            <button className="btn btn-sm btn-success" onClick={() => handleUseCaseAction(uc, 'approve')}>Approve</button>
-                            <button className="btn btn-sm btn-danger" onClick={() => handleUseCaseAction(uc, 'decline')}>Decline</button>
-                          </>
-                        )}
-                        {uc.status === 'Rework Required' && (
-                          <>
-                            <button className="btn btn-sm" onClick={() => handleUseCaseAction(uc, 'park')}>Park</button>
-                            <button className="btn btn-sm btn-danger" onClick={() => handleUseCaseAction(uc, 'decline')}>Decline</button>
-                          </>
-                        )}
-                        {!['Approved', 'Declined', 'In Progress'].includes(uc.status) && (
-                          <button className="btn btn-sm btn-icon" onClick={() => handleEditUseCase(uc)} title="Edit" data-tooltip-id="admin-tooltip" data-tooltip-content="Edit">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                            </svg>
-                          </button>
-                        )}
-                        <button className="btn btn-sm btn-icon btn-icon-danger" onClick={() => handleDeleteUseCase(uc.id, uc.idea_name)} title="Delete" data-tooltip-id="admin-tooltip" data-tooltip-content="Delete">
+                        <button className="btn btn-sm btn-icon" onClick={() => handleEditUseCase(uc)} title="Edit">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                           </svg>
                         </button>
-                        {uc.project_deleted && (
-                          <button className="btn btn-sm btn-warning" onClick={() => handleUseCaseAction(uc, 'recreate')} data-tooltip-id="admin-tooltip" data-tooltip-content="Restore deleted project">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8"/>
-                              <path d="M21 3v5h-5"/>
-                              <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16"/>
-                              <path d="M3 21v-5h5"/>
-                            </svg>
-                          </button>
-                        )}
-                        <button className="btn btn-sm btn-icon btn-icon-primary" onClick={() => setViewingUseCase(uc)} title="View" data-tooltip-id="admin-tooltip" data-tooltip-content="View">
+                        <button className="btn btn-sm btn-icon btn-icon-primary" onClick={() => setViewingUseCase(uc)} title="View">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        </button>
+                        <button className="btn btn-sm btn-icon btn-icon-danger" onClick={() => handleDeleteUseCase(uc.id, uc.idea_name)} title="Delete">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                           </svg>
                         </button>
                       </div>
@@ -2156,12 +2236,12 @@ function Admin() {
                     uc.idea_owner?.toLowerCase().includes(useCaseSearchQuery.toLowerCase()) ||
                     uc.division?.toLowerCase().includes(useCaseSearchQuery.toLowerCase());
                   const matchesStatus = useCaseStatusFilter === 'all' || uc.status === useCaseStatusFilter;
-                  const matchesCluster = useCaseClusterFilter === 'all' || uc.priority_cluster === useCaseClusterFilter;
-                  const matchesTshirt = useCaseTshirtFilter === 'all' || uc.tshirt_size === useCaseTshirtFilter;
+                  const matchesCluster = useCaseClusterFilter === 'all' || uc.quadrant === useCaseClusterFilter;
+                  const matchesTshirt = useCaseTshirtFilter === 'all' || (uc.effort_size || uc.tshirt_size) === useCaseTshirtFilter;
                   return matchesSearch && matchesStatus && matchesCluster && matchesTshirt;
                 }).length === 0 && (
                   <tr>
-                    <td colSpan="11" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
+                    <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px' }}>
                       {useCaseIntakes.length === 0
                         ? 'No use cases yet. Click "New Use Case" to create one.'
                         : 'No use cases match your filters.'}
@@ -2323,19 +2403,16 @@ function Admin() {
               </div>
 
               {/* Step Indicator */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px 24px', borderBottom: '1px solid var(--border-light)' }}>
-                {[1, 2, 3, 4].map(step => {
-                  const canAccess = step === 1 || (useCaseForm.idea_name?.trim() && useCaseForm.usecase_type && useCaseForm.submission_date);
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', padding: '16px 24px', borderBottom: '1px solid var(--border-light)', flexWrap: 'wrap' }}>
+                {[1, 2, 3, 4, 5].map(step => {
+                  const canAccess = step === 1 || (useCaseForm.idea_name?.trim() && useCaseForm.submission_date);
+                  const stepLabels = ['Basic Info', 'Details', 'Value', 'Data & Tech', 'Effort'];
                   return (
                     <div
                       key={step}
                       onClick={() => {
                         if (step > 1 && !useCaseForm.idea_name?.trim()) {
                           showAlert('Please fill in Idea Name first', 'error');
-                          return;
-                        }
-                        if (step > 1 && !useCaseForm.usecase_type) {
-                          showAlert('Please select Use Case Type first', 'error');
                           return;
                         }
                         if (step > 1 && !useCaseForm.submission_date) {
@@ -2345,21 +2422,21 @@ function Admin() {
                         setUseCaseStep(step);
                       }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px',
+                        display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
                         borderRadius: '20px', cursor: canAccess ? 'pointer' : 'not-allowed',
                         background: useCaseStep === step ? 'var(--brand-primary)' : 'var(--bg-muted)',
                         color: useCaseStep === step ? 'white' : 'var(--text-secondary)',
-                        fontWeight: 500, fontSize: '0.85rem',
+                        fontWeight: 500, fontSize: '0.8rem',
                         opacity: canAccess ? 1 : 0.5
                       }}
                     >
                       <span style={{
-                        width: '20px', height: '20px', borderRadius: '50%',
+                        width: '18px', height: '18px', borderRadius: '50%',
                         background: useCaseStep === step ? 'white' : 'var(--border-light)',
                         color: useCaseStep === step ? 'var(--brand-primary)' : 'var(--text-muted)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700
                       }}>{step}</span>
-                      {step === 1 ? 'Basic Info' : step === 2 ? 'Details' : step === 3 ? 'Complexity' : 'Benefit'}
+                      {stepLabels[step - 1]}
                     </div>
                   );
                 })}
@@ -2375,27 +2452,20 @@ function Admin() {
                         <input type="text" className="form-control" value={useCaseForm.idea_name} onChange={e => setUseCaseForm({...useCaseForm, idea_name: e.target.value})} required />
                       </div>
                       <div className="form-group">
-                        <label>Use Case Type *</label>
-                        <select className="form-control" value={useCaseForm.usecase_type || ''} onChange={e => setUseCaseForm({...useCaseForm, usecase_type: e.target.value})} required>
-                          <option value="">Select...</option>
-                          {USECASE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
+                        <label>Submission Date *</label>
+                        <input type="date" className="form-control" value={useCaseForm.submission_date} onChange={e => setUseCaseForm({...useCaseForm, submission_date: e.target.value})} max={new Date().toISOString().split('T')[0]} required />
                       </div>
                       <div className="form-group">
                         <label>Idea Owner</label>
                         <input type="text" className="form-control" value={useCaseForm.idea_owner} onChange={e => setUseCaseForm({...useCaseForm, idea_owner: e.target.value})} />
                       </div>
                       <div className="form-group">
-                        <label>Submission Date *</label>
-                        <input type="date" className="form-control" value={useCaseForm.submission_date} onChange={e => setUseCaseForm({...useCaseForm, submission_date: e.target.value})} max={new Date().toISOString().split('T')[0]} required />
+                        <label>Division</label>
+                        <input type="text" className="form-control" value={useCaseForm.division} onChange={e => setUseCaseForm({...useCaseForm, division: e.target.value})} />
                       </div>
                       <div className="form-group">
                         <label>Sponsor</label>
                         <input type="text" className="form-control" value={useCaseForm.sponsor} onChange={e => setUseCaseForm({...useCaseForm, sponsor: e.target.value})} />
-                      </div>
-                      <div className="form-group">
-                        <label>Division</label>
-                        <input type="text" className="form-control" value={useCaseForm.division} onChange={e => setUseCaseForm({...useCaseForm, division: e.target.value})} />
                       </div>
                       <div className="form-group">
                         <label>Product Owner</label>
@@ -2404,6 +2474,15 @@ function Admin() {
                       <div className="form-group">
                         <label>Line of Business</label>
                         <input type="text" className="form-control" value={useCaseForm.line_of_business} onChange={e => setUseCaseForm({...useCaseForm, line_of_business: e.target.value})} />
+                      </div>
+                      <div className="form-group">
+                        <label>Solution Approach</label>
+                        <select className="form-control" value={useCaseForm.solution_approach || ''} onChange={e => setUseCaseForm({...useCaseForm, solution_approach: e.target.value})}>
+                          <option value="">Select...</option>
+                          <option value="AI Solution">AI Solution</option>
+                          <option value="IT Solution">IT Solution</option>
+                          <option value="Hybrid">Hybrid</option>
+                        </select>
                       </div>
                     </div>
                   )}
@@ -2472,113 +2551,285 @@ function Admin() {
                     </div>
                   )}
 
-                  {/* Step 3: Complexity Scorecard */}
+                  {/* Step 3: Value Assessment */}
                   {useCaseStep === 3 && (
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <div>
-                          <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Complexity Scorecard</h4>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the complexity</p>
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Value Assessment</h4>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Estimate the financial impact and confidence level</p>
+                      </div>
+
+                      {/* EBIT Value Inputs */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '20px' }}>
+                        <div className="form-group">
+                          <label>Efficiency Savings (M €)</label>
+                          <input type="number" step="0.1" min="0" className="form-control"
+                            value={useCaseForm.efficiency_savings}
+                            onChange={e => setUseCaseForm({...useCaseForm, efficiency_savings: parseFloat(e.target.value) || 0})}
+                            placeholder="e.g. 2.5" />
+                          <small style={{ color: 'var(--text-muted)' }}>Annual cost savings</small>
                         </div>
-                        <div style={{ padding: '8px 16px', background: 'var(--bg-muted)', borderRadius: '8px', fontWeight: 700, color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                          Score: {(useCaseForm.complexity_integration || 1) + (useCaseForm.complexity_data_security || 1) + (useCaseForm.complexity_solution_type || 1) + (useCaseForm.complexity_users || 1) + (useCaseForm.complexity_process_change || 1) + (useCaseForm.complexity_stakeholder || 1) + (useCaseForm.complexity_effort_cost || 1)} / 28
+                        <div className="form-group">
+                          <label>Revenue Uplift (M €)</label>
+                          <input type="number" step="0.1" min="0" className="form-control"
+                            value={useCaseForm.revenue_uplift}
+                            onChange={e => setUseCaseForm({...useCaseForm, revenue_uplift: parseFloat(e.target.value) || 0})}
+                            placeholder="e.g. 1.0" />
+                          <small style={{ color: 'var(--text-muted)' }}>Revenue increase</small>
+                        </div>
+                        <div className="form-group">
+                          <label>Cost Avoidance (M €)</label>
+                          <input type="number" step="0.1" min="0" className="form-control"
+                            value={useCaseForm.cost_avoidance}
+                            onChange={e => setUseCaseForm({...useCaseForm, cost_avoidance: parseFloat(e.target.value) || 0})}
+                            placeholder="e.g. 0.5" />
+                          <small style={{ color: 'var(--text-muted)' }}>Avoided future costs</small>
                         </div>
                       </div>
-                      {[
-                        { key: 'complexity_integration', label: 'Integration / System Landscape', options: ['1 system / standalone', '2-3 systems', '4-5 systems', '6+ or unclear'] },
-                        { key: 'complexity_data_security', label: 'Data & Information Security', options: ['Non-critical, 1 source', 'Multiple sources, non-critical', 'Unstructured / distributed', 'Sensitive / personal / IP-critical'] },
-                        { key: 'complexity_solution_type', label: 'Type of Solution / Implementation', options: ['Configuration of standard solution', 'Standard solution + customization', 'In-house development / custom component', 'Architecture / platform intervention, multi-layered'] },
-                        { key: 'complexity_users', label: 'Users / Reach', options: ['< 20 (pilot/team)', '20-200 (department)', '200-2,000 (division)', '2,000+ (cross-functional / company-wide)'] },
-                        { key: 'complexity_process_change', label: 'Process & Organizational Change', options: ['Only a tool, same process', 'Minor process adjustments', 'New workflow, roles shift', 'Cross-functional redesign, governance change'] },
-                        { key: 'complexity_stakeholder', label: 'Change & Stakeholder Complexity', options: ['Single team, no change mgmt needed', 'Multiple teams, informal alignment', 'Formal change mgmt, training required', 'Works council / legal approval, cross-division'] },
-                        { key: 'complexity_effort_cost', label: 'Effort / Cost (indicative)', options: ['10-50 k€', '50-250 k€', '250-750 k€', '> 750 k€'] }
-                      ].map(item => (
-                        <div key={item.key} style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
-                          <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>{item.label}</label>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                            {item.options.map((opt, idx) => (
-                              <label key={idx} style={{
-                                padding: '10px 8px', borderRadius: '6px', cursor: 'pointer', textAlign: 'center',
-                                background: useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--bg-base)',
-                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-primary)',
-                                border: `1px solid ${useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--border-light)'}`,
-                                fontSize: '0.7rem', transition: 'all 0.15s', lineHeight: 1.3
-                              }}>
-                                <input type="radio" name={item.key} checked={useCaseForm[item.key] === idx + 1}
-                                  onChange={() => setUseCaseForm({...useCaseForm, [item.key]: idx + 1})} style={{ display: 'none' }} />
-                                {opt}
-                              </label>
-                            ))}
-                          </div>
+
+                      {/* EBIT Total Display */}
+                      <div style={{ padding: '16px', background: 'var(--bg-muted)', borderRadius: '10px', marginBottom: '20px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total EBIT Impact</div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--brand-primary)' }}>
+                          {((parseFloat(useCaseForm.efficiency_savings) || 0) + (parseFloat(useCaseForm.revenue_uplift) || 0) + (parseFloat(useCaseForm.cost_avoidance) || 0)).toFixed(2)} M €
                         </div>
-                      ))}
+                      </div>
+
+                      {/* Value Confidence */}
+                      <div className="form-group">
+                        <label>Value Confidence</label>
+                        <select className="form-control" value={useCaseForm.value_confidence} onChange={e => setUseCaseForm({...useCaseForm, value_confidence: parseInt(e.target.value)})}>
+                          <option value={5}>Value already proven with baseline measurements or production evidence</option>
+                          <option value={4}>Strong benchmark, internal evidence or comparable use case exists</option>
+                          <option value={3}>Benefit plausible but key assumptions still unvalidated</option>
+                          <option value={2}>Value mostly estimated; baseline unclear</option>
+                          <option value={1}>No quantified value or no value owner</option>
+                        </select>
+                      </div>
                     </div>
                   )}
 
-                  {/* Step 4: Benefit Scorecard */}
+                  {/* Step 4: Data & Technical Assessment */}
                   {useCaseStep === 4 && (
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <div>
-                          <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Benefit Scorecard</h4>
-                          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the expected benefit</p>
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Data & Technical Assessment</h4>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the current state</p>
+                      </div>
+
+                      {/* Data Readiness Section */}
+                      <div style={{ marginBottom: '20px' }}>
+                        <h5 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Data Readiness</h5>
+
+                        <div className="form-group">
+                          <label>Data Existence & Completeness</label>
+                          <select className="form-control" value={useCaseForm.data_existence} onChange={e => setUseCaseForm({...useCaseForm, data_existence: parseInt(e.target.value)})}>
+                            <option value={5}>All critical data exists with right granularity and sufficient history</option>
+                            <option value={4}>Core data exists; only minor peripheral gaps</option>
+                            <option value={3}>Core data exists but relevant gaps in periods, locations or fields</option>
+                            <option value={2}>Major data parts missing or fragmented across silos</option>
+                            <option value={1}>Data largely does not exist; paper, unstructured or tribal knowledge</option>
+                          </select>
                         </div>
-                        <div style={{ padding: '8px 16px', background: 'var(--bg-muted)', borderRadius: '8px', fontWeight: 700, color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
-                          Score: {(useCaseForm.benefit_availability || 1) + (useCaseForm.benefit_time_saving || 1) + (useCaseForm.benefit_cost_reduction || 1) + (useCaseForm.benefit_legacy_consolidation || 1) + (useCaseForm.benefit_automation || 1) + (useCaseForm.benefit_data_quality || 1) + (useCaseForm.benefit_compliance || 1)} / 28
+
+                        <div className="form-group">
+                          <label>Data Access & Legal Usability</label>
+                          <select className="form-control" value={useCaseForm.data_access} onChange={e => setUseCaseForm({...useCaseForm, data_access: parseInt(e.target.value)})}>
+                            <option value={5}>Data accessible for AI use; permissions, legal basis and security clear</option>
+                            <option value={4}>Access mostly clear; minor approval steps needed</option>
+                            <option value={3}>Access path exists but approvals/security review required</option>
+                            <option value={2}>Access unclear or restricted; legal/security issues likely</option>
+                            <option value={1}>Data cannot be used for this purpose under current constraints</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Data Quality</label>
+                          <select className="form-control" value={useCaseForm.data_quality} onChange={e => setUseCaseForm({...useCaseForm, data_quality: parseInt(e.target.value)})}>
+                            <option value={5}>Quality measured and good; data trusted and already productively used</option>
+                            <option value={4}>Quality known and acceptable; limited cleansing/mapping required</option>
+                            <option value={3}>Quality not measured; sampling shows inconsistencies</option>
+                            <option value={2}>Quality poor; duplicates, inconsistencies, missing stewardship</option>
+                            <option value={1}>Quality so poor that re-collection may be cheaper than cleansing</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Data Ownership & Governance</label>
+                          <select className="form-control" value={useCaseForm.data_ownership} onChange={e => setUseCaseForm({...useCaseForm, data_ownership: parseInt(e.target.value)})}>
+                            <option value={5}>Data owner, steward, definitions and refresh rhythm clearly defined</option>
+                            <option value={4}>Owner and refresh rhythm known; minor definition gaps</option>
+                            <option value={3}>Owner exists but definitions or stewardship are incomplete</option>
+                            <option value={2}>Ownership unclear; no reliable refresh or issue handling</option>
+                            <option value={1}>No accountable owner or governance model</option>
+                          </select>
                         </div>
                       </div>
-                      {[
-                        { key: 'benefit_availability', label: 'Availability & Resilience', options: ['No impact on system availability', 'Reduces planned downtime / maintenance windows', 'Eliminates single points of failure in one system', 'Improves availability company-wide / SLA-relevant'] },
-                        { key: 'benefit_time_saving', label: 'Process Time Saving', options: ['No measurable time saving', '< 10% of process time saved', '10-30% of process time saved', '> 30% or entire process step eliminated'] },
-                        { key: 'benefit_cost_reduction', label: 'Run Cost Reduction (p.a.)', options: ['< 50k € (licensing, infra, support)', '50-150k €', '150-500k €', '> 500k € or full cost category eliminated'] },
-                        { key: 'benefit_legacy_consolidation', label: 'Legacy System Consolidation', options: ['No legacy system affected', 'Legacy system remains but workload reduced', '1 system fully decommissioned', '2+ systems decommissioned or full platform replaced'] },
-                        { key: 'benefit_automation', label: 'Automation Depth', options: ['Digitisation of an analogue process only', 'Partial automation of individual steps', 'Full end-to-end automation of one process', 'AI / rule-based decision replaces manual judgement'] },
-                        { key: 'benefit_data_quality', label: 'Data Quality & Decision Enablement', options: ['No improvement to data basis', 'Manual data consolidation reduced', 'Automated data availability in one system', 'Real-time data foundation enabling new decision logic'] },
-                        { key: 'benefit_compliance', label: 'Compliance & Audit-Readiness', options: ['No compliance relevance', 'Reduces manual audit effort / documentation', 'Closes a known audit finding or regulatory gap', 'Fulfils a mandatory regulatory requirement (DSGVO, NIS2, SOX...)'] }
-                      ].map(item => (
-                        <div key={item.key} style={{ marginBottom: '12px', padding: '12px', background: 'var(--bg-muted)', borderRadius: '8px' }}>
-                          <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: '8px' }}>{item.label}</label>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                            {item.options.map((opt, idx) => (
-                              <label key={idx} style={{
-                                padding: '10px 8px', borderRadius: '6px', cursor: 'pointer', textAlign: 'center',
-                                background: useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--bg-base)',
-                                color: useCaseForm[item.key] === idx + 1 ? 'white' : 'var(--text-primary)',
-                                border: `1px solid ${useCaseForm[item.key] === idx + 1 ? 'var(--brand-primary)' : 'var(--border-light)'}`,
-                                fontSize: '0.7rem', transition: 'all 0.15s', lineHeight: 1.3
-                              }}>
-                                <input type="radio" name={item.key} checked={useCaseForm[item.key] === idx + 1}
-                                  onChange={() => setUseCaseForm({...useCaseForm, [item.key]: idx + 1})} style={{ display: 'none' }} />
-                                {opt}
-                              </label>
-                            ))}
-                          </div>
+
+                      {/* Technical Readiness Section */}
+                      <div>
+                        <h5 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technical Readiness</h5>
+
+                        <div className="form-group">
+                          <label>Tech Feasibility</label>
+                          <select className="form-control" value={useCaseForm.tech_feasibility} onChange={e => setUseCaseForm({...useCaseForm, tech_feasibility: parseInt(e.target.value)})}>
+                            <option value={5}>Proven pattern with known solution approach and mature technology</option>
+                            <option value={4}>Well-understood use case; manageable accuracy/performance risk</option>
+                            <option value={3}>Some tech uncertainty; validation required</option>
+                            <option value={2}>Significant uncertainty; extensive experimentation needed</option>
+                            <option value={1}>No evidence tech can reliably solve the problem</option>
+                          </select>
                         </div>
-                      ))}
+
+                        <div className="form-group">
+                          <label>Technical Interfaces</label>
+                          <select className="form-control" value={useCaseForm.interfaces} onChange={e => setUseCaseForm({...useCaseForm, interfaces: parseInt(e.target.value)})}>
+                            <option value={5}>Standalone; no interfaces</option>
+                            <option value={4}>1-2 standard interfaces to modern systems</option>
+                            <option value={3}>3-5 interfaces or one batch legacy integration</option>
+                            <option value={2}>Several interfaces incl. core legacy such as ERP/MES</option>
+                            <option value={1}>More than 5 interfaces incl. real-time core legacy</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Delivery Dependencies</label>
+                          <select className="form-control" value={useCaseForm.delivery_dependencies} onChange={e => setUseCaseForm({...useCaseForm, delivery_dependencies: parseInt(e.target.value)})}>
+                            <option value={5}>No dependency on other use cases or planned enablers</option>
+                            <option value={4}>Uses shared enablers already in production</option>
+                            <option value={3}>Depends on committed enabler/use case; sequencing required</option>
+                            <option value={2}>One blocking dependency on unbuilt enabler or not-started use case</option>
+                            <option value={1}>Multiple blocking dependencies in a chain</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Platform / Architecture Fit</label>
+                          <select className="form-control" value={useCaseForm.platform_fit} onChange={e => setUseCaseForm({...useCaseForm, platform_fit: parseInt(e.target.value)})}>
+                            <option value={5}>Fits existing target architecture and approved platforms</option>
+                            <option value={4}>Minor architecture adjustments required</option>
+                            <option value={3}>Architecture decision required but options are clear</option>
+                            <option value={2}>New platform/component likely required</option>
+                            <option value={1}>Conflicts with target architecture or requires major platform decision</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 5: Effort & Results */}
+                  {useCaseStep === 5 && (
+                    <div>
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ margin: 0, color: 'var(--text-primary)' }}>Effort & Risk Assessment</h4>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0' }}>Select the option that best describes the expected effort</p>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Time-to-Value</label>
+                        <select className="form-control" value={useCaseForm.time_to_value} onChange={e => setUseCaseForm({...useCaseForm, time_to_value: parseInt(e.target.value)})}>
+                          <option value={5}>First measurable value in production in 3 months or less</option>
+                          <option value={4}>First measurable value in production in 3-6 months</option>
+                          <option value={3}>First measurable value in production in 6-12 months</option>
+                          <option value={2}>First measurable value in production in 12-18 months</option>
+                          <option value={1}>First measurable value in production after more than 18 months</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Build Effort</label>
+                        <select className="form-control" value={useCaseForm.build_effort} onChange={e => setUseCaseForm({...useCaseForm, build_effort: parseInt(e.target.value)})}>
+                          <option value={5}>Small configuration or light build; existing components reused</option>
+                          <option value={4}>Moderate build with limited custom development</option>
+                          <option value={3}>Several components or model pipelines to build</option>
+                          <option value={2}>Large build across multiple teams</option>
+                          <option value={1}>Major program-level build effort</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Change & Adoption</label>
+                        <select className="form-control" value={useCaseForm.change_adoption} onChange={e => setUseCaseForm({...useCaseForm, change_adoption: parseInt(e.target.value)})}>
+                          <option value={5}>No process/method/tool change; adoption is tool activation</option>
+                          <option value={4}>No process/method change, tool change only; limited training</option>
+                          <option value={3}>Process change + tool change; training and process adjustments required</option>
+                          <option value={2}>Process + method + tool change; fundamental changes, change program needed</option>
+                          <option value={1}>New process, new method, new tool; dedicated change program needed</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Rollout Complexity</label>
+                        <select className="form-control" value={useCaseForm.rollout_complexity} onChange={e => setUseCaseForm({...useCaseForm, rollout_complexity: parseInt(e.target.value)})}>
+                          <option value={5}>Single team / &lt;10 users</option>
+                          <option value={4}>One department / 10-50 users</option>
+                          <option value={3}>Function or BU / 50-250 users</option>
+                          <option value={2}>Division or multiple sites / 250-1,000 users</option>
+                          <option value={1}>Enterprise-wide / &gt;1,000 users</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Risk & Compliance</label>
+                        <select className="form-control" value={useCaseForm.risk_compliance} onChange={e => setUseCaseForm({...useCaseForm, risk_compliance: parseInt(e.target.value)})}>
+                          <option value={5}>No personal, customer, regulated or safety-critical data/use</option>
+                          <option value={4}>Internal data only; low security or legal complexity</option>
+                          <option value={3}>Sensitive internal data or standard security/privacy review needed</option>
+                          <option value={2}>Personal/customer/regulated data or works council/legal review likely</option>
+                          <option value={1}>High-risk or regulated AI use requiring extensive approval or redesign</option>
+                        </select>
+                      </div>
 
                       {/* Results Preview */}
                       {(() => {
                         const scores = calculateUseCaseScores(useCaseForm);
                         return (
-                          <div style={{ marginTop: '16px', padding: '16px', background: 'var(--bg-muted)', border: '2px solid var(--brand-primary)', borderRadius: '10px' }}>
-                            <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--text-primary)' }}>Calculated Results</h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{scores.priorityIndex}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Priority Index</div>
+                          <div style={{ marginTop: '20px', padding: '20px', background: 'var(--bg-muted)', border: '2px solid var(--brand-primary)', borderRadius: '12px' }}>
+                            <h4 style={{ margin: '0 0 16px', fontSize: '1rem', color: 'var(--text-primary)' }}>T-Shirt Sizing Results</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                              <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-base)', borderRadius: '10px', border: '2px solid var(--brand-primary)' }}>
+                                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--brand-primary)' }}>{scores.effortSize}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Effort Size</div>
                               </div>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>{scores.priorityCluster}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Cluster</div>
+                              <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-base)', borderRadius: '10px' }}>
+                                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>{scores.valueSize}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Value Size</div>
                               </div>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{scores.tshirtSize}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>T-Shirt</div>
+                              <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-base)', borderRadius: '10px' }}>
+                                <div style={{ fontSize: '1rem', fontWeight: 700, color: scores.quadrant === 'Quick Win' ? '#22c55e' : scores.quadrant === 'Strategic Bet' ? '#3b82f6' : scores.quadrant === 'Fill-in' ? '#f59e0b' : '#ef4444' }}>{scores.quadrant}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Quadrant</div>
                               </div>
-                              <div style={{ textAlign: 'center', padding: '10px', background: 'var(--bg-base)', borderRadius: '8px' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-primary)' }}>{scores.recommendedAction}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Action</div>
+                              <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-base)', borderRadius: '10px' }}>
+                                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{scores.ebitTotal.toFixed(1)}M €</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>EBIT Impact</div>
                               </div>
+                            </div>
+
+                            {/* Scores Detail */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                              <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Effort Score:</span> <strong>{scores.effortScore}</strong>
+                              </div>
+                              <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Value Score:</span> <strong>{scores.valueScore}</strong>
+                              </div>
+                              <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', fontSize: '0.8rem' }}>
+                                <span style={{ color: 'var(--text-muted)' }}>Knockouts:</span> <strong style={{ color: scores.knockoutCount > 0 ? '#ef4444' : 'inherit' }}>{scores.knockoutCount}</strong>
+                              </div>
+                            </div>
+
+                            {/* Compliance Gate Warning */}
+                            {scores.complianceGate && (
+                              <div style={{ padding: '12px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                                <span style={{ fontSize: '0.85rem', color: '#92400e', fontWeight: 500 }}>Compliance Gate triggered - regulatory/risk review required</span>
+                              </div>
+                            )}
+
+                            {/* Recommendation */}
+                            <div style={{ padding: '14px', background: 'var(--bg-base)', borderRadius: '8px', borderLeft: '4px solid var(--brand-primary)' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recommendation</div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>{scores.recommendedAction}</div>
                             </div>
                           </div>
                         );
@@ -2595,16 +2846,12 @@ function Admin() {
                   </div>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button type="button" className="btn btn-outline" onClick={() => setShowUseCaseModal(false)} disabled={saving}>Cancel</button>
-                    {useCaseStep < 4 ? (
+                    {useCaseStep < 5 ? (
                       <button type="button" className="btn btn-primary" onClick={(e) => {
                         e.preventDefault();
                         if (useCaseStep === 1) {
                           if (!useCaseForm.idea_name?.trim()) {
                             showAlert('Please fill in Idea Name', 'error');
-                            return;
-                          }
-                          if (!useCaseForm.usecase_type) {
-                            showAlert('Please select Use Case Type', 'error');
                             return;
                           }
                           if (!useCaseForm.submission_date) {
@@ -2635,38 +2882,64 @@ function Admin() {
                 <button className="modal-close" onClick={() => setViewingUseCase(null)}>&times;</button>
               </div>
               <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-                {/* Score Summary */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                {/* T-Shirt Sizing Summary */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '2px solid var(--brand-primary)' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-primary)' }}>{viewingUseCase.priority_index}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority Index</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--brand-primary)' }}>{viewingUseCase.effort_size || viewingUseCase.tshirt_size || '-'}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Effort Size</div>
                   </div>
                   <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{viewingUseCase.priority_cluster}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Priority Cluster</div>
+                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--text-primary)' }}>{viewingUseCase.value_size || '-'}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Value Size</div>
                   </div>
                   <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)' }}>{viewingUseCase.tshirt_size}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>T-Shirt Size</div>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: viewingUseCase.quadrant === 'Quick Win' ? '#22c55e' : viewingUseCase.quadrant === 'Strategic Bet' ? '#3b82f6' : viewingUseCase.quadrant === 'Fill-in' ? '#f59e0b' : '#ef4444' }}>{viewingUseCase.quadrant || '-'}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quadrant</div>
                   </div>
                   <div style={{ textAlign: 'center', padding: '14px 10px', background: 'var(--bg-muted)', borderRadius: '10px', border: '1px solid var(--border-light)' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.3 }}>{viewingUseCase.recommended_action}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Action</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--brand-primary)' }}>{viewingUseCase.ebit_total ? `${parseFloat(viewingUseCase.ebit_total).toFixed(1)}M €` : '-'}</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>EBIT Impact</div>
                   </div>
+                </div>
+
+                {/* Scores and Compliance Gate */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+                  <div style={{ padding: '10px', background: 'var(--bg-muted)', borderRadius: '8px', fontSize: '0.85rem', textAlign: 'center' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Effort Score:</span> <strong>{viewingUseCase.effort_score || '-'}</strong>
+                  </div>
+                  <div style={{ padding: '10px', background: 'var(--bg-muted)', borderRadius: '8px', fontSize: '0.85rem', textAlign: 'center' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Value Score:</span> <strong>{viewingUseCase.value_score || '-'}</strong>
+                  </div>
+                  <div style={{ padding: '10px', background: 'var(--bg-muted)', borderRadius: '8px', fontSize: '0.85rem', textAlign: 'center' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Knockouts:</span> <strong style={{ color: (viewingUseCase.knockout_count || 0) > 0 ? '#ef4444' : 'inherit' }}>{viewingUseCase.knockout_count || 0}</strong>
+                  </div>
+                </div>
+
+                {/* Compliance Gate Warning */}
+                {viewingUseCase.compliance_gate && (
+                  <div style={{ padding: '12px', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                    <span style={{ fontSize: '0.85rem', color: '#92400e', fontWeight: 500 }}>Compliance Gate triggered - regulatory/risk review required</span>
+                  </div>
+                )}
+
+                {/* Recommendation */}
+                <div style={{ padding: '14px', background: 'var(--bg-muted)', borderRadius: '8px', borderLeft: '4px solid var(--brand-primary)', marginBottom: '24px' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recommendation</div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 500, color: 'var(--text-primary)', lineHeight: 1.4 }}>{viewingUseCase.recommended_action || '-'}</div>
                 </div>
 
                 {/* Basic Info */}
                 <div style={{ marginBottom: '20px', background: 'var(--bg-muted)', borderRadius: '10px', padding: '16px' }}>
                   <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Basic Information</h4>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', fontSize: '0.9rem' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Use Case Type:</span> <span style={{ padding: '2px 8px', borderRadius: '4px', background: 'var(--bg-base)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{viewingUseCase.usecase_type || '-'}</span></div>
+                    <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Solution Approach:</span> <span style={{ padding: '2px 8px', borderRadius: '4px', background: viewingUseCase.solution_approach === 'AI Solution' ? '#dbeafe' : viewingUseCase.solution_approach === 'IT Solution' ? '#dcfce7' : viewingUseCase.solution_approach === 'Hybrid' ? '#fef3c7' : 'var(--bg-base)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontSize: '0.85rem' }}>{viewingUseCase.solution_approach || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Submission Date:</span> <span>{viewingUseCase.submission_date ? new Date(viewingUseCase.submission_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Idea Owner:</span> <span>{viewingUseCase.idea_owner || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Division:</span> <span>{viewingUseCase.division || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Sponsor:</span> <span>{viewingUseCase.sponsor || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Product Owner:</span> <span>{viewingUseCase.product_owner || '-'}</span></div>
                     <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Line of Business:</span> <span>{viewingUseCase.line_of_business || '-'}</span></div>
-                    <div style={{ display: 'flex', gap: '8px', gridColumn: 'span 2' }}><span style={{ color: 'var(--text-muted)', minWidth: '120px' }}>Status:</span> <span className={`status-badge ${viewingUseCase.status === 'Submitted' || viewingUseCase.status === 'Resubmitted' ? 'active' : viewingUseCase.status === 'Approved' || viewingUseCase.status === 'In Progress' ? 'completed' : viewingUseCase.status === 'Declined' ? 'cancelled' : 'on-hold'}`}>{viewingUseCase.status}</span></div>
                   </div>
                 </div>
 
@@ -2710,60 +2983,92 @@ function Admin() {
                   );
                 })()}
 
-                {/* Scores */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                  {/* Complexity Score */}
-                  <div style={{ background: 'rgba(254, 243, 199, 0.1)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(253, 230, 138, 0.2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Complexity</h4>
-                      <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#92400e' }}>{viewingUseCase.complexity_score}/28</span>
+                {/* Value Parameters */}
+                <div style={{ marginBottom: '20px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                  <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#1d4ed8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Value Parameters</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', fontSize: '0.85rem' }}>
+                    <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1d4ed8' }}>{viewingUseCase.efficiency_savings || 0}M €</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Efficiency Savings</div>
                     </div>
+                    <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1d4ed8' }}>{viewingUseCase.revenue_uplift || 0}M €</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Revenue Uplift</div>
+                    </div>
+                    <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1d4ed8' }}>{viewingUseCase.cost_avoidance || 0}M €</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Cost Avoidance</div>
+                    </div>
+                    <div style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1d4ed8' }}>{viewingUseCase.value_confidence || 3}/5</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>Confidence</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Scores Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  {/* Data Readiness */}
+                  <div style={{ background: 'rgba(34, 197, 94, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Data Readiness</h4>
                     <div style={{ display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
                       {[
-                        { label: 'Integration', value: viewingUseCase.complexity_integration, options: ['1 system / standalone', '2-3 systems', '4-5 systems', '6+ or unclear'] },
-                        { label: 'Data Security', value: viewingUseCase.complexity_data_security, options: ['Non-critical, 1 source', 'Multiple sources, non-critical', 'Unstructured / distributed', 'Sensitive / personal / IP-critical'] },
-                        { label: 'Solution Type', value: viewingUseCase.complexity_solution_type, options: ['Configuration of standard solution', 'Standard solution + customization', 'In-house development / custom component', 'Architecture / platform intervention'] },
-                        { label: 'Users / Reach', value: viewingUseCase.complexity_users, options: ['< 20 (pilot/team)', '20-200 (department)', '200-2,000 (division)', '2,000+ (company-wide)'] },
-                        { label: 'Process Change', value: viewingUseCase.complexity_process_change, options: ['Only a tool, same process', 'Minor process adjustments', 'New workflow, roles shift', 'Cross-functional redesign'] },
-                        { label: 'Stakeholder', value: viewingUseCase.complexity_stakeholder, options: ['Single team, no change mgmt', 'Multiple teams, informal', 'Formal change mgmt, training', 'Works council / legal approval'] },
-                        { label: 'Effort & Cost', value: viewingUseCase.complexity_effort_cost, options: ['10-50 k€', '50-250 k€', '250-750 k€', '> 750 k€'] }
+                        { label: 'Data Existence', value: viewingUseCase.data_existence },
+                        { label: 'Data Access', value: viewingUseCase.data_access },
+                        { label: 'Data Quality', value: viewingUseCase.data_quality },
+                        { label: 'Data Ownership', value: viewingUseCase.data_ownership }
                       ].map((item, idx) => (
-                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 6 ? '1px solid var(--border-light)' : 'none' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                            <span style={{ fontWeight: 700, color: '#92400e', fontSize: '0.75rem' }}>{item.value}/4</span>
+                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 3 ? '1px solid var(--border-light)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {[1,2,3,4,5].map(n => (
+                              <span key={n} style={{ width: '18px', height: '18px', borderRadius: '50%', background: (item.value || 3) >= n ? '#22c55e' : 'var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: (item.value || 3) >= n ? 'white' : 'var(--text-muted)' }}>{n}</span>
+                            ))}
                           </div>
-                          <div style={{ marginTop: '2px', color: 'var(--text-primary)', fontWeight: 500 }}>{item.options[(item.value || 1) - 1]}</div>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Benefit Score */}
-                  <div style={{ background: 'rgba(220, 252, 231, 0.1)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(187, 247, 208, 0.2)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h4 style={{ margin: 0, fontSize: '0.85rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Benefit</h4>
-                      <span style={{ fontSize: '1.2rem', fontWeight: 800, color: '#166534' }}>{viewingUseCase.benefit_score}/28</span>
-                    </div>
+                  {/* Technical Readiness */}
+                  <div style={{ background: 'rgba(168, 85, 247, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                    <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technical Readiness</h4>
                     <div style={{ display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
                       {[
-                        { label: 'Availability', value: viewingUseCase.benefit_availability, options: ['No impact on availability', 'Reduces planned downtime', 'Eliminates single points of failure', 'Improves availability company-wide'] },
-                        { label: 'Time Saving', value: viewingUseCase.benefit_time_saving, options: ['No measurable time saving', '< 10% of process time saved', '10-30% of process time saved', '> 30% or step eliminated'] },
-                        { label: 'Cost Reduction', value: viewingUseCase.benefit_cost_reduction, options: ['< 50k € p.a.', '50-150k € p.a.', '150-500k € p.a.', '> 500k € or cost eliminated'] },
-                        { label: 'Legacy Consolidation', value: viewingUseCase.benefit_legacy_consolidation, options: ['No legacy system affected', 'Legacy workload reduced', '1 system decommissioned', '2+ systems decommissioned'] },
-                        { label: 'Automation', value: viewingUseCase.benefit_automation, options: ['Digitisation only', 'Partial automation', 'Full end-to-end automation', 'AI replaces manual judgement'] },
-                        { label: 'Data Quality', value: viewingUseCase.benefit_data_quality, options: ['No improvement', 'Manual consolidation reduced', 'Automated data availability', 'Real-time data foundation'] },
-                        { label: 'Compliance', value: viewingUseCase.benefit_compliance, options: ['No compliance relevance', 'Reduces audit effort', 'Closes audit finding', 'Fulfils regulatory requirement'] }
+                        { label: 'Tech Feasibility', value: viewingUseCase.tech_feasibility },
+                        { label: 'Interfaces', value: viewingUseCase.interfaces },
+                        { label: 'Dependencies', value: viewingUseCase.delivery_dependencies },
+                        { label: 'Platform Fit', value: viewingUseCase.platform_fit }
                       ].map((item, idx) => (
-                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 6 ? '1px solid var(--border-light)' : 'none' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                            <span style={{ fontWeight: 700, color: '#166534', fontSize: '0.75rem' }}>{item.value}/4</span>
+                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 3 ? '1px solid var(--border-light)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            {[1,2,3,4,5].map(n => (
+                              <span key={n} style={{ width: '18px', height: '18px', borderRadius: '50%', background: (item.value || 3) >= n ? '#a855f7' : 'var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: (item.value || 3) >= n ? 'white' : 'var(--text-muted)' }}>{n}</span>
+                            ))}
                           </div>
-                          <div style={{ marginTop: '2px', color: 'var(--text-primary)', fontWeight: 500 }}>{item.options[(item.value || 1) - 1]}</div>
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                {/* Effort Parameters */}
+                <div style={{ marginTop: '16px', background: 'rgba(249, 115, 22, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(249, 115, 22, 0.2)' }}>
+                  <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Effort & Risk</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', fontSize: '0.8rem' }}>
+                    {[
+                      { label: 'Time to Value', value: viewingUseCase.time_to_value },
+                      { label: 'Build Effort', value: viewingUseCase.build_effort },
+                      { label: 'Change Adoption', value: viewingUseCase.change_adoption },
+                      { label: 'Rollout', value: viewingUseCase.rollout_complexity },
+                      { label: 'Risk/Compliance', value: viewingUseCase.risk_compliance }
+                    ].map((item, idx) => (
+                      <div key={idx} style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (item.value || 3) <= 2 ? '#ef4444' : (item.value || 3) >= 4 ? '#22c55e' : '#f59e0b' }}>{item.value || 3}</div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.label}</div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 

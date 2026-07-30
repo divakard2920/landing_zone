@@ -1,10 +1,119 @@
 const express = require('express');
 const { DefaultAzureCredential, getBearerTokenProvider } = require('@azure/identity');
 const { AzureOpenAI } = require('openai');
-const { queryAll } = require('../db/database');
+const { v4: uuidv4 } = require('uuid');
+const { queryAll, query } = require('../db/database');
 const { searchSimilarProjects } = require('../services/embedding');
 
 const router = express.Router();
+
+// T-Shirt Sizing Configuration
+const SIZING_CONFIG = {
+  effortWeights: {
+    tech_feasibility: 0.15,
+    data_block: 0.20,
+    dependency_block: 0.15,
+    time_to_value: 0.15,
+    build_effort: 0.10,
+    change_adoption: 0.12,
+    rollout_complexity: 0.08,
+    risk_compliance: 0.05
+  },
+  effortThresholds: { XS: 4.5, S: 3.5, M: 2.5, L: 1.75 },
+  ebitThresholds: { 5: 5.0, 4: 3.5, 3: 2.0, 2: 0.5 },
+  quadrantThresholds: { highValue: 3.5, lowEffort: 3.5 }
+};
+
+// Calculate T-shirt sizing from scores
+const calculateTShirtSize = (scores) => {
+  const dataBlock = Math.min(
+    scores.data_existence || 3, scores.data_access || 3,
+    scores.data_quality || 3, scores.data_ownership || 3
+  );
+  const dependencyBlock = Math.min(
+    scores.interfaces || 3, scores.delivery_dependencies || 3, scores.platform_fit || 3
+  );
+
+  const effortScore =
+    (scores.tech_feasibility || 3) * SIZING_CONFIG.effortWeights.tech_feasibility +
+    dataBlock * SIZING_CONFIG.effortWeights.data_block +
+    dependencyBlock * SIZING_CONFIG.effortWeights.dependency_block +
+    (scores.time_to_value || 3) * SIZING_CONFIG.effortWeights.time_to_value +
+    (scores.build_effort || 3) * SIZING_CONFIG.effortWeights.build_effort +
+    (scores.change_adoption || 3) * SIZING_CONFIG.effortWeights.change_adoption +
+    (scores.rollout_complexity || 3) * SIZING_CONFIG.effortWeights.rollout_complexity +
+    (scores.risk_compliance || 3) * SIZING_CONFIG.effortWeights.risk_compliance;
+
+  const allScores = [
+    scores.tech_feasibility, scores.data_existence, scores.data_access,
+    scores.data_quality, scores.data_ownership, scores.interfaces,
+    scores.delivery_dependencies, scores.platform_fit, scores.time_to_value,
+    scores.build_effort, scores.change_adoption, scores.rollout_complexity,
+    scores.risk_compliance, scores.value_confidence
+  ];
+  const knockoutCount = allScores.filter(s => s === 1).length;
+
+  let effortSize = 'XL';
+  if (effortScore >= SIZING_CONFIG.effortThresholds.XS) effortSize = 'XS';
+  else if (effortScore >= SIZING_CONFIG.effortThresholds.S) effortSize = 'S';
+  else if (effortScore >= SIZING_CONFIG.effortThresholds.M) effortSize = 'M';
+  else if (effortScore >= SIZING_CONFIG.effortThresholds.L) effortSize = 'L';
+
+  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL'];
+  let sizeIndex = sizeOrder.indexOf(effortSize);
+  if (knockoutCount >= 2) sizeIndex = Math.max(3, Math.min(4, sizeIndex + 2));
+  else if (knockoutCount === 1) sizeIndex = Math.min(4, sizeIndex + 1);
+  effortSize = sizeOrder[sizeIndex];
+
+  const ebitTotal = (scores.efficiency_savings || 0) + (scores.revenue_uplift || 0) + (scores.cost_avoidance || 0);
+  let impactScore = 1;
+  if (ebitTotal >= SIZING_CONFIG.ebitThresholds[5]) impactScore = 5;
+  else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[4]) impactScore = 4;
+  else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[3]) impactScore = 3;
+  else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[2]) impactScore = 2;
+
+  const valueConfidence = scores.value_confidence || 3;
+  const valueScore = Math.min(impactScore, valueConfidence);
+
+  let valueSize = 'XS';
+  if (valueScore >= 5) valueSize = 'XL';
+  else if (valueScore >= 4) valueSize = 'L';
+  else if (valueScore >= 3) valueSize = 'M';
+  else if (valueScore >= 2) valueSize = 'S';
+
+  const isHighValue = valueScore >= SIZING_CONFIG.quadrantThresholds.highValue;
+  const isLowEffort = effortScore >= SIZING_CONFIG.quadrantThresholds.lowEffort;
+  let quadrant;
+  if (isHighValue && isLowEffort) quadrant = 'Quick Win';
+  else if (isHighValue && !isLowEffort) quadrant = 'Strategic Bet';
+  else if (!isHighValue && isLowEffort) quadrant = 'Fill-in';
+  else quadrant = 'Reconsider';
+
+  const complianceGate = (scores.risk_compliance || 5) <= 2;
+
+  let recommendation = complianceGate
+    ? 'COMPLIANCE GATE: Risk & Compliance score is low - clear regulatory/legal requirements before proceeding. '
+    : '';
+  switch (quadrant) {
+    case 'Quick Win': recommendation += 'Start now - high value, low effort.'; break;
+    case 'Strategic Bet': recommendation += 'Invest selectively - high value but requires de-risking first.'; break;
+    case 'Fill-in': recommendation += 'Opportunistic only - proceed with spare capacity.'; break;
+    case 'Reconsider': recommendation += 'Stop or rescope - value does not justify effort.'; break;
+  }
+
+  return {
+    effortScore: Math.round(effortScore * 100) / 100,
+    effortSize,
+    valueScore,
+    valueSize,
+    ebitTotal: Math.round(ebitTotal * 100) / 100,
+    quadrant,
+    complianceGate,
+    knockoutCount,
+    recommendation
+  };
+};
+
 
 const AZURE_OPENAI_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT;
 const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4';
@@ -115,6 +224,98 @@ const tools = [
           }
         },
         required: ['project_name']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'submit_use_case_intake',
+      description: 'Submit a new use case intake to the database. Use when all required information has been collected from the user through conversation.',
+      parameters: {
+        type: 'object',
+        properties: {
+          idea_name: { type: 'string', description: 'Name of the use case idea' },
+          idea_owner: { type: 'string', description: 'Person who owns/proposed the idea' },
+          sponsor: { type: 'string', description: 'Business sponsor for the use case' },
+          division: { type: 'string', description: 'Business division (e.g., CVS, TBS, ITS, Group)' },
+          product_owner: { type: 'string', description: 'Product owner responsible' },
+          line_of_business: { type: 'string', description: 'Line of business' },
+          motivation: { type: 'string', description: 'Why this use case is needed' },
+          description_target: { type: 'string', description: 'What the solution should achieve' },
+          value_add: { type: 'string', description: 'Expected business value' },
+          problem_evidence: { type: 'string', description: 'Evidence of the problem' },
+          solution_maturity: { type: 'string', description: 'Maturity level of proposed solution' },
+          value_proof: { type: 'string', description: 'How value will be proven' },
+          dependencies_risks: { type: 'string', description: 'Key dependencies and risks' },
+          solution_approach: { type: 'string', enum: ['AI Solution', 'IT Solution', 'Hybrid'], description: 'Your analysis of the solution approach' },
+          efficiency_savings: { type: 'number', description: 'Cost savings in EUR millions p.a.' },
+          revenue_uplift: { type: 'number', description: 'Revenue uplift in EUR millions p.a.' },
+          cost_avoidance: { type: 'number', description: 'Cost avoidance in EUR millions p.a.' },
+          value_confidence: { type: 'integer', description: 'Confidence in value (1-5)' },
+          data_existence: { type: 'integer', description: 'Data exists and complete (1-5)' },
+          data_access: { type: 'integer', description: 'Data accessible and legal (1-5)' },
+          data_quality: { type: 'integer', description: 'Data quality (1-5)' },
+          data_ownership: { type: 'integer', description: 'Clear data ownership (1-5)' },
+          tech_feasibility: { type: 'integer', description: 'Technical feasibility (1-5)' },
+          interfaces: { type: 'integer', description: 'Interface complexity (1-5)' },
+          delivery_dependencies: { type: 'integer', description: 'Dependencies on other projects (1-5)' },
+          platform_fit: { type: 'integer', description: 'Fits target architecture (1-5)' },
+          time_to_value: { type: 'integer', description: 'Time to first value (1-5)' },
+          build_effort: { type: 'integer', description: 'Build effort (1-5)' },
+          change_adoption: { type: 'integer', description: 'Change management needed (1-5)' },
+          rollout_complexity: { type: 'integer', description: 'Rollout complexity (1-5)' },
+          risk_compliance: { type: 'integer', description: 'Risk and compliance (1-5)' }
+        },
+        required: ['idea_name', 'idea_owner', 'division', 'motivation', 'description_target', 'solution_approach']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'calculate_use_case_sizing',
+      description: 'Calculate T-shirt sizing for a use case based on scores. Use when you have collected scoring parameters from user.',
+      parameters: {
+        type: 'object',
+        properties: {
+          efficiency_savings: { type: 'number' },
+          revenue_uplift: { type: 'number' },
+          cost_avoidance: { type: 'number' },
+          value_confidence: { type: 'integer' },
+          data_existence: { type: 'integer' },
+          data_access: { type: 'integer' },
+          data_quality: { type: 'integer' },
+          data_ownership: { type: 'integer' },
+          tech_feasibility: { type: 'integer' },
+          interfaces: { type: 'integer' },
+          delivery_dependencies: { type: 'integer' },
+          platform_fit: { type: 'integer' },
+          time_to_value: { type: 'integer' },
+          build_effort: { type: 'integer' },
+          change_adoption: { type: 'integer' },
+          rollout_complexity: { type: 'integer' },
+          risk_compliance: { type: 'integer' }
+        }
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'show_intake_summary',
+      description: 'Display a summary card of collected use case information before final submission.',
+      parameters: {
+        type: 'object',
+        properties: {
+          idea_name: { type: 'string' },
+          division: { type: 'string' },
+          motivation: { type: 'string' },
+          description_target: { type: 'string' },
+          solution_approach: { type: 'string', enum: ['AI Solution', 'IT Solution', 'Hybrid'], description: 'Your analysis of whether this is AI/IT/Hybrid' },
+          sizing_preview: { type: 'object', description: 'Preview sizing results' }
+        },
+        required: ['idea_name', 'solution_approach']
       }
     }
   }
@@ -263,18 +464,124 @@ const executeFunction = async (functionName, args, context) => {
       };
     }
 
+    case 'submit_use_case_intake': {
+      const id = uuidv4();
+      const sizing = calculateTShirtSize(args);
+      const solutionApproach = args.solution_approach || 'To Be Determined';
+
+      try {
+        await query(`
+          INSERT INTO use_case_intake (
+            id, idea_name, idea_owner, sponsor, division, product_owner, line_of_business,
+            motivation, description_target, value_add, problem_evidence, solution_maturity,
+            value_proof, dependencies_risks, efficiency_savings, revenue_uplift, cost_avoidance,
+            value_confidence, data_existence, data_access, data_quality, data_ownership,
+            tech_feasibility, interfaces, delivery_dependencies, platform_fit, time_to_value,
+            build_effort, change_adoption, rollout_complexity, risk_compliance,
+            effort_score, effort_size, value_score, value_size, ebit_total, quadrant,
+            compliance_gate, knockout_count, solution_approach, status
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31,
+            $32, $33, $34, $35, $36, $37, $38, $39, $40, $41
+          )
+        `, [
+          id,
+          args.idea_name,
+          args.idea_owner || null,
+          args.sponsor || null,
+          args.division || null,
+          args.product_owner || null,
+          args.line_of_business || null,
+          args.motivation || null,
+          args.description_target || null,
+          args.value_add || null,
+          args.problem_evidence || null,
+          args.solution_maturity || null,
+          args.value_proof || null,
+          args.dependencies_risks || null,
+          args.efficiency_savings || 0,
+          args.revenue_uplift || 0,
+          args.cost_avoidance || 0,
+          args.value_confidence || 3,
+          args.data_existence || 3,
+          args.data_access || 3,
+          args.data_quality || 3,
+          args.data_ownership || 3,
+          args.tech_feasibility || 3,
+          args.interfaces || 3,
+          args.delivery_dependencies || 3,
+          args.platform_fit || 3,
+          args.time_to_value || 3,
+          args.build_effort || 3,
+          args.change_adoption || 3,
+          args.rollout_complexity || 3,
+          args.risk_compliance || 3,
+          sizing.effortScore,
+          sizing.effortSize,
+          sizing.valueScore,
+          sizing.valueSize,
+          sizing.ebitTotal,
+          sizing.quadrant,
+          sizing.complianceGate,
+          sizing.knockoutCount,
+          solutionApproach,
+          'Submitted'
+        ]);
+
+        return {
+          type: 'intake_submitted',
+          data: {
+            id,
+            idea_name: args.idea_name,
+            division: args.division,
+            solution_approach: solutionApproach,
+            sizing: sizing
+          }
+        };
+      } catch (error) {
+        console.error('Error submitting use case intake:', error);
+        return {
+          type: 'intake_error',
+          error: error.message
+        };
+      }
+    }
+
+    case 'calculate_use_case_sizing': {
+      const sizing = calculateTShirtSize(args);
+      return {
+        type: 'sizing_result',
+        data: sizing
+      };
+    }
+
+    case 'show_intake_summary': {
+      return {
+        type: 'intake_summary',
+        data: {
+          idea_name: args.idea_name,
+          division: args.division,
+          motivation: args.motivation,
+          description_target: args.description_target,
+          solution_approach: args.solution_approach,
+          sizing_preview: args.sizing_preview
+        }
+      };
+    }
+
     default:
       return null;
   }
 };
 
 const buildSystemPrompt = (relevantProjects, doiStages, totalCount) => {
-  return `You are an AI assistant for KBase, the AI Projects Portal. You ONLY help users with project-related information.
+  return `You are an AI assistant for KBase, the AI Projects Portal. You help users with project information AND new use case intake.
 
 ## IMPORTANT: Scope Restriction
-- You ONLY answer questions about projects, AI initiatives, DOI stages, project status, analytics, and KBase-related topics
-- For ANY off-topic questions (sports, weather, general knowledge, coding help, etc.), politely decline and redirect to project topics
-- Example response for off-topic: "I'm the KBase Project Assistant and can only help with project-related questions. Try asking me about project status, DOI stages, or analytics!"
+- You help with projects, AI initiatives, DOI stages, project status, analytics, and KBase-related topics
+- You also help users submit NEW use case ideas through conversational intake
+- For ANY off-topic questions (sports, weather, general knowledge, coding help, etc.), politely decline and redirect
 
 ## DOI Stages Reference
 ${JSON.stringify(doiStages, null, 2)}
@@ -283,19 +590,106 @@ ${JSON.stringify(doiStages, null, 2)}
 ${JSON.stringify(relevantProjects, null, 2)}
 
 ## Tools Available
-- show_projects: Display project cards with visual UI (has access to ALL projects)
-- show_statistics: Display analytics/charts (has access to ALL projects)
+- show_projects: Display project cards with visual UI
+- show_statistics: Display analytics/charts
 - show_project_detail: Show single project details
+- submit_use_case_intake: Submit a new use case to the database
+- calculate_use_case_sizing: Calculate T-shirt sizing from scores
+- classify_solution_approach: Classify as AI/IT/Hybrid solution
+
+## USE CASE INTAKE FLOW
+When user wants to submit a new idea or use case, guide them conversationally:
+
+**Step 1 - Basic Info** (collect naturally through conversation):
+- Idea Name: What should we call this use case?
+- Idea Owner: Who is proposing this?
+- Division: Which business division? (CVS, TBS, ITS, Group, etc.)
+- Sponsor: Who is the business sponsor?
+- Product Owner: Who will own the product?
+- Line of Business: Which LOB does this serve?
+
+**Step 2 - Details** (understand the use case):
+- Motivation: Why is this needed? What problem are we solving?
+- Description/Target: What should the solution achieve?
+- Value Add: What business value will it deliver?
+- Problem Evidence: What evidence shows this problem exists?
+- Solution Maturity: Is there a known solution approach?
+- Value Proof: How will we prove the value?
+- Dependencies/Risks: Any key dependencies or risks?
+
+**Step 3 - Value Scoring** (ask about expected benefits):
+- Efficiency Savings: Cost savings in EUR millions p.a.
+- Revenue Uplift: Revenue increase in EUR millions p.a.
+- Cost Avoidance: Costs avoided in EUR millions p.a.
+- Value Confidence: How confident? (1=Very Low to 5=Very High)
+
+**Step 4 - Effort Scoring** (assess complexity, 1-5 scale):
+Data Block:
+- Data Existence: Does required data exist? (1=No data to 5=Complete)
+- Data Access: Is data accessible? (1=Blocked to 5=Easy access)
+- Data Quality: How good is data quality? (1=Poor to 5=Excellent)
+- Data Ownership: Clear ownership? (1=Unclear to 5=Clear)
+
+Technical Block:
+- Tech Feasibility: Technically feasible? (1=Unproven to 5=Proven)
+- Interfaces: How many interfaces needed? (1=Many to 5=Few)
+- Delivery Dependencies: Dependencies? (1=Many to 5=None)
+- Platform Fit: Fits architecture? (1=No fit to 5=Perfect fit)
+
+Effort Block:
+- Time to Value: Time to first value? (1=Long to 5=Quick)
+- Build Effort: Development effort? (1=High to 5=Low)
+- Change Adoption: Change management? (1=Major to 5=Minor)
+- Rollout Complexity: Rollout difficulty? (1=Complex to 5=Simple)
+- Risk/Compliance: Compliance concerns? (1=High risk to 5=No concerns)
+
+**Step 5 - Review & Submit**:
+After collecting info, show a summary, calculate sizing, classify as AI/IT/Hybrid, then submit.
+
+## SOLUTION APPROACH CLASSIFICATION (AI / IT / Hybrid)
+Analyze the use case through conversation and determine the appropriate approach:
+
+**AI Solution** - Use case requires:
+- Learning from data patterns (prediction, forecasting, anomaly detection)
+- Understanding unstructured content (text, images, documents, speech)
+- Making intelligent decisions that improve over time
+- Automation that requires human-like reasoning or judgment
+- Examples: Demand forecasting, document classification, chatbots, quality inspection with computer vision, recommendation engines
+
+**IT Solution** - Use case can be solved with:
+- Standard software/tools (dashboards, reports, workflows)
+- System integrations and data pipelines
+- Process automation with clear rules (no learning needed)
+- Database/infrastructure work
+- Examples: BI dashboards, ERP integration, data migration, workflow automation, portal development
+
+**Hybrid** - Use case needs both:
+- AI capabilities embedded in IT infrastructure
+- ML models deployed within business applications
+- Examples: AI-powered search in a portal, predictive analytics dashboard, intelligent document processing system
+
+Ask clarifying questions to understand:
+- What decisions/actions need to be made?
+- Is there a need to learn from data or just process it?
+- Are there patterns to discover or known rules to follow?
+- Is human-like understanding (language, vision) required?
+
+## INTAKE CONVERSATION STYLE
+- Be conversational, not form-like
+- Group related questions naturally
+- If user provides info proactively, acknowledge and move on
+- Analyze the use case to determine AI/IT/Hybrid through understanding, not keywords
+- Use calculate_use_case_sizing to preview results before submitting
+- Only call submit_use_case_intake when all required fields are collected
 
 ## When to Use Tools vs Text
-USE TOOLS only when user explicitly asks to "show", "list", "display"
-USE TEXT for all other questions - analyze the relevant projects above
+USE TOOLS only when user explicitly asks to "show", "list", "display" OR for intake submission
+USE TEXT for explanations, Q&A, and conversational intake questions
 
 ## Guidelines
 - Answer questions using the relevant projects provided
-- Tools have access to all projects for filtering/stats
-- If data is null/empty, say "not specified"
-- Stay focused on KBase and project topics only`;
+- For intake, guide users step by step naturally
+- If data is null/empty, say "not specified"`;
 };
 
 router.post('/chat', async (req, res) => {
@@ -389,6 +783,18 @@ router.post('/chat', async (req, res) => {
                 break;
               case 'not_found':
                 textContent = `I couldn't find a project matching "${richContent.query}". Please check the name and try again.`;
+                break;
+              case 'intake_submitted':
+                textContent = `Use case "${richContent.data.idea_name}" has been submitted successfully! Classified as: ${richContent.data.solution_approach}. Quadrant: ${richContent.data.sizing.quadrant}, Effort: ${richContent.data.sizing.effortSize}, Value: ${richContent.data.sizing.valueSize}.`;
+                break;
+              case 'intake_error':
+                textContent = `Error submitting use case: ${richContent.error}`;
+                break;
+              case 'sizing_result':
+                textContent = `T-Shirt Sizing: Effort ${richContent.data.effortSize} (score: ${richContent.data.effortScore}), Value ${richContent.data.valueSize} (score: ${richContent.data.valueScore}). Quadrant: ${richContent.data.quadrant}. ${richContent.data.recommendation}`;
+                break;
+              case 'intake_summary':
+                textContent = `Summary for "${richContent.data.idea_name}" - Classified as: ${richContent.data.solution_approach}`;
                 break;
             }
 

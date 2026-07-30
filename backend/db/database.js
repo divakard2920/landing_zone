@@ -395,6 +395,53 @@ const initDb = async () => {
       }
     }
 
+    // Migration: Add new T-shirt sizing columns to use_case_intake (Excel-based scoring)
+    const newScoringColumns = [
+      // Value parameters
+      { name: 'efficiency_savings', type: 'DECIMAL DEFAULT 0' },
+      { name: 'revenue_uplift', type: 'DECIMAL DEFAULT 0' },
+      { name: 'cost_avoidance', type: 'DECIMAL DEFAULT 0' },
+      { name: 'value_confidence', type: 'INTEGER DEFAULT 3' },
+      // Data parameters (1-5)
+      { name: 'data_existence', type: 'INTEGER DEFAULT 3' },
+      { name: 'data_access', type: 'INTEGER DEFAULT 3' },
+      { name: 'data_quality', type: 'INTEGER DEFAULT 3' },
+      { name: 'data_ownership', type: 'INTEGER DEFAULT 3' },
+      // Technical parameters (1-5)
+      { name: 'tech_feasibility', type: 'INTEGER DEFAULT 3' },
+      { name: 'interfaces', type: 'INTEGER DEFAULT 3' },
+      { name: 'delivery_dependencies', type: 'INTEGER DEFAULT 3' },
+      { name: 'platform_fit', type: 'INTEGER DEFAULT 3' },
+      // Effort parameters (1-5)
+      { name: 'time_to_value', type: 'INTEGER DEFAULT 3' },
+      { name: 'build_effort', type: 'INTEGER DEFAULT 3' },
+      { name: 'change_adoption', type: 'INTEGER DEFAULT 3' },
+      { name: 'rollout_complexity', type: 'INTEGER DEFAULT 3' },
+      { name: 'risk_compliance', type: 'INTEGER DEFAULT 3' },
+      // Computed results
+      { name: 'effort_score', type: 'DECIMAL' },
+      { name: 'effort_size', type: 'TEXT' },
+      { name: 'value_score', type: 'DECIMAL' },
+      { name: 'value_size', type: 'TEXT' },
+      { name: 'ebit_total', type: 'DECIMAL' },
+      { name: 'quadrant', type: 'TEXT' },
+      { name: 'compliance_gate', type: 'BOOLEAN DEFAULT FALSE' },
+      { name: 'knockout_count', type: 'INTEGER DEFAULT 0' },
+      // Solution approach classification
+      { name: 'solution_approach', type: 'TEXT' }
+    ];
+
+    for (const col of newScoringColumns) {
+      const colCheck = await client.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'use_case_intake' AND column_name = $1
+      `, [col.name]);
+      if (colCheck.rows.length === 0) {
+        await client.query(`ALTER TABLE use_case_intake ADD COLUMN ${col.name} ${col.type}`);
+        console.log(`Migration: Added ${col.name} column to use_case_intake table`);
+      }
+    }
+
     console.log('Database initialized successfully');
   } finally {
     client.release();

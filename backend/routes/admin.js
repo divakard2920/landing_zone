@@ -8,6 +8,170 @@ const { query, queryOne, queryAll } = require('../db/database');
 
 const router = express.Router();
 
+// T-Shirt Sizing Configuration (from Excel template)
+const SIZING_CONFIG = {
+  effortWeights: {
+    tech_feasibility: 0.15,
+    data_block: 0.20,
+    dependency_block: 0.15,
+    time_to_value: 0.15,
+    build_effort: 0.10,
+    change_adoption: 0.12,
+    rollout_complexity: 0.08,
+    risk_compliance: 0.05
+  },
+  effortThresholds: { XS: 4.5, S: 3.5, M: 2.5, L: 1.75 },
+  effortBands: {
+    XS: { duration: '< 3 months', cost: '< 100k EUR' },
+    S: { duration: '3-6 months', cost: '100-250k EUR' },
+    M: { duration: '6-12 months', cost: '250-600k EUR' },
+    L: { duration: '12-18 months', cost: '600k - 1.2M EUR' },
+    XL: { duration: '> 18 months', cost: '> 1.2M EUR' }
+  },
+  ebitThresholds: { 5: 5.0, 4: 3.5, 3: 2.0, 2: 0.5 },
+  quadrantThresholds: { highValue: 3.5, lowEffort: 3.5 }
+};
+
+// Calculate T-shirt sizing from new parameters
+const calculateTShirtSizing = (params) => {
+  // Data block = MIN of data parameters
+  const dataBlock = Math.min(
+    params.data_existence || 3,
+    params.data_access || 3,
+    params.data_quality || 3,
+    params.data_ownership || 3
+  );
+
+  // Dependency block = MIN of dependency parameters
+  const dependencyBlock = Math.min(
+    params.interfaces || 3,
+    params.delivery_dependencies || 3,
+    params.platform_fit || 3
+  );
+
+  // Weighted effort score
+  const effortScore =
+    (params.tech_feasibility || 3) * SIZING_CONFIG.effortWeights.tech_feasibility +
+    dataBlock * SIZING_CONFIG.effortWeights.data_block +
+    dependencyBlock * SIZING_CONFIG.effortWeights.dependency_block +
+    (params.time_to_value || 3) * SIZING_CONFIG.effortWeights.time_to_value +
+    (params.build_effort || 3) * SIZING_CONFIG.effortWeights.build_effort +
+    (params.change_adoption || 3) * SIZING_CONFIG.effortWeights.change_adoption +
+    (params.rollout_complexity || 3) * SIZING_CONFIG.effortWeights.rollout_complexity +
+    (params.risk_compliance || 3) * SIZING_CONFIG.effortWeights.risk_compliance;
+
+  // Count knock-outs (scores of 1)
+  const allScores = [
+    params.tech_feasibility, params.data_existence, params.data_access,
+    params.data_quality, params.data_ownership, params.interfaces,
+    params.delivery_dependencies, params.platform_fit, params.time_to_value,
+    params.build_effort, params.change_adoption, params.rollout_complexity,
+    params.risk_compliance, params.value_confidence
+  ];
+  const knockoutCount = allScores.filter(s => s === 1).length;
+
+  // Base effort size
+  let effortSize = 'XL';
+  if (effortScore >= SIZING_CONFIG.effortThresholds.XS) effortSize = 'XS';
+  else if (effortScore >= SIZING_CONFIG.effortThresholds.S) effortSize = 'S';
+  else if (effortScore >= SIZING_CONFIG.effortThresholds.M) effortSize = 'M';
+  else if (effortScore >= SIZING_CONFIG.effortThresholds.L) effortSize = 'L';
+
+  // Apply knock-out rule
+  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL'];
+  let sizeIndex = sizeOrder.indexOf(effortSize);
+  if (knockoutCount >= 2) {
+    sizeIndex = Math.max(3, Math.min(4, sizeIndex + 2)); // +2 steps, minimum L
+  } else if (knockoutCount === 1) {
+    sizeIndex = Math.min(4, sizeIndex + 1); // +1 step
+  }
+  effortSize = sizeOrder[sizeIndex];
+
+  // EBIT calculation
+  const ebitTotal = (params.efficiency_savings || 0) + (params.revenue_uplift || 0) + (params.cost_avoidance || 0);
+
+  // Impact score from EBIT
+  let impactScore = 1;
+  if (ebitTotal >= SIZING_CONFIG.ebitThresholds[5]) impactScore = 5;
+  else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[4]) impactScore = 4;
+  else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[3]) impactScore = 3;
+  else if (ebitTotal >= SIZING_CONFIG.ebitThresholds[2]) impactScore = 2;
+
+  // Value score = MIN(impact, confidence)
+  const valueConfidence = params.value_confidence || 3;
+  const valueScore = Math.min(impactScore, valueConfidence);
+
+  // Value size
+  let valueSize = 'XS';
+  if (valueScore >= 5) valueSize = 'XL';
+  else if (valueScore >= 4) valueSize = 'L';
+  else if (valueScore >= 3) valueSize = 'M';
+  else if (valueScore >= 2) valueSize = 'S';
+
+  // Quadrant
+  const isHighValue = valueScore >= SIZING_CONFIG.quadrantThresholds.highValue;
+  const isLowEffort = effortScore >= SIZING_CONFIG.quadrantThresholds.lowEffort;
+
+  let quadrant;
+  if (isHighValue && isLowEffort) quadrant = 'Quick Win';
+  else if (isHighValue && !isLowEffort) quadrant = 'Strategic Bet';
+  else if (!isHighValue && isLowEffort) quadrant = 'Fill-in';
+  else quadrant = 'Reconsider';
+
+  // Compliance gate - triggered when Risk & Compliance is 1 or 2
+  const complianceGate = (params.risk_compliance || 3) <= 2;
+
+  // Recommended action (matches Excel formula exactly)
+  let recommendedAction;
+  if (complianceGate) {
+    // With compliance gate
+    const compliancePrefix = 'COMPLIANCE GATE (6e): sensitive/regulated - clear before proceeding. ';
+    if (quadrant === 'Quick Win') {
+      recommendedAction = compliancePrefix + 'Otherwise start now.';
+    } else if (quadrant === 'Strategic Bet') {
+      recommendedAction = compliancePrefix + 'Otherwise invest selectively.';
+    } else if (quadrant === 'Fill-in') {
+      recommendedAction = compliancePrefix + 'Otherwise opportunistic only.';
+    } else {
+      recommendedAction = compliancePrefix + 'Otherwise stop or rescope.';
+    }
+  } else {
+    // Without compliance gate
+    if (quadrant === 'Quick Win') {
+      recommendedAction = 'Start now - high value, low effort.';
+    } else if (quadrant === 'Strategic Bet') {
+      recommendedAction = 'Invest selectively - high value; de-risk first.';
+    } else if (quadrant === 'Fill-in') {
+      recommendedAction = 'Opportunistic - only with spare capacity.';
+    } else {
+      recommendedAction = 'Stop or rescope - value does not justify effort.';
+    }
+  }
+
+  // Map quadrant to priority cluster for backward compatibility
+  const priorityClusterMap = {
+    'Quick Win': 'High Priority / Quick Win',
+    'Strategic Bet': 'Medium Priority',
+    'Fill-in': 'Low Priority',
+    'Reconsider': 'Rework'
+  };
+
+  return {
+    effortScore: Math.round(effortScore * 100) / 100,
+    effortSize,
+    valueScore,
+    valueSize,
+    ebitTotal,
+    quadrant,
+    complianceGate,
+    knockoutCount,
+    recommendedAction,
+    priorityCluster: priorityClusterMap[quadrant],
+    // For backward compatibility
+    tshirtSize: effortSize
+  };
+};
+
 // Azure Blob Storage configuration
 const CONTAINER_NAME = 'kbase';
 
@@ -981,55 +1145,80 @@ router.post('/use-case-intake', async (req, res) => {
   try {
     const id = uuidv4();
     const {
+      // Basic info
       idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
       line_of_business, motivation, description_target,
       value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
+      solution_approach, // AI, IT, or Hybrid
+      // Old scoring parameters (for backward compatibility)
       complexity_integration, complexity_data_security, complexity_solution_type,
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
       benefit_availability, benefit_time_saving, benefit_cost_reduction,
       benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
+      // New Excel-based scoring parameters
+      efficiency_savings, revenue_uplift, cost_avoidance, value_confidence,
+      data_existence, data_access, data_quality, data_ownership,
+      tech_feasibility, interfaces, delivery_dependencies, platform_fit,
+      time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance,
       status, attachments
     } = req.body;
 
-    const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
-      (complexity_solution_type || 1) + (complexity_users || 1) + (complexity_process_change || 1) +
-      (complexity_stakeholder || 1) + (complexity_effort_cost || 1);
+    // Check if new scoring parameters are provided
+    const useNewScoring = tech_feasibility !== undefined || data_existence !== undefined || efficiency_savings !== undefined;
 
-    const benefitScore = (benefit_availability || 1) + (benefit_time_saving || 1) +
-      (benefit_cost_reduction || 1) + (benefit_legacy_consolidation || 1) +
-      (benefit_automation || 1) + (benefit_data_quality || 1) + (benefit_compliance || 1);
+    let sizing, priorityCluster, recommendedAction, tshirtSize;
+    let complexityScore = null, benefitScore = null, priorityIndex = null;
 
-    const priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
-
-    let priorityCluster;
-    if (complexityScore > 16 && benefitScore < 18) {
-      priorityCluster = 'Rework';
-    } else if (complexityScore <= 16 && benefitScore >= 18) {
-      priorityCluster = 'High Priority / Quick Win';
-    } else if (complexityScore <= 16 && benefitScore < 18) {
-      priorityCluster = 'Low Priority';
+    if (useNewScoring) {
+      // Use new Excel-based T-shirt sizing
+      sizing = calculateTShirtSizing({
+        efficiency_savings, revenue_uplift, cost_avoidance, value_confidence,
+        data_existence, data_access, data_quality, data_ownership,
+        tech_feasibility, interfaces, delivery_dependencies, platform_fit,
+        time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance
+      });
+      priorityCluster = sizing.priorityCluster;
+      recommendedAction = sizing.recommendedAction;
+      tshirtSize = sizing.tshirtSize;
     } else {
-      priorityCluster = 'Medium Priority';
-    }
+      // Fall back to old scoring for backward compatibility
+      complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
+        (complexity_solution_type || 1) + (complexity_users || 1) + (complexity_process_change || 1) +
+        (complexity_stakeholder || 1) + (complexity_effort_cost || 1);
 
-    let recommendedAction;
-    if (priorityCluster === 'High Priority / Quick Win') {
-      recommendedAction = 'Start with DOI1';
-    } else if (priorityCluster === 'Medium Priority') {
-      recommendedAction = 'Approval for DOI1 necessary';
-    } else if (priorityCluster === 'Low Priority') {
-      recommendedAction = 'Park in Backlog; Benefit not sufficient';
-    } else {
-      recommendedAction = 'Decline and rework';
-    }
+      benefitScore = (benefit_availability || 1) + (benefit_time_saving || 1) +
+        (benefit_cost_reduction || 1) + (benefit_legacy_consolidation || 1) +
+        (benefit_automation || 1) + (benefit_data_quality || 1) + (benefit_compliance || 1);
 
-    const totalScore = complexityScore + benefitScore;
-    let tshirtSize;
-    if (totalScore < 16) tshirtSize = 'XS';
-    else if (totalScore <= 20) tshirtSize = 'S';
-    else if (totalScore <= 28) tshirtSize = 'M';
-    else if (totalScore <= 42) tshirtSize = 'L';
-    else tshirtSize = 'XL';
+      priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
+
+      if (complexityScore > 16 && benefitScore < 18) {
+        priorityCluster = 'Rework';
+      } else if (complexityScore <= 16 && benefitScore >= 18) {
+        priorityCluster = 'High Priority / Quick Win';
+      } else if (complexityScore <= 16 && benefitScore < 18) {
+        priorityCluster = 'Low Priority';
+      } else {
+        priorityCluster = 'Medium Priority';
+      }
+
+      if (priorityCluster === 'High Priority / Quick Win') {
+        recommendedAction = 'Start with DOI1';
+      } else if (priorityCluster === 'Medium Priority') {
+        recommendedAction = 'Approval for DOI1 necessary';
+      } else if (priorityCluster === 'Low Priority') {
+        recommendedAction = 'Park in Backlog; Benefit not sufficient';
+      } else {
+        recommendedAction = 'Decline and rework';
+      }
+
+      const totalScore = complexityScore + benefitScore;
+      if (totalScore < 16) tshirtSize = 'XS';
+      else if (totalScore <= 20) tshirtSize = 'S';
+      else if (totalScore <= 28) tshirtSize = 'M';
+      else if (totalScore <= 42) tshirtSize = 'L';
+      else tshirtSize = 'XL';
+    }
 
     const effectiveSubmissionDate = submission_date || new Date().toISOString().split('T')[0];
 
@@ -1095,30 +1284,57 @@ router.post('/use-case-intake', async (req, res) => {
         id, idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
         line_of_business, motivation, description_target,
         value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
+        solution_approach,
+        -- Old scoring (backward compat)
         complexity_integration, complexity_data_security, complexity_solution_type,
         complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
         complexity_score, benefit_availability, benefit_time_saving, benefit_cost_reduction,
         benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
-        benefit_score, priority_index, priority_cluster, recommended_action, tshirt_size, status, app_id, attachments
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39)`,
+        benefit_score, priority_index,
+        -- New scoring
+        efficiency_savings, revenue_uplift, cost_avoidance, value_confidence,
+        data_existence, data_access, data_quality, data_ownership,
+        tech_feasibility, interfaces, delivery_dependencies, platform_fit,
+        time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance,
+        effort_score, effort_size, value_score, value_size, ebit_total, quadrant, compliance_gate, knockout_count,
+        -- Common
+        priority_cluster, recommended_action, tshirt_size, status, app_id, attachments
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65)`,
       [
         id, idea_name, usecase_type, idea_owner, effectiveSubmissionDate,
         sponsor, division, product_owner, line_of_business,
         motivation, description_target, value_add, problem_evidence, solution_maturity,
-        value_proof, dependencies_risks, complexity_integration || 1, complexity_data_security || 1,
-        complexity_solution_type || 1, complexity_users || 1, complexity_process_change || 1,
-        complexity_stakeholder || 1, complexity_effort_cost || 1, complexityScore,
-        benefit_availability || 1, benefit_time_saving || 1, benefit_cost_reduction || 1,
-        benefit_legacy_consolidation || 1, benefit_automation || 1, benefit_data_quality || 1,
-        benefit_compliance || 1, benefitScore, priorityIndex, priorityCluster, recommendedAction,
-        tshirtSize, status || 'Draft', appId, attachments ? JSON.stringify(attachments) : null
+        value_proof, dependencies_risks, solution_approach || null,
+        // Old scoring
+        complexity_integration || null, complexity_data_security || null,
+        complexity_solution_type || null, complexity_users || null, complexity_process_change || null,
+        complexity_stakeholder || null, complexity_effort_cost || null, complexityScore,
+        benefit_availability || null, benefit_time_saving || null, benefit_cost_reduction || null,
+        benefit_legacy_consolidation || null, benefit_automation || null, benefit_data_quality || null,
+        benefit_compliance || null, benefitScore, priorityIndex,
+        // New scoring
+        efficiency_savings || null, revenue_uplift || null, cost_avoidance || null, value_confidence || null,
+        data_existence || null, data_access || null, data_quality || null, data_ownership || null,
+        tech_feasibility || null, interfaces || null, delivery_dependencies || null, platform_fit || null,
+        time_to_value || null, build_effort || null, change_adoption || null, rollout_complexity || null, risk_compliance || null,
+        sizing?.effortScore || null, sizing?.effortSize || null, sizing?.valueScore || null, sizing?.valueSize || null,
+        sizing?.ebitTotal || null, sizing?.quadrant || null, sizing?.complianceGate || false, sizing?.knockoutCount || 0,
+        // Common
+        priorityCluster, recommendedAction, tshirtSize, status || 'Draft', appId, attachments ? JSON.stringify(attachments) : null
       ]
     );
 
     res.status(201).json({
-      id, app_id: appId, complexity_score: complexityScore, benefit_score: benefitScore,
-      priority_index: priorityIndex, priority_cluster: priorityCluster,
-      recommended_action: recommendedAction, tshirt_size: tshirtSize
+      id, app_id: appId,
+      // Old scoring results
+      complexity_score: complexityScore, benefit_score: benefitScore, priority_index: priorityIndex,
+      // New scoring results
+      effort_score: sizing?.effortScore, effort_size: sizing?.effortSize,
+      value_score: sizing?.valueScore, value_size: sizing?.valueSize,
+      ebit_total: sizing?.ebitTotal, quadrant: sizing?.quadrant,
+      compliance_gate: sizing?.complianceGate, knockout_count: sizing?.knockoutCount,
+      // Common
+      priority_cluster: priorityCluster, recommended_action: recommendedAction, tshirt_size: tshirtSize
     });
   } catch (error) {
     console.error('Error creating use case:', error);
@@ -1130,55 +1346,78 @@ router.put('/use-case-intake/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const {
+      // Basic info
       idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
       line_of_business, motivation, description_target,
       value_add, problem_evidence, solution_maturity, value_proof, dependencies_risks,
+      solution_approach,
+      // Old scoring
       complexity_integration, complexity_data_security, complexity_solution_type,
       complexity_users, complexity_process_change, complexity_stakeholder, complexity_effort_cost,
       benefit_availability, benefit_time_saving, benefit_cost_reduction,
       benefit_legacy_consolidation, benefit_automation, benefit_data_quality, benefit_compliance,
+      // New scoring
+      efficiency_savings, revenue_uplift, cost_avoidance, value_confidence,
+      data_existence, data_access, data_quality, data_ownership,
+      tech_feasibility, interfaces, delivery_dependencies, platform_fit,
+      time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance,
       status, admin_notes, attachments, restore_project
     } = req.body;
 
-    const complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
-      (complexity_solution_type || 1) + (complexity_users || 1) + (complexity_process_change || 1) +
-      (complexity_stakeholder || 1) + (complexity_effort_cost || 1);
+    // Check if new scoring parameters are provided
+    const useNewScoring = tech_feasibility !== undefined || data_existence !== undefined || efficiency_savings !== undefined;
 
-    const benefitScore = (benefit_availability || 1) + (benefit_time_saving || 1) +
-      (benefit_cost_reduction || 1) + (benefit_legacy_consolidation || 1) +
-      (benefit_automation || 1) + (benefit_data_quality || 1) + (benefit_compliance || 1);
+    let sizing, priorityCluster, recommendedAction, tshirtSize;
+    let complexityScore = null, benefitScore = null, priorityIndex = null;
 
-    const priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
-
-    let priorityCluster;
-    if (complexityScore > 16 && benefitScore < 18) {
-      priorityCluster = 'Rework';
-    } else if (complexityScore <= 16 && benefitScore >= 18) {
-      priorityCluster = 'High Priority / Quick Win';
-    } else if (complexityScore <= 16 && benefitScore < 18) {
-      priorityCluster = 'Low Priority';
+    if (useNewScoring) {
+      sizing = calculateTShirtSizing({
+        efficiency_savings, revenue_uplift, cost_avoidance, value_confidence,
+        data_existence, data_access, data_quality, data_ownership,
+        tech_feasibility, interfaces, delivery_dependencies, platform_fit,
+        time_to_value, build_effort, change_adoption, rollout_complexity, risk_compliance
+      });
+      priorityCluster = sizing.priorityCluster;
+      recommendedAction = sizing.recommendedAction;
+      tshirtSize = sizing.tshirtSize;
     } else {
-      priorityCluster = 'Medium Priority';
-    }
+      complexityScore = (complexity_integration || 1) + (complexity_data_security || 1) +
+        (complexity_solution_type || 1) + (complexity_users || 1) + (complexity_process_change || 1) +
+        (complexity_stakeholder || 1) + (complexity_effort_cost || 1);
 
-    let recommendedAction;
-    if (priorityCluster === 'High Priority / Quick Win') {
-      recommendedAction = 'Start with DOI1';
-    } else if (priorityCluster === 'Medium Priority') {
-      recommendedAction = 'Approval for DOI1 necessary';
-    } else if (priorityCluster === 'Low Priority') {
-      recommendedAction = 'Park in Backlog; Benefit not sufficient';
-    } else {
-      recommendedAction = 'Decline and rework';
-    }
+      benefitScore = (benefit_availability || 1) + (benefit_time_saving || 1) +
+        (benefit_cost_reduction || 1) + (benefit_legacy_consolidation || 1) +
+        (benefit_automation || 1) + (benefit_data_quality || 1) + (benefit_compliance || 1);
 
-    const totalScore = complexityScore + benefitScore;
-    let tshirtSize;
-    if (totalScore < 16) tshirtSize = 'XS';
-    else if (totalScore <= 20) tshirtSize = 'S';
-    else if (totalScore <= 28) tshirtSize = 'M';
-    else if (totalScore <= 42) tshirtSize = 'L';
-    else tshirtSize = 'XL';
+      priorityIndex = Math.round((benefitScore / 28 * 70) + ((29 - complexityScore) / 28 * 30));
+
+      if (complexityScore > 16 && benefitScore < 18) {
+        priorityCluster = 'Rework';
+      } else if (complexityScore <= 16 && benefitScore >= 18) {
+        priorityCluster = 'High Priority / Quick Win';
+      } else if (complexityScore <= 16 && benefitScore < 18) {
+        priorityCluster = 'Low Priority';
+      } else {
+        priorityCluster = 'Medium Priority';
+      }
+
+      if (priorityCluster === 'High Priority / Quick Win') {
+        recommendedAction = 'Start with DOI1';
+      } else if (priorityCluster === 'Medium Priority') {
+        recommendedAction = 'Approval for DOI1 necessary';
+      } else if (priorityCluster === 'Low Priority') {
+        recommendedAction = 'Park in Backlog; Benefit not sufficient';
+      } else {
+        recommendedAction = 'Decline and rework';
+      }
+
+      const totalScore = complexityScore + benefitScore;
+      if (totalScore < 16) tshirtSize = 'XS';
+      else if (totalScore <= 20) tshirtSize = 'S';
+      else if (totalScore <= 28) tshirtSize = 'M';
+      else if (totalScore <= 42) tshirtSize = 'L';
+      else tshirtSize = 'XL';
+    }
 
     // Get current use case to check status change, priority cluster change, and get app_id
     const currentUseCase = await queryOne('SELECT status, priority_cluster, app_id FROM use_case_intake WHERE id = $1', [id]);
@@ -1191,26 +1430,40 @@ router.put('/use-case-intake/:id', async (req, res) => {
         idea_name = $1, usecase_type = $2, idea_owner = $3, submission_date = $4, sponsor = $5, division = $6,
         product_owner = $7, line_of_business = $8, motivation = $9,
         description_target = $10, value_add = $11, problem_evidence = $12, solution_maturity = $13,
-        value_proof = $14, dependencies_risks = $15, complexity_integration = $16,
-        complexity_data_security = $17, complexity_solution_type = $18, complexity_users = $19,
-        complexity_process_change = $20, complexity_stakeholder = $21, complexity_effort_cost = $22,
-        complexity_score = $23, benefit_availability = $24, benefit_time_saving = $25,
-        benefit_cost_reduction = $26, benefit_legacy_consolidation = $27, benefit_automation = $28,
-        benefit_data_quality = $29, benefit_compliance = $30, benefit_score = $31,
-        priority_index = $32, priority_cluster = $33, recommended_action = $34, tshirt_size = $35,
-        status = $36, admin_notes = $37, attachments = $38, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $39`,
+        value_proof = $14, dependencies_risks = $15, solution_approach = $16,
+        complexity_integration = $17, complexity_data_security = $18, complexity_solution_type = $19,
+        complexity_users = $20, complexity_process_change = $21, complexity_stakeholder = $22,
+        complexity_effort_cost = $23, complexity_score = $24, benefit_availability = $25,
+        benefit_time_saving = $26, benefit_cost_reduction = $27, benefit_legacy_consolidation = $28,
+        benefit_automation = $29, benefit_data_quality = $30, benefit_compliance = $31,
+        benefit_score = $32, priority_index = $33,
+        efficiency_savings = $34, revenue_uplift = $35, cost_avoidance = $36, value_confidence = $37,
+        data_existence = $38, data_access = $39, data_quality = $40, data_ownership = $41,
+        tech_feasibility = $42, interfaces = $43, delivery_dependencies = $44, platform_fit = $45,
+        time_to_value = $46, build_effort = $47, change_adoption = $48, rollout_complexity = $49, risk_compliance = $50,
+        effort_score = $51, effort_size = $52, value_score = $53, value_size = $54,
+        ebit_total = $55, quadrant = $56, compliance_gate = $57, knockout_count = $58,
+        priority_cluster = $59, recommended_action = $60, tshirt_size = $61,
+        status = $62, admin_notes = $63, attachments = $64, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $65`,
       [
         idea_name, usecase_type, idea_owner, submission_date, sponsor, division, product_owner,
         line_of_business, motivation, description_target, value_add,
-        problem_evidence, solution_maturity, value_proof, dependencies_risks,
-        complexity_integration || 1, complexity_data_security || 1, complexity_solution_type || 1,
-        complexity_users || 1, complexity_process_change || 1, complexity_stakeholder || 1,
-        complexity_effort_cost || 1, complexityScore, benefit_availability || 1,
-        benefit_time_saving || 1, benefit_cost_reduction || 1, benefit_legacy_consolidation || 1,
-        benefit_automation || 1, benefit_data_quality || 1, benefit_compliance || 1, benefitScore,
-        priorityIndex, priorityCluster, recommendedAction, tshirtSize, status || 'Draft', admin_notes,
-        attachments ? JSON.stringify(attachments) : null, id
+        problem_evidence, solution_maturity, value_proof, dependencies_risks, solution_approach || null,
+        complexity_integration || null, complexity_data_security || null, complexity_solution_type || null,
+        complexity_users || null, complexity_process_change || null, complexity_stakeholder || null,
+        complexity_effort_cost || null, complexityScore, benefit_availability || null,
+        benefit_time_saving || null, benefit_cost_reduction || null, benefit_legacy_consolidation || null,
+        benefit_automation || null, benefit_data_quality || null, benefit_compliance || null,
+        benefitScore, priorityIndex,
+        efficiency_savings || null, revenue_uplift || null, cost_avoidance || null, value_confidence || null,
+        data_existence || null, data_access || null, data_quality || null, data_ownership || null,
+        tech_feasibility || null, interfaces || null, delivery_dependencies || null, platform_fit || null,
+        time_to_value || null, build_effort || null, change_adoption || null, rollout_complexity || null, risk_compliance || null,
+        sizing?.effortScore || null, sizing?.effortSize || null, sizing?.valueScore || null, sizing?.valueSize || null,
+        sizing?.ebitTotal || null, sizing?.quadrant || null, sizing?.complianceGate || false, sizing?.knockoutCount || 0,
+        priorityCluster, recommendedAction, tshirtSize,
+        status || 'Draft', admin_notes, attachments ? JSON.stringify(attachments) : null, id
       ]
     );
 
