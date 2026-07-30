@@ -362,37 +362,33 @@ const executeFunction = async (functionName, args) => {
 const buildSystemPrompt = () => {
   const projectCount = projects.length;
 
-  return `You are Kiwi 2.0, an AI Project Manager assistant.
+  return `You are Kiwi 2.0, a friendly AI Project Manager assistant.
 ${projectCount > 0 ? `Portfolio: ${projectCount} projects loaded.` : ''}
 
-IMPORTANT RULES:
-- ALWAYS respond with text. Never just call a tool without saying something.
-- Do NOT call check_similar_projects on every message. Only call it ONCE when user FIRST describes a new idea.
-- For follow-up messages like "ok", "yes", "tell me more", just respond conversationally - NO tool calls.
-- If you already searched for similar projects in this conversation, do NOT search again.
+HOW TO BEHAVE:
+- Have a natural conversation. Listen and respond to what the user actually says.
+- Never repeat the same question. If user already answered something, acknowledge it and move on.
+- Ask ONE question at a time, not multiple.
+- React to user's answers - show you understood before asking more.
 
-TOOLS (use sparingly):
-- show_projects: Only when user asks to see/list projects
-- show_statistics: Only when user asks for stats/breakdown
-- check_similar_projects: Only ONCE when user first describes a new idea (not on follow-ups)
-- show_scoring_form: Only when you have collected all required information
+FOR PROJECT QUERIES:
+Use show_projects or show_statistics tools when user wants to see existing projects.
 
-CONVERSATION FLOW FOR NEW IDEAS:
-1. User describes idea → Search for similar projects ONCE → Show results
-2. If similar found: Share the project info and suggest connecting with that team
-3. Continue conversation naturally - ask about motivation, problem, value, etc.
-4. Do NOT search again on follow-up messages
-5. When all info collected, show the scoring form
+FOR NEW IDEAS:
+When user first describes an idea, use check_similar_projects to find related work.
+Then have a conversation to understand:
+- The problem and why it matters
+- What they want to build
+- Expected business value
+- How it's solved today
+- Data and technical needs
+- Risks and dependencies
 
-WHAT TO COLLECT (through conversation, not all at once):
-- What problem does this solve? Why now?
-- What will be built? Target state?
-- Business value - savings, revenue, efficiency?
-- How is it solved today? Evidence of the problem?
-- Could this be solved WITHOUT AI/ML?
-- Data needs, dependencies, risks?
+Also consider: Does this need AI/ML or could simpler approaches work?
 
-Be conversational. React to what user says. Don't repeat yourself.`;
+When you have enough info, use show_scoring_form to let them evaluate it.
+
+REMEMBER: Be helpful and conversational. Don't interrogate. Build on what user shares.`;
 };
 
 // Routes
@@ -489,6 +485,20 @@ router.post('/chat', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    // Check if similar projects search was already done in this conversation
+    const alreadySearched = messages.some(m =>
+      m.role === 'assistant' &&
+      m.content &&
+      (m.content.includes('checked our portfolio') ||
+       m.content.includes('similar project') ||
+       m.content.includes('SIMILAR PROJECTS'))
+    );
+
+    // Remove check_similar_projects tool if already used
+    const availableTools = alreadySearched
+      ? tools.filter(t => t.function.name !== 'check_similar_projects')
+      : tools;
+
     const systemPrompt = buildSystemPrompt();
     const client = getOpenAIClient();
 
@@ -498,8 +508,8 @@ router.post('/chat', async (req, res) => {
         { role: 'system', content: systemPrompt },
         ...messages
       ],
-      tools,
-      tool_choice: 'auto',
+      tools: availableTools.length > 0 ? availableTools : undefined,
+      tool_choice: availableTools.length > 0 ? 'auto' : undefined,
       temperature: 0.7,
       max_tokens: 1500,
       stream: true
