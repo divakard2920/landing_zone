@@ -8,6 +8,7 @@ const adminRoutes = require('./routes/admin');
 const authRoutes = require('./routes/auth');
 const agentRoutes = require('./routes/agent');
 const kiwiAgentRoutes = require('./routes/kiwi-agent');
+const kiwiAgentV2Routes = require('./routes/kiwi-agent-v2');
 const { requireAuth } = require('./middleware/auth');
 
 const app = express();
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', requireAuth, adminRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/kiwi', kiwiAgentRoutes);
+app.use('/api/kiwi2', kiwiAgentV2Routes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

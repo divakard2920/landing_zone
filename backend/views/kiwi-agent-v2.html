@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiwi 2.0 - AI Project Manager</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      padding: 16px 24px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header h1 span { font-size: 24px; }
+
+    .upload-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .upload-btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .upload-btn:hover { background: #2563eb; }
+
+    .project-count {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.5;
+    }
+
+    .message.user {
+      background: #3b82f6;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant {
+      background: #1e293b;
+      border: 1px solid #334155;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.assistant p { margin-bottom: 8px; }
+    .message.assistant p:last-child { margin-bottom: 0; }
+
+    /* Rich content cards */
+    .rich-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      max-width: 90%;
+      align-self: flex-start;
+    }
+
+    .rich-card h3 {
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Project cards */
+    .project-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .project-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .project-item .name {
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+    }
+
+    .project-item .meta {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .project-item .similarity {
+      display: inline-block;
+      background: #22c55e;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      margin-top: 8px;
+    }
+
+    /* Statistics */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+    }
+
+    .stat-item {
+      background: #0f172a;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .stat-item .count {
+      font-size: 24px;
+      font-weight: 700;
+      color: #3b82f6;
+    }
+
+    .stat-item .label {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* Scoring Form */
+    .scoring-form {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid #3b82f6;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 100%;
+      align-self: flex-start;
+    }
+
+    .scoring-form h3 {
+      color: #3b82f6;
+      margin-bottom: 16px;
+      font-size: 16px;
+    }
+
+    .scoring-form .idea-name {
+      color: #f1f5f9;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .form-section {
+      margin-bottom: 20px;
+    }
+
+    .form-section h4 {
+      color: #94a3b8;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #334155;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-field label {
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+
+    .form-field input, .form-field select {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #f1f5f9;
+      font-size: 14px;
+    }
+
+    .form-field input:focus, .form-field select:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .form-field .hint {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .score-select {
+      display: flex;
+      gap: 8px;
+    }
+
+    .score-btn {
+      width: 36px;
+      height: 36px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #94a3b8;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .score-btn:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+
+    .score-btn.selected {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: white;
+    }
+
+    .submit-scoring {
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 16px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .submit-scoring:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+
+    /* Sizing Result */
+    .sizing-result {
+      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+      border: 2px solid #22c55e;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 100%;
+    }
+
+    .sizing-result h3 {
+      color: #22c55e;
+      margin-bottom: 16px;
+    }
+
+    .sizing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .sizing-box {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+
+    .sizing-box .label {
+      font-size: 12px;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .sizing-box .size {
+      font-size: 32px;
+      font-weight: 700;
+    }
+
+    .sizing-box .size.effort { color: #f59e0b; }
+    .sizing-box .size.value { color: #22c55e; }
+    .sizing-box .size.quadrant { font-size: 18px; color: #3b82f6; }
+
+    .sizing-box .detail {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    .recommendation {
+      background: #0f172a;
+      border-left: 4px solid #3b82f6;
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      color: #cbd5e1;
+    }
+
+    .recommendation.compliance {
+      border-left-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .knockout-warning {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid #f59e0b;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #f59e0b;
+      margin-bottom: 12px;
+    }
+
+    /* Input area */
+    .input-container {
+      padding: 16px 24px;
+      background: #1e293b;
+      border-top: 1px solid #334155;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 12px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .input-wrapper input {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #f1f5f9;
+      font-size: 15px;
+    }
+
+    .input-wrapper input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .input-wrapper input::placeholder {
+      color: #64748b;
+    }
+
+    .send-btn {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      transition: background 0.2s;
+    }
+
+    .send-btn:hover { background: #2563eb; }
+    .send-btn:disabled { background: #475569; cursor: not-allowed; }
+
+    /* Typing indicator */
+    .typing {
+      display: flex;
+      gap: 4px;
+      padding: 12px 16px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+
+    .typing span {
+      width: 8px;
+      height: 8px;
+      background: #64748b;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out;
+    }
+
+    .typing span:nth-child(1) { animation-delay: -0.32s; }
+    .typing span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><span>🥝</span> Kiwi 2.0 - AI Project Manager</h1>
+    <div class="upload-section">
+      <span class="project-count" id="projectCount">No projects loaded</span>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+      <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Upload Portfolio</button>
+    </div>
+  </div>
+
+  <div class="chat-container" id="chatContainer">
+    <div class="message assistant">
+      <p>Hi! I'm Kiwi 2.0, your AI Project Manager assistant.</p>
+      <p>I can help you with:</p>
+      <p>• <strong>Existing projects</strong> - Ask me about our portfolio, statistics, or find specific projects</p>
+      <p>• <strong>New use cases</strong> - Tell me about your idea and I'll help you refine it, check for duplicates, and evaluate it</p>
+      <p>Start by uploading a project portfolio, or just tell me what you're working on!</p>
+    </div>
+  </div>
+
+  <div class="input-container">
+    <div class="input-wrapper">
+      <input type="text" id="messageInput" placeholder="Ask about projects or describe your idea..." onkeypress="if(event.key==='Enter')sendMessage()">
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    let conversationHistory = [];
+
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/kiwi2/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (data.success) {
+          document.getElementById('projectCount').textContent = `${data.count} projects loaded`;
+          addMessage('assistant', `Portfolio uploaded successfully! I now have access to ${data.count} projects. What would you like to know?`);
+        } else {
+          addMessage('assistant', `Error uploading: ${data.error}`);
+        }
+      } catch (err) {
+        addMessage('assistant', `Upload failed: ${err.message}`);
+      }
+    });
+
+    function addMessage(role, content) {
+      const container = document.getElementById('chatContainer');
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.innerHTML = content.replace(/\n/g, '<br>');
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function addRichContent(content) {
+      const container = document.getElementById('chatContainer');
+      const div = document.createElement('div');
+
+      switch (content.type) {
+        case 'projects':
+          div.className = 'rich-card';
+          div.innerHTML = `
+            <h3>Projects (${content.showing} of ${content.total})</h3>
+            <div class="project-grid">
+              ${content.projects.map(p => `
+                <div class="project-item">
+                  <div class="name">${p.name || p.project_name || p.use_case || 'Unnamed'}</div>
+                  <div class="meta">${p.status || ''} ${p.priority ? '• ' + p.priority : ''} ${p.division ? '• ' + p.division : ''}</div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+          break;
+
+        case 'statistics':
+          div.className = 'rich-card';
+          div.innerHTML = `
+            <h3>Breakdown by ${content.group_by}</h3>
+            <div class="stat-grid">
+              ${content.data.map(d => `
+                <div class="stat-item">
+                  <div class="count">${d.count}</div>
+                  <div class="label">${d.name}</div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+          break;
+
+        case 'similar_projects':
+          div.className = 'rich-card';
+          if (content.found > 0) {
+            div.innerHTML = `
+              <h3>Similar Projects Found</h3>
+              <div class="project-grid">
+                ${content.projects.map(p => `
+                  <div class="project-item">
+                    <div class="name">${p.name || p.project_name || p.use_case || 'Unnamed'}</div>
+                    <div class="meta">${p.status || ''} ${p.division ? '• ' + p.division : ''}</div>
+                    <span class="similarity">${p.similarity}% match</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          } else {
+            div.className = 'message assistant';
+            div.textContent = 'No similar projects found in the portfolio.';
+          }
+          break;
+
+        case 'scoring_form':
+          div.className = 'scoring-form';
+          div.innerHTML = createScoringForm(content.idea_name, content.idea_summary);
+          break;
+
+        case 'sizing_result':
+          div.className = 'rich-card sizing-result';
+          div.innerHTML = createSizingResult(content);
+          break;
+
+        default:
+          return;
+      }
+
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function createScoringForm(ideaName, summary) {
+      return `
+        <h3>T-Shirt Sizing Evaluation</h3>
+        <div class="idea-name">${ideaName}</div>
+        ${summary ? `<p style="color:#94a3b8;margin-bottom:16px;font-size:14px;">${summary}</p>` : ''}
+
+        <form id="scoringForm" onsubmit="submitScoring(event)">
+          <div class="form-section">
+            <h4>Value Estimation (EUR millions p.a.)</h4>
+            <div class="form-grid">
+              <div class="form-field">
+                <label>Efficiency Savings</label>
+                <input type="number" name="efficiency_savings" step="0.1" min="0" value="0">
+              </div>
+              <div class="form-field">
+                <label>Revenue Uplift</label>
+                <input type="number" name="revenue_uplift" step="0.1" min="0" value="0">
+              </div>
+              <div class="form-field">
+                <label>Cost Avoidance</label>
+                <input type="number" name="cost_avoidance" step="0.1" min="0" value="0">
+              </div>
+              <div class="form-field">
+                <label>Value Confidence</label>
+                <div class="score-select" data-field="value_confidence">
+                  ${[1,2,3,4,5].map(n => `<button type="button" class="score-btn" data-value="${n}">${n}</button>`).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4>Data Readiness (1=Poor, 5=Excellent)</h4>
+            <div class="form-grid">
+              ${['data_existence:Data Exists', 'data_access:Data Accessible', 'data_quality:Data Quality', 'data_ownership:Data Ownership'].map(f => {
+                const [key, label] = f.split(':');
+                return `
+                  <div class="form-field">
+                    <label>${label}</label>
+                    <div class="score-select" data-field="${key}">
+                      ${[1,2,3,4,5].map(n => `<button type="button" class="score-btn" data-value="${n}">${n}</button>`).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4>Technical Complexity (1=Hard, 5=Easy)</h4>
+            <div class="form-grid">
+              ${['tech_feasibility:Technical Feasibility', 'interfaces:Interface Simplicity', 'delivery_dependencies:Low Dependencies', 'platform_fit:Platform Fit'].map(f => {
+                const [key, label] = f.split(':');
+                return `
+                  <div class="form-field">
+                    <label>${label}</label>
+                    <div class="score-select" data-field="${key}">
+                      ${[1,2,3,4,5].map(n => `<button type="button" class="score-btn" data-value="${n}">${n}</button>`).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4>Implementation Effort (1=High, 5=Low)</h4>
+            <div class="form-grid">
+              ${['time_to_value:Time to Value', 'build_effort:Build Effort', 'change_adoption:Change Adoption', 'rollout_complexity:Rollout Simplicity', 'risk_compliance:Risk/Compliance'].map(f => {
+                const [key, label] = f.split(':');
+                return `
+                  <div class="form-field">
+                    <label>${label}</label>
+                    <div class="score-select" data-field="${key}">
+                      ${[1,2,3,4,5].map(n => `<button type="button" class="score-btn" data-value="${n}">${n}</button>`).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <button type="submit" class="submit-scoring">Calculate T-Shirt Size</button>
+        </form>
+      `;
+    }
+
+    function createSizingResult(result) {
+      let html = `<h3>T-Shirt Sizing Result</h3>`;
+
+      if (result.knockOutApplied) {
+        html += `<div class="knockout-warning">⚠️ ${result.knockOutApplied} - size adjusted upward</div>`;
+      }
+
+      html += `
+        <div class="sizing-grid">
+          <div class="sizing-box">
+            <div class="label">Effort Size</div>
+            <div class="size effort">${result.effort.size}</div>
+            <div class="detail">${result.effort.duration}</div>
+            <div class="detail">${result.effort.cost}</div>
+          </div>
+          <div class="sizing-box">
+            <div class="label">Value Size</div>
+            <div class="size value">${result.value.size}</div>
+            <div class="detail">EBIT: €${result.value.ebit}M</div>
+          </div>
+          <div class="sizing-box">
+            <div class="label">Quadrant</div>
+            <div class="size quadrant">${result.quadrant}</div>
+          </div>
+        </div>
+        <div class="recommendation ${result.complianceGate ? 'compliance' : ''}">
+          ${result.recommendation}
+        </div>
+      `;
+
+      return html;
+    }
+
+    // Handle score button clicks
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('score-btn')) {
+        const parent = e.target.closest('.score-select');
+        parent.querySelectorAll('.score-btn').forEach(btn => btn.classList.remove('selected'));
+        e.target.classList.add('selected');
+      }
+    });
+
+    async function submitScoring(e) {
+      e.preventDefault();
+      const form = e.target;
+      const scores = {};
+
+      // Get number inputs
+      form.querySelectorAll('input[type="number"]').forEach(input => {
+        scores[input.name] = parseFloat(input.value) || 0;
+      });
+
+      // Get score selections
+      form.querySelectorAll('.score-select').forEach(select => {
+        const field = select.dataset.field;
+        const selected = select.querySelector('.score-btn.selected');
+        scores[field] = selected ? parseInt(selected.dataset.value) : 3;
+      });
+
+      try {
+        const res = await fetch('/api/kiwi2/compute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scores)
+        });
+        const result = await res.json();
+
+        // Remove the form
+        form.closest('.scoring-form').remove();
+
+        // Add result
+        addRichContent(result);
+
+        // Add follow-up message
+        addMessage('assistant', `Based on this evaluation, your use case is a <strong>${result.quadrant}</strong>. ${result.recommendation}\n\nWould you like to refine any of the scores, or shall we discuss next steps?`);
+      } catch (err) {
+        addMessage('assistant', `Error computing sizing: ${err.message}`);
+      }
+    }
+
+    function showTyping() {
+      const container = document.getElementById('chatContainer');
+      const div = document.createElement('div');
+      div.className = 'typing';
+      div.id = 'typingIndicator';
+      div.innerHTML = '<span></span><span></span><span></span>';
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function hideTyping() {
+      const indicator = document.getElementById('typingIndicator');
+      if (indicator) indicator.remove();
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      if (!message) return;
+
+      input.value = '';
+      addMessage('user', message);
+      conversationHistory.push({ role: 'user', content: message });
+
+      document.getElementById('sendBtn').disabled = true;
+      showTyping();
+
+      try {
+        const res = await fetch('/api/kiwi2/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: conversationHistory })
+        });
+
+        hideTyping();
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantMessage = '';
+        let currentMessageDiv = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+
+                if (parsed.type === 'text') {
+                  if (!currentMessageDiv) {
+                    currentMessageDiv = document.createElement('div');
+                    currentMessageDiv.className = 'message assistant';
+                    document.getElementById('chatContainer').appendChild(currentMessageDiv);
+                  }
+                  assistantMessage += parsed.content;
+                  currentMessageDiv.innerHTML = assistantMessage.replace(/\n/g, '<br>');
+                  document.getElementById('chatContainer').scrollTop = document.getElementById('chatContainer').scrollHeight;
+                } else if (parsed.type === 'rich') {
+                  addRichContent(parsed.content);
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        if (assistantMessage) {
+          conversationHistory.push({ role: 'assistant', content: assistantMessage });
+        }
+      } catch (err) {
+        hideTyping();
+        addMessage('assistant', `Error: ${err.message}`);
+      }
+
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('messageInput').focus();
+    }
+  </script>
+</body>
+</html>
