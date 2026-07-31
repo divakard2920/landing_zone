@@ -176,8 +176,8 @@ const tools = [
         properties: {
           filter_type: {
             type: 'string',
-            enum: ['doi_stage', 'priority', 'status', 'division', 'usecase_type', 'search', 'all'],
-            description: 'Filter type. Use "search" to search by keyword across all fields.'
+            enum: ['doi_stage', 'priority', 'status', 'division', 'business_function', 'usecase_type', 'search', 'all'],
+            description: 'Filter type. Use "business_function" for HR, Finance, Engineering etc. Use "search" to search across all fields.'
           },
           filter_value: {
             type: 'string',
@@ -344,6 +344,9 @@ const executeFunction = async (functionName, args, context) => {
             break;
           case 'division':
             filtered = filtered.filter(p => p.business_division?.toLowerCase().includes(searchVal));
+            break;
+          case 'business_function':
+            filtered = filtered.filter(p => p.business_function?.toLowerCase().includes(searchVal));
             break;
           case 'usecase_type':
             filtered = filtered.filter(p => p.usecase_type?.toLowerCase().includes(searchVal));
@@ -586,9 +589,9 @@ const buildSystemPrompt = (relevantProjects, doiStages, totalCount) => {
 ## DOI Stages Reference
 ${JSON.stringify(doiStages, null, 2)}
 
-## Background Context - Sample Projects (${relevantProjects.length} of ${totalCount} total)
-These are semantically related projects for general context only. DO NOT use these directly to answer "show me X projects" requests - always use the show_projects tool for accurate filtering.
-${JSON.stringify(relevantProjects, null, 2)}
+## Background Context (DO NOT USE FOR PROJECT QUERIES)
+The following ${relevantProjects.length} projects are for general awareness only. When user asks to show/find/list projects (e.g., "show HR projects", "any Finance projects?"), you MUST call show_projects tool - never list projects from this context.
+${JSON.stringify(relevantProjects.slice(0, 3), null, 2)}
 
 ## Tools Available
 - show_projects: Display project cards with visual UI
