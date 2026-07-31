@@ -586,7 +586,8 @@ const buildSystemPrompt = (relevantProjects, doiStages, totalCount) => {
 ## DOI Stages Reference
 ${JSON.stringify(doiStages, null, 2)}
 
-## Relevant Projects (${relevantProjects.length} of ${totalCount} total)
+## Background Context - Sample Projects (${relevantProjects.length} of ${totalCount} total)
+These are semantically related projects for general context only. DO NOT use these directly to answer "show me X projects" requests - always use the show_projects tool for accurate filtering.
 ${JSON.stringify(relevantProjects, null, 2)}
 
 ## Tools Available
@@ -766,8 +767,8 @@ Ask clarifying questions to understand:
 - Only call submit_use_case_intake when all required fields are collected
 
 ## When to Use Tools vs Text
-USE TOOLS only when user explicitly asks to "show", "list", "display" OR for intake submission
-USE TEXT for explanations, Q&A, and conversational intake questions
+ALWAYS USE show_projects tool when user asks to see, show, list, find, or search for projects - the tool provides accurate filtering from the database. Never answer project listing requests using only the background context above.
+USE TEXT for explanations, general Q&A, and conversational intake questions
 
 ## Guidelines
 - Answer questions using the relevant projects provided
