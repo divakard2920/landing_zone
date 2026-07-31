@@ -781,8 +781,8 @@ Ask clarifying questions to understand:
 - Only call submit_use_case_intake when all required fields are collected
 
 ## When to Use Tools vs Text
-USE TOOLS only when user explicitly asks to "show", "list", "display" OR for intake submission
-USE TEXT for explanations, Q&A, and conversational intake questions
+USE TOOLS when user asks to "show", "list", "display", for intake submission, or checking similar projects
+ALWAYS respond with text alongside tool results to maintain conversation flow
 
 ## Guidelines
 - Answer questions using the relevant projects provided
