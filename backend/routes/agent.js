@@ -352,14 +352,21 @@ const executeFunction = async (functionName, args, context) => {
             filtered = filtered.filter(p => p.usecase_type?.toLowerCase().includes(searchVal));
             break;
           case 'search':
-            filtered = filtered.filter(p => {
-              const searchFields = [
-                p.name, p.description, p.business_division, p.business_function,
-                p.current_status, p.usecase_type, p.platform, p.requester_name,
-                p.ai_spoc, p.usecase_identifier, p.demand_type
-              ];
-              return searchFields.some(field => field?.toLowerCase().includes(searchVal));
-            });
+            // Use semantic/embedding search for better results
+            const semanticResults = await searchSimilarProjects(filter_value, limit);
+            if (semanticResults.length > 0) {
+              filtered = semanticResults;
+            } else {
+              // Fallback to keyword search if semantic search returns nothing
+              filtered = filtered.filter(p => {
+                const searchFields = [
+                  p.name, p.description, p.business_division, p.business_function,
+                  p.current_status, p.usecase_type, p.platform, p.requester_name,
+                  p.ai_spoc, p.usecase_identifier, p.demand_type
+                ];
+                return searchFields.some(field => field?.toLowerCase().includes(searchVal));
+              });
+            }
             break;
         }
       }
