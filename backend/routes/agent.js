@@ -823,7 +823,7 @@ router.post('/chat', async (req, res) => {
       tools,
       tool_choice: 'auto',
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 2000,
       stream: true
     });
 
@@ -890,7 +890,7 @@ router.post('/chat', async (req, res) => {
                 ...followUpMessages
               ],
               temperature: 0.7,
-              max_tokens: 500,
+              max_tokens: 1500,
               stream: true
             });
 
