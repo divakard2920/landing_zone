@@ -83,7 +83,7 @@ const generateAllEmbeddings = async () => {
 };
 
 const searchSimilarProjects = async (queryText, limit = 5, options = {}) => {
-  const { minSimilarity = 0.65 } = options;
+  const { minSimilarity = 0.40 } = options;
 
   const embedding = await generateEmbedding(queryText);
   if (!embedding) return [];

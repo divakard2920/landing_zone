@@ -351,7 +351,7 @@ const executeFunction = async (functionName, args, context) => {
           case 'search':
             // Try semantic search first
             try {
-              const semanticResults = await searchSimilarProjects(filter_value, limit, { minSimilarity: 0.65 });
+              const semanticResults = await searchSimilarProjects(filter_value, limit, { minSimilarity: 0.40 });
               if (semanticResults.length > 0) {
                 filtered = semanticResults;
                 break;
