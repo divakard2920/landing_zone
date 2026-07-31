@@ -176,8 +176,8 @@ const tools = [
         properties: {
           filter_type: {
             type: 'string',
-            enum: ['doi_stage', 'priority', 'status', 'division', 'business_function', 'usecase_type', 'search', 'all'],
-            description: 'Filter type. Use "business_function" for HR, Finance, Engineering etc. Use "search" to search across all fields.'
+            enum: ['doi_stage', 'priority', 'status', 'division', 'usecase_type', 'search', 'all'],
+            description: 'Filter type. Use "search" to search by keyword across all fields.'
           },
           filter_value: {
             type: 'string',
@@ -345,28 +345,18 @@ const executeFunction = async (functionName, args, context) => {
           case 'division':
             filtered = filtered.filter(p => p.business_division?.toLowerCase().includes(searchVal));
             break;
-          case 'business_function':
-            filtered = filtered.filter(p => p.business_function?.toLowerCase().includes(searchVal));
-            break;
           case 'usecase_type':
             filtered = filtered.filter(p => p.usecase_type?.toLowerCase().includes(searchVal));
             break;
           case 'search':
-            // Use semantic/embedding search for better results
-            const semanticResults = await searchSimilarProjects(filter_value, limit);
-            if (semanticResults.length > 0) {
-              filtered = semanticResults;
-            } else {
-              // Fallback to keyword search if semantic search returns nothing
-              filtered = filtered.filter(p => {
-                const searchFields = [
-                  p.name, p.description, p.business_division, p.business_function,
-                  p.current_status, p.usecase_type, p.platform, p.requester_name,
-                  p.ai_spoc, p.usecase_identifier, p.demand_type
-                ];
-                return searchFields.some(field => field?.toLowerCase().includes(searchVal));
-              });
-            }
+            filtered = filtered.filter(p => {
+              const searchFields = [
+                p.name, p.description, p.business_division, p.business_function,
+                p.current_status, p.usecase_type, p.platform, p.requester_name,
+                p.ai_spoc, p.usecase_identifier, p.demand_type
+              ];
+              return searchFields.some(field => field?.toLowerCase().includes(searchVal));
+            });
             break;
         }
       }
@@ -596,9 +586,8 @@ const buildSystemPrompt = (relevantProjects, doiStages, totalCount) => {
 ## DOI Stages Reference
 ${JSON.stringify(doiStages, null, 2)}
 
-## Background Context (DO NOT USE FOR PROJECT QUERIES)
-The following ${relevantProjects.length} projects are for general awareness only. When user asks to show/find/list projects (e.g., "show HR projects", "any Finance projects?"), you MUST call show_projects tool - never list projects from this context.
-${JSON.stringify(relevantProjects.slice(0, 3), null, 2)}
+## Relevant Projects (${relevantProjects.length} of ${totalCount} total)
+${JSON.stringify(relevantProjects, null, 2)}
 
 ## Tools Available
 - show_projects: Display project cards with visual UI
@@ -610,9 +599,6 @@ ${JSON.stringify(relevantProjects.slice(0, 3), null, 2)}
 
 ## USE CASE INTAKE FLOW
 When user wants to submit a new idea or use case, guide them conversationally:
-
-**Step 0 - Check for Similar Projects**:
-When user describes their use case idea, use show_projects with filter_type "search" to find similar existing projects. If similar projects are found, inform the user - they may want to collaborate or learn from existing work. If no similar projects exist, proceed with intake.
 
 **Step 1 - Basic Info** (collect naturally through conversation):
 - Idea Name: What should we call this use case?
@@ -780,8 +766,8 @@ Ask clarifying questions to understand:
 - Only call submit_use_case_intake when all required fields are collected
 
 ## When to Use Tools vs Text
-ALWAYS USE show_projects tool when user asks to see, show, list, find, or search for projects - the tool provides accurate filtering from the database. Never answer project listing requests using only the background context above.
-USE TEXT for explanations, general Q&A, and conversational intake questions
+USE TOOLS only when user explicitly asks to "show", "list", "display" OR for intake submission
+USE TEXT for explanations, Q&A, and conversational intake questions
 
 ## Guidelines
 - Answer questions using the relevant projects provided
