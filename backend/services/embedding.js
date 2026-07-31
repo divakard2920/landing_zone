@@ -82,7 +82,7 @@ const generateAllEmbeddings = async () => {
   console.log('All embeddings generated');
 };
 
-const searchSimilarProjects = async (queryText, limit = 5) => {
+const searchSimilarProjects = async (queryText, limit = 5, maxDistance = 0.6) => {
   const embedding = await generateEmbedding(queryText);
   if (!embedding) return [];
 
@@ -91,10 +91,12 @@ const searchSimilarProjects = async (queryText, limit = 5) => {
   const result = await query(`
     SELECT *, embedding <=> $1 AS distance
     FROM apps
-    WHERE deleted_at IS NULL AND embedding IS NOT NULL
+    WHERE deleted_at IS NULL
+      AND embedding IS NOT NULL
+      AND embedding <=> $1 < $3
     ORDER BY embedding <=> $1
     LIMIT $2
-  `, [vectorStr, limit]);
+  `, [vectorStr, limit, maxDistance]);
 
   return result.rows;
 };
