@@ -611,6 +611,9 @@ ${JSON.stringify(relevantProjects.slice(0, 3), null, 2)}
 ## USE CASE INTAKE FLOW
 When user wants to submit a new idea or use case, guide them conversationally:
 
+**Step 0 - Check for Similar Projects**:
+When user describes their use case idea, use show_projects with filter_type "search" to find similar existing projects. If similar projects are found, inform the user - they may want to collaborate or learn from existing work. If no similar projects exist, proceed with intake.
+
 **Step 1 - Basic Info** (collect naturally through conversation):
 - Idea Name: What should we call this use case?
 - Idea Owner: Who is proposing this?
