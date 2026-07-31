@@ -349,13 +349,26 @@ const executeFunction = async (functionName, args, context) => {
             filtered = filtered.filter(p => p.usecase_type?.toLowerCase().includes(searchVal));
             break;
           case 'search':
+            // Try semantic search first
+            try {
+              const semanticResults = await searchSimilarProjects(filter_value, limit, { minSimilarity: 0.65 });
+              if (semanticResults.length > 0) {
+                filtered = semanticResults;
+                break;
+              }
+            } catch (err) {
+              console.error('Semantic search failed:', err.message);
+            }
+            // Fallback to word-boundary keyword search
+            const escapedSearch = searchVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const searchPattern = new RegExp(`\\b${escapedSearch}\\b`, 'i');
             filtered = filtered.filter(p => {
-              const searchFields = [
+              const searchText = [
                 p.name, p.description, p.business_division, p.business_function,
                 p.current_status, p.usecase_type, p.platform, p.requester_name,
                 p.ai_spoc, p.usecase_identifier, p.demand_type
-              ];
-              return searchFields.some(field => field?.toLowerCase().includes(searchVal));
+              ].filter(Boolean).join(' ');
+              return searchPattern.test(searchText);
             });
             break;
         }

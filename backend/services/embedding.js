@@ -82,21 +82,29 @@ const generateAllEmbeddings = async () => {
   console.log('All embeddings generated');
 };
 
-const searchSimilarProjects = async (queryText, limit = 5) => {
+const searchSimilarProjects = async (queryText, limit = 5, options = {}) => {
+  const { minSimilarity = 0.65 } = options;
+
   const embedding = await generateEmbedding(queryText);
   if (!embedding) return [];
 
   const vectorStr = `[${embedding.join(',')}]`;
 
   const result = await query(`
-    SELECT *, embedding <=> $1 AS distance
+    SELECT *,
+           embedding <=> $1 AS distance,
+           ROUND((1 - (embedding <=> $1))::numeric * 100) AS similarity_score
     FROM apps
     WHERE deleted_at IS NULL AND embedding IS NOT NULL
     ORDER BY embedding <=> $1
     LIMIT $2
-  `, [vectorStr, limit]);
+  `, [vectorStr, limit * 2]);
 
-  return result.rows;
+  // Filter by similarity threshold (distance < 0.35 means > 65% similar)
+  const maxDistance = 1 - minSimilarity;
+  return result.rows
+    .filter(row => parseFloat(row.distance) <= maxDistance)
+    .slice(0, limit);
 };
 
 module.exports = {
