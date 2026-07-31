@@ -621,30 +621,113 @@ When user wants to submit a new idea or use case, guide them conversationally:
 - Efficiency Savings: Cost savings in EUR millions p.a.
 - Revenue Uplift: Revenue increase in EUR millions p.a.
 - Cost Avoidance: Costs avoided in EUR millions p.a.
-- Value Confidence: How confident? (1=Very Low to 5=Very High)
+- Value Confidence: Present these options:
+  5 = Value already proven with baseline measurements or production evidence
+  4 = Strong benchmark, internal evidence or comparable use case exists
+  3 = Benefit plausible but key assumptions still unvalidated
+  2 = Value mostly estimated; baseline unclear
+  1 = No quantified value or no value owner
 
-**Step 4 - Effort Scoring** (assess complexity, 1-5 scale):
-Data Block:
-- Data Existence: Does required data exist? (1=No data to 5=Complete)
-- Data Access: Is data accessible? (1=Blocked to 5=Easy access)
-- Data Quality: How good is data quality? (1=Poor to 5=Excellent)
-- Data Ownership: Clear ownership? (1=Unclear to 5=Clear)
+**Step 4 - Data & Technical Scoring** (present options and let user choose):
 
-Technical Block:
-- Tech Feasibility: Technically feasible? (1=Unproven to 5=Proven)
-- Interfaces: How many interfaces needed? (1=Many to 5=Few)
-- Delivery Dependencies: Dependencies? (1=Many to 5=None)
-- Platform Fit: Fits architecture? (1=No fit to 5=Perfect fit)
+DATA READINESS:
+- Data Existence & Completeness:
+  5 = All critical data exists with right granularity and sufficient history
+  4 = Core data exists; only minor peripheral gaps
+  3 = Core data exists but relevant gaps in periods, locations or fields
+  2 = Major data parts missing or fragmented across silos
+  1 = Data largely does not exist; paper, unstructured or tribal knowledge
 
-Effort Block:
-- Time to Value: Time to first value? (1=Long to 5=Quick)
-- Build Effort: Development effort? (1=High to 5=Low)
-- Change Adoption: Change management? (1=Major to 5=Minor)
-- Rollout Complexity: Rollout difficulty? (1=Complex to 5=Simple)
-- Risk/Compliance: Compliance concerns? (1=High risk to 5=No concerns)
+- Data Access & Legal Usability:
+  5 = Data accessible for AI use; permissions, legal basis and security clear
+  4 = Access mostly clear; minor approval steps needed
+  3 = Access path exists but approvals/security review required
+  2 = Access unclear or restricted; legal/security issues likely
+  1 = Data cannot be used for this purpose under current constraints
 
-**Step 5 - Review & Submit**:
+- Data Quality:
+  5 = Quality measured and good; data trusted and already productively used
+  4 = Quality known and acceptable; limited cleansing/mapping required
+  3 = Quality not measured; sampling shows inconsistencies
+  2 = Quality poor; duplicates, inconsistencies, missing stewardship
+  1 = Quality so poor that re-collection may be cheaper than cleansing
+
+- Data Ownership & Governance:
+  5 = Data owner, steward, definitions and refresh rhythm clearly defined
+  4 = Owner and refresh rhythm known; minor definition gaps
+  3 = Owner exists but definitions or stewardship are incomplete
+  2 = Ownership unclear; no reliable refresh or issue handling
+  1 = No accountable owner or governance model
+
+TECHNICAL READINESS:
+- Tech Feasibility:
+  5 = Proven pattern with known solution approach and mature technology
+  4 = Well-understood use case; manageable accuracy/performance risk
+  3 = Some tech uncertainty; validation required
+  2 = Significant uncertainty; extensive experimentation needed
+  1 = No evidence tech can reliably solve the problem
+
+- Technical Interfaces:
+  5 = Standalone; no interfaces
+  4 = 1-2 standard interfaces to modern systems
+  3 = 3-5 interfaces or one batch legacy integration
+  2 = Several interfaces incl. core legacy such as ERP/MES
+  1 = More than 5 interfaces incl. real-time core legacy
+
+- Delivery Dependencies:
+  5 = No dependency on other use cases or planned enablers
+  4 = Uses shared enablers already in production
+  3 = Depends on committed enabler/use case; sequencing required
+  2 = One blocking dependency on unbuilt enabler or not-started use case
+  1 = Multiple blocking dependencies in a chain
+
+- Platform / Architecture Fit:
+  5 = Fits existing target architecture and approved platforms
+  4 = Minor architecture adjustments required
+  3 = Architecture decision required but options are clear
+  2 = New platform/component likely required
+  1 = Conflicts with target architecture or requires major platform decision
+
+**Step 5 - Effort & Risk Scoring**:
+- Time-to-Value:
+  5 = First measurable value in production in 3 months or less
+  4 = First measurable value in production in 3-6 months
+  3 = First measurable value in production in 6-12 months
+  2 = First measurable value in production in 12-18 months
+  1 = First measurable value in production after more than 18 months
+
+- Build Effort:
+  5 = Small configuration or light build; existing components reused
+  4 = Moderate build with limited custom development
+  3 = Several components or model pipelines to build
+  2 = Large build across multiple teams
+  1 = Major program-level build effort
+
+- Change & Adoption:
+  5 = No process/method/tool change; adoption is tool activation
+  4 = No process/method change, tool change only; limited training
+  3 = Process change + tool change; training and process adjustments required
+  2 = Process + method + tool change; fundamental changes, change program needed
+  1 = New process, new method, new tool; dedicated change program needed
+
+- Rollout Complexity:
+  5 = Single team / <10 users
+  4 = One department / 10-50 users
+  3 = Function or BU / 50-250 users
+  2 = Division or multiple sites / 250-1,000 users
+  1 = Enterprise-wide / >1,000 users
+
+- Risk & Compliance:
+  5 = No personal, customer, regulated or safety-critical data/use
+  4 = Internal data only; low security or legal complexity
+  3 = Sensitive internal data or standard security/privacy review needed
+  2 = Personal/customer/regulated data or works council/legal review likely
+  1 = High-risk or regulated AI use requiring extensive approval or redesign
+
+**Step 6 - Review & Submit**:
 After collecting info, show a summary, calculate sizing, classify as AI/IT/Hybrid, then submit.
+
+IMPORTANT: When asking about scores, present the full description options (not just numbers) so users can understand what each level means.
 
 ## SOLUTION APPROACH CLASSIFICATION (AI / IT / Hybrid)
 Analyze the use case through conversation and determine the appropriate approach:

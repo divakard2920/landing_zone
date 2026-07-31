@@ -3007,70 +3007,177 @@ function Admin() {
                 </div>
 
                 {/* Scores Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                  {/* Data Readiness */}
-                  <div style={{ background: 'rgba(34, 197, 94, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
-                    <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Data Readiness</h4>
-                    <div style={{ display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
-                      {[
-                        { label: 'Data Existence', value: viewingUseCase.data_existence },
-                        { label: 'Data Access', value: viewingUseCase.data_access },
-                        { label: 'Data Quality', value: viewingUseCase.data_quality },
-                        { label: 'Data Ownership', value: viewingUseCase.data_ownership }
-                      ].map((item, idx) => (
-                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 3 ? '1px solid var(--border-light)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            {[1,2,3,4,5].map(n => (
-                              <span key={n} style={{ width: '18px', height: '18px', borderRadius: '50%', background: (item.value || 3) >= n ? '#22c55e' : 'var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: (item.value || 3) >= n ? 'white' : 'var(--text-muted)' }}>{n}</span>
+                {(() => {
+                  const scoreDescriptions = {
+                    data_existence: {
+                      5: 'All critical data exists with right granularity and sufficient history',
+                      4: 'Core data exists; only minor peripheral gaps',
+                      3: 'Core data exists but relevant gaps in periods, locations or fields',
+                      2: 'Major data parts missing or fragmented across silos',
+                      1: 'Data largely does not exist; paper, unstructured or tribal knowledge'
+                    },
+                    data_access: {
+                      5: 'Data accessible for AI use; permissions, legal basis and security clear',
+                      4: 'Access mostly clear; minor approval steps needed',
+                      3: 'Access path exists but approvals/security review required',
+                      2: 'Access unclear or restricted; legal/security issues likely',
+                      1: 'Data cannot be used for this purpose under current constraints'
+                    },
+                    data_quality: {
+                      5: 'Quality measured and good; data trusted and already productively used',
+                      4: 'Quality known and acceptable; limited cleansing/mapping required',
+                      3: 'Quality not measured; sampling shows inconsistencies',
+                      2: 'Quality poor; duplicates, inconsistencies, missing stewardship',
+                      1: 'Quality so poor that re-collection may be cheaper than cleansing'
+                    },
+                    data_ownership: {
+                      5: 'Data owner, steward, definitions and refresh rhythm clearly defined',
+                      4: 'Owner and refresh rhythm known; minor definition gaps',
+                      3: 'Owner exists but definitions or stewardship are incomplete',
+                      2: 'Ownership unclear; no reliable refresh or issue handling',
+                      1: 'No accountable owner or governance model'
+                    },
+                    tech_feasibility: {
+                      5: 'Proven pattern with known solution approach and mature technology',
+                      4: 'Well-understood use case; manageable accuracy/performance risk',
+                      3: 'Some tech uncertainty; validation required',
+                      2: 'Significant uncertainty; extensive experimentation needed',
+                      1: 'No evidence tech can reliably solve the problem'
+                    },
+                    interfaces: {
+                      5: 'Standalone; no interfaces',
+                      4: '1-2 standard interfaces to modern systems',
+                      3: '3-5 interfaces or one batch legacy integration',
+                      2: 'Several interfaces incl. core legacy such as ERP/MES',
+                      1: 'More than 5 interfaces incl. real-time core legacy'
+                    },
+                    delivery_dependencies: {
+                      5: 'No dependency on other use cases or planned enablers',
+                      4: 'Uses shared enablers already in production',
+                      3: 'Depends on committed enabler/use case; sequencing required',
+                      2: 'One blocking dependency on unbuilt enabler or not-started use case',
+                      1: 'Multiple blocking dependencies in a chain'
+                    },
+                    platform_fit: {
+                      5: 'Fits existing target architecture and approved platforms',
+                      4: 'Minor architecture adjustments required',
+                      3: 'Architecture decision required but options are clear',
+                      2: 'New platform/component likely required',
+                      1: 'Conflicts with target architecture or requires major platform decision'
+                    },
+                    time_to_value: {
+                      5: '< 3 months to first measurable value',
+                      4: '3-6 months to first measurable value',
+                      3: '6-12 months to first measurable value',
+                      2: '12-18 months to first measurable value',
+                      1: '> 18 months to first measurable value'
+                    },
+                    build_effort: {
+                      5: 'Small configuration or light build; existing components reused',
+                      4: 'Moderate build with limited custom development',
+                      3: 'Several components or model pipelines to build',
+                      2: 'Large build across multiple teams',
+                      1: 'Major program-level build effort'
+                    },
+                    change_adoption: {
+                      5: 'No process/method/tool change; adoption is tool activation',
+                      4: 'No process/method change, tool change only; limited training',
+                      3: 'Process change + tool change; training and adjustments required',
+                      2: 'Process + method + tool change; change program needed',
+                      1: 'New process, new method, new tool; dedicated change program'
+                    },
+                    rollout_complexity: {
+                      5: 'Single team / <10 users',
+                      4: 'One department / 10-50 users',
+                      3: 'Function or BU / 50-250 users',
+                      2: 'Division or multiple sites / 250-1,000 users',
+                      1: 'Enterprise-wide / >1,000 users'
+                    },
+                    risk_compliance: {
+                      5: 'No personal, customer, regulated or safety-critical data/use',
+                      4: 'Internal data only; low security or legal complexity',
+                      3: 'Sensitive internal data or standard security/privacy review needed',
+                      2: 'Personal/customer/regulated data or works council/legal review likely',
+                      1: 'High-risk or regulated AI use requiring extensive approval'
+                    }
+                  };
+                  const getScoreColor = (val) => val <= 2 ? '#ef4444' : val >= 4 ? '#22c55e' : '#f59e0b';
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                        {/* Data Readiness */}
+                        <div style={{ background: 'rgba(34, 197, 94, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                          <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#166534', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Data Readiness</h4>
+                          <div style={{ display: 'grid', gap: '10px', fontSize: '0.8rem' }}>
+                            {[
+                              { label: 'Data Existence', key: 'data_existence', value: viewingUseCase.data_existence },
+                              { label: 'Data Access', key: 'data_access', value: viewingUseCase.data_access },
+                              { label: 'Data Quality', key: 'data_quality', value: viewingUseCase.data_quality },
+                              { label: 'Data Ownership', key: 'data_ownership', value: viewingUseCase.data_ownership }
+                            ].map((item, idx) => (
+                              <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-base)', borderRadius: '6px', borderLeft: `3px solid ${getScoreColor(item.value || 3)}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.label}</span>
+                                  <span style={{ fontWeight: 700, color: getScoreColor(item.value || 3), fontSize: '0.85rem' }}>{item.value || 3}/5</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                                  {scoreDescriptions[item.key][item.value || 3]}
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
 
-                  {/* Technical Readiness */}
-                  <div style={{ background: 'rgba(168, 85, 247, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
-                    <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technical Readiness</h4>
-                    <div style={{ display: 'grid', gap: '8px', fontSize: '0.8rem' }}>
-                      {[
-                        { label: 'Tech Feasibility', value: viewingUseCase.tech_feasibility },
-                        { label: 'Interfaces', value: viewingUseCase.interfaces },
-                        { label: 'Dependencies', value: viewingUseCase.delivery_dependencies },
-                        { label: 'Platform Fit', value: viewingUseCase.platform_fit }
-                      ].map((item, idx) => (
-                        <div key={idx} style={{ padding: '6px 0', borderBottom: idx < 3 ? '1px solid var(--border-light)' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ color: 'var(--text-muted)' }}>{item.label}</span>
-                          <div style={{ display: 'flex', gap: '4px' }}>
-                            {[1,2,3,4,5].map(n => (
-                              <span key={n} style={{ width: '18px', height: '18px', borderRadius: '50%', background: (item.value || 3) >= n ? '#a855f7' : 'var(--border-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: (item.value || 3) >= n ? 'white' : 'var(--text-muted)' }}>{n}</span>
+                        {/* Technical Readiness */}
+                        <div style={{ background: 'rgba(168, 85, 247, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                          <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Technical Readiness</h4>
+                          <div style={{ display: 'grid', gap: '10px', fontSize: '0.8rem' }}>
+                            {[
+                              { label: 'Tech Feasibility', key: 'tech_feasibility', value: viewingUseCase.tech_feasibility },
+                              { label: 'Interfaces', key: 'interfaces', value: viewingUseCase.interfaces },
+                              { label: 'Dependencies', key: 'delivery_dependencies', value: viewingUseCase.delivery_dependencies },
+                              { label: 'Platform Fit', key: 'platform_fit', value: viewingUseCase.platform_fit }
+                            ].map((item, idx) => (
+                              <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-base)', borderRadius: '6px', borderLeft: `3px solid ${getScoreColor(item.value || 3)}` }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.label}</span>
+                                  <span style={{ fontWeight: 700, color: getScoreColor(item.value || 3), fontSize: '0.85rem' }}>{item.value || 3}/5</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                                  {scoreDescriptions[item.key][item.value || 3]}
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Effort Parameters */}
-                <div style={{ marginTop: '16px', background: 'rgba(249, 115, 22, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(249, 115, 22, 0.2)' }}>
-                  <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Effort & Risk</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '12px', fontSize: '0.8rem' }}>
-                    {[
-                      { label: 'Time to Value', value: viewingUseCase.time_to_value },
-                      { label: 'Build Effort', value: viewingUseCase.build_effort },
-                      { label: 'Change Adoption', value: viewingUseCase.change_adoption },
-                      { label: 'Rollout', value: viewingUseCase.rollout_complexity },
-                      { label: 'Risk/Compliance', value: viewingUseCase.risk_compliance }
-                    ].map((item, idx) => (
-                      <div key={idx} style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '1.4rem', fontWeight: 700, color: (item.value || 3) <= 2 ? '#ef4444' : (item.value || 3) >= 4 ? '#22c55e' : '#f59e0b' }}>{item.value || 3}</div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.label}</div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+
+                      {/* Effort Parameters */}
+                      <div style={{ marginTop: '16px', background: 'rgba(249, 115, 22, 0.05)', borderRadius: '10px', padding: '16px', border: '1px solid rgba(249, 115, 22, 0.2)' }}>
+                        <h4 style={{ margin: '0 0 12px', fontSize: '0.85rem', color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Effort & Risk</h4>
+                        <div style={{ display: 'grid', gap: '10px', fontSize: '0.8rem' }}>
+                          {[
+                            { label: 'Time to Value', key: 'time_to_value', value: viewingUseCase.time_to_value },
+                            { label: 'Build Effort', key: 'build_effort', value: viewingUseCase.build_effort },
+                            { label: 'Change & Adoption', key: 'change_adoption', value: viewingUseCase.change_adoption },
+                            { label: 'Rollout Complexity', key: 'rollout_complexity', value: viewingUseCase.rollout_complexity },
+                            { label: 'Risk & Compliance', key: 'risk_compliance', value: viewingUseCase.risk_compliance }
+                          ].map((item, idx) => (
+                            <div key={idx} style={{ padding: '8px 10px', background: 'var(--bg-base)', borderRadius: '6px', borderLeft: `3px solid ${getScoreColor(item.value || 3)}` }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.label}</span>
+                                <span style={{ fontWeight: 700, color: getScoreColor(item.value || 3), fontSize: '0.85rem' }}>{item.value || 3}/5</span>
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                                {scoreDescriptions[item.key][item.value || 3]}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
 
                 {/* Admin Notes */}
                 {viewingUseCase.admin_notes && (
