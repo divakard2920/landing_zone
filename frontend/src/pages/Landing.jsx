@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
@@ -177,6 +177,15 @@ function Landing() {
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const chatMessagesRef = useRef(null);
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+    }
+  }, [chatMessages, chatLoading]);
+
   const [feedback, setFeedback] = useState({
     name: '',
     email: '',
@@ -2538,7 +2547,7 @@ function Landing() {
                 </button>
               </div>
             </div>
-          <div className="ai-chat-messages">
+          <div className="ai-chat-messages" ref={chatMessagesRef}>
             {chatMessages.length === 0 && (
               <div className="ai-chat-empty">
                 <div className="ai-chat-capybara">
