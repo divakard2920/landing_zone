@@ -750,6 +750,113 @@ function Admin() {
     quadrantThresholds: { highValue: 3.5, lowEffort: 3.5 }
   };
 
+  // Score descriptions for display and export
+  const SCORE_DESCRIPTIONS = {
+    value_confidence: {
+      5: 'Value already proven with baseline measurements or production evidence',
+      4: 'Strong benchmark, internal evidence or comparable use case exists',
+      3: 'Benefit plausible but key assumptions still unvalidated',
+      2: 'Value mostly estimated; baseline unclear',
+      1: 'No quantified value or no value owner'
+    },
+    data_existence: {
+      5: 'All critical data exists with right granularity and sufficient history',
+      4: 'Core data exists; only minor peripheral gaps',
+      3: 'Core data exists but relevant gaps in periods, locations or fields',
+      2: 'Major data parts missing or fragmented across silos',
+      1: 'Data largely does not exist; paper, unstructured or tribal knowledge'
+    },
+    data_access: {
+      5: 'Data accessible for AI use; permissions, legal basis and security clear',
+      4: 'Access mostly clear; minor approval steps needed',
+      3: 'Access path exists but approvals/security review required',
+      2: 'Access unclear or restricted; legal/security issues likely',
+      1: 'Data cannot be used for this purpose under current constraints'
+    },
+    data_quality: {
+      5: 'Quality measured and good; data trusted and already productively used',
+      4: 'Quality known and acceptable; limited cleansing/mapping required',
+      3: 'Quality not measured; sampling shows inconsistencies',
+      2: 'Quality poor; duplicates, inconsistencies, missing stewardship',
+      1: 'Quality so poor that re-collection may be cheaper than cleansing'
+    },
+    data_ownership: {
+      5: 'Data owner, steward, definitions and refresh rhythm clearly defined',
+      4: 'Owner and refresh rhythm known; minor definition gaps',
+      3: 'Owner exists but definitions or stewardship are incomplete',
+      2: 'Ownership unclear; no reliable refresh or issue handling',
+      1: 'No accountable owner or governance model'
+    },
+    tech_feasibility: {
+      5: 'Proven pattern with known solution approach and mature technology',
+      4: 'Well-understood use case; manageable accuracy/performance risk',
+      3: 'Some tech uncertainty; validation required',
+      2: 'Significant uncertainty; extensive experimentation needed',
+      1: 'No evidence tech can reliably solve the problem'
+    },
+    interfaces: {
+      5: 'Standalone; no interfaces',
+      4: '1-2 standard interfaces to modern systems',
+      3: '3-5 interfaces or one batch legacy integration',
+      2: 'Several interfaces incl. core legacy such as ERP/MES',
+      1: 'More than 5 interfaces incl. real-time core legacy'
+    },
+    delivery_dependencies: {
+      5: 'No dependency on other use cases or planned enablers',
+      4: 'Uses shared enablers already in production',
+      3: 'Depends on committed enabler/use case; sequencing required',
+      2: 'One blocking dependency on unbuilt enabler or not-started use case',
+      1: 'Multiple blocking dependencies in a chain'
+    },
+    platform_fit: {
+      5: 'Fits existing target architecture and approved platforms',
+      4: 'Minor architecture adjustments required',
+      3: 'Architecture decision required but options are clear',
+      2: 'New platform/component likely required',
+      1: 'Conflicts with target architecture or requires major platform decision'
+    },
+    time_to_value: {
+      5: '< 3 months to first measurable value',
+      4: '3-6 months to first measurable value',
+      3: '6-12 months to first measurable value',
+      2: '12-18 months to first measurable value',
+      1: '> 18 months to first measurable value'
+    },
+    build_effort: {
+      5: 'Small configuration or light build; existing components reused',
+      4: 'Moderate build with limited custom development',
+      3: 'Several components or model pipelines to build',
+      2: 'Large build across multiple teams',
+      1: 'Major program-level build effort'
+    },
+    change_adoption: {
+      5: 'No process/method/tool change; adoption is tool activation',
+      4: 'No process/method change, tool change only; limited training',
+      3: 'Process change + tool change; training and adjustments required',
+      2: 'Process + method + tool change; change program needed',
+      1: 'New process, new method, new tool; dedicated change program'
+    },
+    rollout_complexity: {
+      5: 'Single team / <10 users',
+      4: 'One department / 10-50 users',
+      3: 'Function or BU / 50-250 users',
+      2: 'Division or multiple sites / 250-1,000 users',
+      1: 'Enterprise-wide / >1,000 users'
+    },
+    risk_compliance: {
+      5: 'No personal, customer, regulated or safety-critical data/use',
+      4: 'Internal data only; low security or legal complexity',
+      3: 'Sensitive internal data or standard security/privacy review needed',
+      2: 'Personal/customer/regulated data or works council/legal review likely',
+      1: 'High-risk or regulated AI use requiring extensive approval'
+    }
+  };
+
+  const getScoreDescription = (field, value) => {
+    const score = parseInt(value) || 3;
+    return SCORE_DESCRIPTIONS[field]?.[score] || `Score ${score}`;
+  };
+
   const calculateUseCaseScores = (form) => {
     // Calculate EBIT total (in millions)
     const ebitTotal = (parseFloat(form.efficiency_savings) || 0) +
@@ -985,20 +1092,20 @@ function Admin() {
         { header: 'Efficiency Savings', key: 'efficiency_savings', width: 15 },
         { header: 'Revenue Uplift', key: 'revenue_uplift', width: 15 },
         { header: 'Cost Avoidance', key: 'cost_avoidance', width: 15 },
-        { header: 'Value Confidence', key: 'value_confidence', width: 15 },
-        { header: 'Data Existence', key: 'data_existence', width: 12 },
-        { header: 'Data Access', key: 'data_access', width: 12 },
-        { header: 'Data Quality', key: 'data_quality', width: 12 },
-        { header: 'Data Ownership', key: 'data_ownership', width: 12 },
-        { header: 'Tech Feasibility', key: 'tech_feasibility', width: 15 },
-        { header: 'Interfaces', key: 'interfaces', width: 12 },
-        { header: 'Dependencies', key: 'delivery_dependencies', width: 12 },
-        { header: 'Platform Fit', key: 'platform_fit', width: 12 },
-        { header: 'Time to Value', key: 'time_to_value', width: 12 },
-        { header: 'Build Effort', key: 'build_effort', width: 12 },
-        { header: 'Change Adoption', key: 'change_adoption', width: 15 },
-        { header: 'Rollout Complexity', key: 'rollout_complexity', width: 15 },
-        { header: 'Risk Compliance', key: 'risk_compliance', width: 15 },
+        { header: 'Value Confidence', key: 'value_confidence', width: 50 },
+        { header: 'Data Existence', key: 'data_existence', width: 50 },
+        { header: 'Data Access', key: 'data_access', width: 50 },
+        { header: 'Data Quality', key: 'data_quality', width: 50 },
+        { header: 'Data Ownership', key: 'data_ownership', width: 50 },
+        { header: 'Tech Feasibility', key: 'tech_feasibility', width: 50 },
+        { header: 'Interfaces', key: 'interfaces', width: 45 },
+        { header: 'Dependencies', key: 'delivery_dependencies', width: 50 },
+        { header: 'Platform Fit', key: 'platform_fit', width: 50 },
+        { header: 'Time to Value', key: 'time_to_value', width: 35 },
+        { header: 'Build Effort', key: 'build_effort', width: 45 },
+        { header: 'Change Adoption', key: 'change_adoption', width: 50 },
+        { header: 'Rollout Complexity', key: 'rollout_complexity', width: 35 },
+        { header: 'Risk Compliance', key: 'risk_compliance', width: 50 },
       ];
 
       worksheet.getRow(1).font = { bold: true };
@@ -1027,20 +1134,20 @@ function Admin() {
           efficiency_savings: uc.efficiency_savings,
           revenue_uplift: uc.revenue_uplift,
           cost_avoidance: uc.cost_avoidance,
-          value_confidence: uc.value_confidence,
-          data_existence: uc.data_existence,
-          data_access: uc.data_access,
-          data_quality: uc.data_quality,
-          data_ownership: uc.data_ownership,
-          tech_feasibility: uc.tech_feasibility,
-          interfaces: uc.interfaces,
-          delivery_dependencies: uc.delivery_dependencies,
-          platform_fit: uc.platform_fit,
-          time_to_value: uc.time_to_value,
-          build_effort: uc.build_effort,
-          change_adoption: uc.change_adoption,
-          rollout_complexity: uc.rollout_complexity,
-          risk_compliance: uc.risk_compliance,
+          value_confidence: getScoreDescription('value_confidence', uc.value_confidence),
+          data_existence: getScoreDescription('data_existence', uc.data_existence),
+          data_access: getScoreDescription('data_access', uc.data_access),
+          data_quality: getScoreDescription('data_quality', uc.data_quality),
+          data_ownership: getScoreDescription('data_ownership', uc.data_ownership),
+          tech_feasibility: getScoreDescription('tech_feasibility', uc.tech_feasibility),
+          interfaces: getScoreDescription('interfaces', uc.interfaces),
+          delivery_dependencies: getScoreDescription('delivery_dependencies', uc.delivery_dependencies),
+          platform_fit: getScoreDescription('platform_fit', uc.platform_fit),
+          time_to_value: getScoreDescription('time_to_value', uc.time_to_value),
+          build_effort: getScoreDescription('build_effort', uc.build_effort),
+          change_adoption: getScoreDescription('change_adoption', uc.change_adoption),
+          rollout_complexity: getScoreDescription('rollout_complexity', uc.rollout_complexity),
+          risk_compliance: getScoreDescription('risk_compliance', uc.risk_compliance),
         });
       });
 
@@ -3008,99 +3115,6 @@ function Admin() {
 
                 {/* Scores Grid */}
                 {(() => {
-                  const scoreDescriptions = {
-                    data_existence: {
-                      5: 'All critical data exists with right granularity and sufficient history',
-                      4: 'Core data exists; only minor peripheral gaps',
-                      3: 'Core data exists but relevant gaps in periods, locations or fields',
-                      2: 'Major data parts missing or fragmented across silos',
-                      1: 'Data largely does not exist; paper, unstructured or tribal knowledge'
-                    },
-                    data_access: {
-                      5: 'Data accessible for AI use; permissions, legal basis and security clear',
-                      4: 'Access mostly clear; minor approval steps needed',
-                      3: 'Access path exists but approvals/security review required',
-                      2: 'Access unclear or restricted; legal/security issues likely',
-                      1: 'Data cannot be used for this purpose under current constraints'
-                    },
-                    data_quality: {
-                      5: 'Quality measured and good; data trusted and already productively used',
-                      4: 'Quality known and acceptable; limited cleansing/mapping required',
-                      3: 'Quality not measured; sampling shows inconsistencies',
-                      2: 'Quality poor; duplicates, inconsistencies, missing stewardship',
-                      1: 'Quality so poor that re-collection may be cheaper than cleansing'
-                    },
-                    data_ownership: {
-                      5: 'Data owner, steward, definitions and refresh rhythm clearly defined',
-                      4: 'Owner and refresh rhythm known; minor definition gaps',
-                      3: 'Owner exists but definitions or stewardship are incomplete',
-                      2: 'Ownership unclear; no reliable refresh or issue handling',
-                      1: 'No accountable owner or governance model'
-                    },
-                    tech_feasibility: {
-                      5: 'Proven pattern with known solution approach and mature technology',
-                      4: 'Well-understood use case; manageable accuracy/performance risk',
-                      3: 'Some tech uncertainty; validation required',
-                      2: 'Significant uncertainty; extensive experimentation needed',
-                      1: 'No evidence tech can reliably solve the problem'
-                    },
-                    interfaces: {
-                      5: 'Standalone; no interfaces',
-                      4: '1-2 standard interfaces to modern systems',
-                      3: '3-5 interfaces or one batch legacy integration',
-                      2: 'Several interfaces incl. core legacy such as ERP/MES',
-                      1: 'More than 5 interfaces incl. real-time core legacy'
-                    },
-                    delivery_dependencies: {
-                      5: 'No dependency on other use cases or planned enablers',
-                      4: 'Uses shared enablers already in production',
-                      3: 'Depends on committed enabler/use case; sequencing required',
-                      2: 'One blocking dependency on unbuilt enabler or not-started use case',
-                      1: 'Multiple blocking dependencies in a chain'
-                    },
-                    platform_fit: {
-                      5: 'Fits existing target architecture and approved platforms',
-                      4: 'Minor architecture adjustments required',
-                      3: 'Architecture decision required but options are clear',
-                      2: 'New platform/component likely required',
-                      1: 'Conflicts with target architecture or requires major platform decision'
-                    },
-                    time_to_value: {
-                      5: '< 3 months to first measurable value',
-                      4: '3-6 months to first measurable value',
-                      3: '6-12 months to first measurable value',
-                      2: '12-18 months to first measurable value',
-                      1: '> 18 months to first measurable value'
-                    },
-                    build_effort: {
-                      5: 'Small configuration or light build; existing components reused',
-                      4: 'Moderate build with limited custom development',
-                      3: 'Several components or model pipelines to build',
-                      2: 'Large build across multiple teams',
-                      1: 'Major program-level build effort'
-                    },
-                    change_adoption: {
-                      5: 'No process/method/tool change; adoption is tool activation',
-                      4: 'No process/method change, tool change only; limited training',
-                      3: 'Process change + tool change; training and adjustments required',
-                      2: 'Process + method + tool change; change program needed',
-                      1: 'New process, new method, new tool; dedicated change program'
-                    },
-                    rollout_complexity: {
-                      5: 'Single team / <10 users',
-                      4: 'One department / 10-50 users',
-                      3: 'Function or BU / 50-250 users',
-                      2: 'Division or multiple sites / 250-1,000 users',
-                      1: 'Enterprise-wide / >1,000 users'
-                    },
-                    risk_compliance: {
-                      5: 'No personal, customer, regulated or safety-critical data/use',
-                      4: 'Internal data only; low security or legal complexity',
-                      3: 'Sensitive internal data or standard security/privacy review needed',
-                      2: 'Personal/customer/regulated data or works council/legal review likely',
-                      1: 'High-risk or regulated AI use requiring extensive approval'
-                    }
-                  };
                   const getScoreColor = (val) => val <= 2 ? '#ef4444' : val >= 4 ? '#22c55e' : '#f59e0b';
                   return (
                     <>
@@ -3121,7 +3135,7 @@ function Admin() {
                                   <span style={{ fontWeight: 700, color: getScoreColor(item.value || 3), fontSize: '0.85rem' }}>{item.value || 3}/5</span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
-                                  {scoreDescriptions[item.key][item.value || 3]}
+                                  {SCORE_DESCRIPTIONS[item.key]?.[item.value || 3] || `Score ${item.value || 3}`}
                                 </div>
                               </div>
                             ))}
@@ -3144,7 +3158,7 @@ function Admin() {
                                   <span style={{ fontWeight: 700, color: getScoreColor(item.value || 3), fontSize: '0.85rem' }}>{item.value || 3}/5</span>
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
-                                  {scoreDescriptions[item.key][item.value || 3]}
+                                  {SCORE_DESCRIPTIONS[item.key]?.[item.value || 3] || `Score ${item.value || 3}`}
                                 </div>
                               </div>
                             ))}
@@ -3169,7 +3183,7 @@ function Admin() {
                                 <span style={{ fontWeight: 700, color: getScoreColor(item.value || 3), fontSize: '0.85rem' }}>{item.value || 3}/5</span>
                               </div>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
-                                {scoreDescriptions[item.key][item.value || 3]}
+                                {SCORE_DESCRIPTIONS[item.key]?.[item.value || 3] || `Score ${item.value || 3}`}
                               </div>
                             </div>
                           ))}
