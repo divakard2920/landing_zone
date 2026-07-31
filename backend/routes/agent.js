@@ -867,41 +867,40 @@ router.post('/chat', async (req, res) => {
           const richContent = await executeFunction(toolCall.function.name, args, { doiStages });
 
           if (richContent) {
-            let textContent = '';
-            switch (richContent.type) {
-              case 'projects':
-                textContent = `Found ${richContent.total} project${richContent.total !== 1 ? 's' : ''}${richContent.showing < richContent.total ? ` (showing ${richContent.showing})` : ''}.`;
-                break;
-              case 'stats':
-              case 'stats_overview':
-                textContent = 'Here are the statistics:';
-                break;
-              case 'project_detail':
-                textContent = `Here are the details for ${richContent.data.name}:`;
-                break;
-              case 'not_found':
-                textContent = `I couldn't find a project matching "${richContent.query}". Please check the name and try again.`;
-                break;
-              case 'intake_submitted':
-                textContent = `Use case "${richContent.data.idea_name}" has been submitted successfully! Classified as: ${richContent.data.solution_approach}. Quadrant: ${richContent.data.sizing.quadrant}, Effort: ${richContent.data.sizing.effortSize}, Value: ${richContent.data.sizing.valueSize}.`;
-                break;
-              case 'intake_error':
-                textContent = `Error submitting use case: ${richContent.error}`;
-                break;
-              case 'sizing_result':
-                textContent = `T-Shirt Sizing: Effort ${richContent.data.effortSize} (score: ${richContent.data.effortScore}), Value ${richContent.data.valueSize} (score: ${richContent.data.valueScore}). Quadrant: ${richContent.data.quadrant}. ${richContent.data.recommendation}`;
-                break;
-              case 'intake_summary':
-                textContent = `Summary for "${richContent.data.idea_name}" - Classified as: ${richContent.data.solution_approach}`;
-                break;
-            }
-
-            if (textContent && !fullContent) {
-              res.write(`data: ${JSON.stringify({ type: 'text', content: textContent })}\n\n`);
-            }
-
+            // Show the rich content first
             if (richContent.type !== 'not_found') {
               res.write(`data: ${JSON.stringify({ type: 'rich', content: richContent })}\n\n`);
+            }
+
+            // Make a follow-up call to let LLM respond to the tool results
+            const toolResultSummary = richContent.type === 'projects'
+              ? `Found ${richContent.total} similar project(s): ${richContent.data.map(p => p.name).join(', ')}`
+              : richContent.type === 'not_found'
+              ? 'No similar projects found.'
+              : JSON.stringify(richContent.data || richContent);
+
+            const followUpMessages = [
+              ...messages,
+              { role: 'assistant', content: fullContent || '', tool_calls: [{ id: toolCall.id, type: 'function', function: { name: toolCall.function.name, arguments: toolCall.function.arguments } }] },
+              { role: 'tool', tool_call_id: toolCall.id, content: toolResultSummary }
+            ];
+
+            const followUpStream = await client.chat.completions.create({
+              model: AZURE_OPENAI_DEPLOYMENT,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                ...followUpMessages
+              ],
+              temperature: 0.7,
+              max_tokens: 500,
+              stream: true
+            });
+
+            for await (const chunk of followUpStream) {
+              const delta = chunk.choices[0]?.delta;
+              if (delta?.content) {
+                res.write(`data: ${JSON.stringify({ type: 'text', content: delta.content })}\n\n`);
+              }
             }
           }
         } catch (e) {
