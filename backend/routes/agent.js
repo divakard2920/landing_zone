@@ -780,7 +780,6 @@ Share these alternatives naturally during conversation to help users make inform
 
 ## When to Use Tools vs Text
 USE TOOLS when user asks to "show", "list", "display", for intake submission, or checking similar projects
-ALWAYS respond with text alongside tool results to maintain conversation flow
 
 ## Guidelines
 - Answer questions using the relevant projects provided
@@ -822,6 +821,7 @@ router.post('/chat', async (req, res) => {
       ],
       tools,
       tool_choice: 'auto',
+      parallel_tool_calls: false,
       temperature: 0.7,
       max_tokens: 2000,
       stream: true
