@@ -413,6 +413,19 @@ function Landing() {
     setFeedback({ ...feedback, [e.target.name]: e.target.value });
   };
 
+  // Prepare messages for API - include richContent in content for LLM context
+  const prepareMessagesForApi = (msgs) => {
+    return msgs.map(msg => {
+      if (msg.role === 'assistant' && msg.richContent) {
+        return {
+          role: msg.role,
+          content: (msg.content || '') + '\n[Tool Result: ' + JSON.stringify(msg.richContent) + ']'
+        };
+      }
+      return { role: msg.role, content: msg.content };
+    });
+  };
+
   const sendChatMessage = async () => {
     if (!chatInput.trim() || chatLoading) return;
     const userMessage = { role: 'user', content: chatInput.trim() };
@@ -428,7 +441,7 @@ function Landing() {
       const response = await fetch('/api/agent/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...chatMessages, userMessage] })
+        body: JSON.stringify({ messages: prepareMessagesForApi([...chatMessages, userMessage]) })
       });
 
       const reader = response.body.getReader();
