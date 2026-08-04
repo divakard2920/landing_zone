@@ -2301,15 +2301,21 @@ function Admin() {
                       </span>
                     </td>
                     <td>
-                      <span style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 500,
-                        color: uc.quadrant === 'Quick Win' ? '#166534' :
-                               uc.quadrant === 'Reconsider' ? '#991b1b' : 'var(--text-primary)',
-                        display: 'block',
-                        maxWidth: '200px',
-                        lineHeight: 1.3
-                      }}>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          color: uc.quadrant === 'Quick Win' ? '#166534' :
+                                 uc.quadrant === 'Reconsider' ? '#991b1b' : 'var(--text-primary)',
+                          display: 'block',
+                          maxWidth: '250px',
+                          lineHeight: 1.3,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={uc.recommended_action || ''}
+                      >
                         {uc.recommended_action || '-'}
                       </span>
                     </td>
