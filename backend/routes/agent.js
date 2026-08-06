@@ -566,7 +566,8 @@ const executeFunction = async (functionName, args, context) => {
           motivation: args.motivation,
           description_target: args.description_target,
           solution_approach: args.solution_approach,
-          sizing_preview: args.sizing_preview
+          sizing_preview: args.sizing_preview,
+          status: 'PREVIEW_ONLY_NOT_SUBMITTED'
         }
       };
     }
@@ -875,6 +876,10 @@ router.post('/chat', async (req, res) => {
               ? `Found ${richContent.total} similar project(s): ${richContent.data.map(p => p.name).join(', ')}`
               : richContent.type === 'not_found'
               ? 'No similar projects found.'
+              : richContent.type === 'intake_summary'
+              ? `PREVIEW ONLY - Use case "${richContent.data.idea_name}" details shown but NOT YET SUBMITTED. Call submit_use_case_intake to actually submit.`
+              : richContent.type === 'intake_submitted'
+              ? `SUBMITTED: Use case "${richContent.data.idea_name}" saved to database with ID ${richContent.data.id}`
               : JSON.stringify(richContent.data || richContent);
 
             const followUpMessages = [
