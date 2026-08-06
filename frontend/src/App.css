@@ -2709,6 +2709,54 @@ body {
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
 }
 
+.fab-menu-item-ai {
+  background: linear-gradient(135deg, rgba(0, 69, 126, 0.08) 0%, rgba(0, 69, 126, 0.03) 100%);
+  border: 1px solid rgba(0, 69, 126, 0.15);
+}
+
+.fab-menu-item-ai:hover {
+  background: linear-gradient(135deg, rgba(0, 69, 126, 0.12) 0%, rgba(0, 69, 126, 0.06) 100%);
+  border-color: rgba(0, 69, 126, 0.25);
+}
+
+[data-theme="dark"] .fab-menu-item-ai {
+  background: linear-gradient(135deg, rgba(100, 150, 200, 0.1) 0%, rgba(100, 150, 200, 0.05) 100%);
+  border: 1px solid rgba(100, 150, 200, 0.2);
+}
+
+[data-theme="dark"] .fab-menu-item-ai:hover {
+  background: linear-gradient(135deg, rgba(100, 150, 200, 0.15) 0%, rgba(100, 150, 200, 0.08) 100%);
+}
+
+.fab-menu-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #f5f0eb 0%, #e8ddd4 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(139, 115, 85, 0.2);
+}
+
+[data-theme="dark"] .fab-menu-avatar {
+  background: linear-gradient(145deg, #4a4035 0%, #3d352c 100%);
+}
+
+.fab-ai-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #00457E 0%, #003366 100%);
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.03em;
+}
+
 /* AI Chat Panel - Full Screen Modal */
 .ai-chat-overlay {
   position: fixed;

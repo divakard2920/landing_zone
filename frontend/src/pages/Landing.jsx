@@ -2481,10 +2481,11 @@ function Landing() {
             <path d="M18 6L6 18M6 6l12 12"/>
           </svg>
         ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-            <path d="M12 17h.01"/>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/>
+            <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>
+            <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/>
+            <path d="M12 18v-5"/>
           </svg>
         )}
       </button>
@@ -2492,18 +2493,25 @@ function Landing() {
       {/* FAB Menu */}
       {showFabMenu && !showChatPanel && !showSupportModal && (
         <div className="fab-menu">
-          <button className="fab-menu-item" onClick={() => { setShowChatPanel(true); setShowFabMenu(false); }}>
-            <div className="fab-menu-icon fab-menu-icon-blue">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          <button className="fab-menu-item fab-menu-item-ai" onClick={() => { setShowChatPanel(true); setShowFabMenu(false); }}>
+            <div className="fab-menu-avatar">
+              <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="50" cy="60" rx="35" ry="25" fill="#8B7355"/>
+                <ellipse cx="50" cy="35" rx="28" ry="22" fill="#A0826D"/>
+                <ellipse cx="50" cy="45" rx="18" ry="12" fill="#C4A484"/>
+                <ellipse cx="50" cy="42" rx="6" ry="4" fill="#4A3728"/>
+                <circle cx="38" cy="30" r="5" fill="#2C1810"/>
+                <circle cx="39" cy="29" r="2" fill="#FFF"/>
+                <circle cx="62" cy="30" r="5" fill="#2C1810"/>
+                <circle cx="63" cy="29" r="2" fill="#FFF"/>
+                <ellipse cx="28" cy="22" rx="8" ry="6" fill="#8B7355"/>
+                <ellipse cx="72" cy="22" rx="8" ry="6" fill="#8B7355"/>
+                <path d="M44 48 Q50 52 56 48" stroke="#4A3728" strokeWidth="2" fill="none" strokeLinecap="round"/>
               </svg>
-              <span className="fab-ai-badge">AI</span>
             </div>
             <div className="fab-menu-text">
-              <div className="fab-menu-title">Project Assistant</div>
-              <div className="fab-menu-subtitle">Ask anything about projects</div>
+              <div className="fab-menu-title">Ask KBase</div>
             </div>
-            <svg className="fab-menu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
           </button>
           <button className="fab-menu-item" onClick={() => { setShowSupportModal(true); setShowFabMenu(false); }}>
             <div className="fab-menu-icon fab-menu-icon-green">
@@ -2512,10 +2520,8 @@ function Landing() {
               </svg>
             </div>
             <div className="fab-menu-text">
-              <div className="fab-menu-title">Support / Feedback</div>
-              <div className="fab-menu-subtitle">Send us a message</div>
+              <div className="fab-menu-title">Feedback</div>
             </div>
-            <svg className="fab-menu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
       )}
