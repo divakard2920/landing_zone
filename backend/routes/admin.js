@@ -1657,4 +1657,52 @@ router.delete('/use-case-intake/:id', async (req, res) => {
   }
 });
 
+// Project Updates
+router.get('/apps/:id/updates', async (req, res) => {
+  try {
+    const updates = await queryAll(
+      'SELECT * FROM project_updates WHERE app_id = $1 ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json(updates);
+  } catch (error) {
+    console.error('Error fetching project updates:', error);
+    res.status(500).json({ error: 'Failed to fetch updates' });
+  }
+});
+
+router.post('/apps/:id/updates', async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    const adminId = req.admin?.id || null;
+    const adminName = req.admin?.name || 'Admin';
+
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    const id = uuidv4();
+    await query(
+      'INSERT INTO project_updates (id, app_id, title, content, admin_id, admin_name) VALUES ($1, $2, $3, $4, $5, $6)',
+      [id, req.params.id, title || null, content, adminId, adminName]
+    );
+
+    const update = await queryOne('SELECT * FROM project_updates WHERE id = $1', [id]);
+    res.status(201).json(update);
+  } catch (error) {
+    console.error('Error creating project update:', error);
+    res.status(500).json({ error: 'Failed to create update' });
+  }
+});
+
+router.delete('/apps/:id/updates/:updateId', async (req, res) => {
+  try {
+    await query('DELETE FROM project_updates WHERE id = $1 AND app_id = $2', [req.params.updateId, req.params.id]);
+    res.json({ message: 'Update deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting project update:', error);
+    res.status(500).json({ error: 'Failed to delete update' });
+  }
+});
+
 module.exports = router;

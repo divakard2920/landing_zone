@@ -77,6 +77,8 @@ function Landing() {
   const [selectedApp, setSelectedApp] = useState(null);
   const [doiHistory, setDoiHistory] = useState([]);
   const [allDoiHistory, setAllDoiHistory] = useState([]);
+  const [projectUpdates, setProjectUpdates] = useState([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
   const [hoveredTimelineProject, setHoveredTimelineProject] = useState(null);
   const [timelineDoiFilter, setTimelineDoiFilter] = useState('all');
   const [timelineExpanded, setTimelineExpanded] = useState(false);
@@ -353,12 +355,23 @@ function Landing() {
   useEffect(() => {
     if (selectedApp) {
       setDoiLoading(true);
-      api.getDoiHistory(selectedApp.id)
-        .then(res => setDoiHistory(res.data))
-        .catch(err => console.error('Failed to load DOI history:', err))
-        .finally(() => setDoiLoading(false));
+      setUpdatesLoading(true);
+      Promise.all([
+        api.getDoiHistory(selectedApp.id),
+        api.public.getProjectUpdates(selectedApp.id)
+      ])
+        .then(([doiRes, updatesRes]) => {
+          setDoiHistory(doiRes.data);
+          setProjectUpdates(updatesRes.data);
+        })
+        .catch(err => console.error('Failed to load project data:', err))
+        .finally(() => {
+          setDoiLoading(false);
+          setUpdatesLoading(false);
+        });
     } else {
       setDoiHistory([]);
+      setProjectUpdates([]);
     }
   }, [selectedApp]);
 
@@ -2440,6 +2453,44 @@ function Landing() {
                       </div>
                     ))}
                   </div>
+                  )}
+                </div>
+              )}
+
+              {/* Project Updates */}
+              {(updatesLoading || projectUpdates.length > 0) && (
+                <div className="slider-section">
+                  <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 20h9"/>
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                    </svg>
+                    Project Updates
+                  </h4>
+                  {updatesLoading ? (
+                    <div className="skeleton-timeline">
+                      <div className="skeleton-item"><div className="skeleton-dot"></div><div className="skeleton-text"></div></div>
+                      <div className="skeleton-item"><div className="skeleton-dot"></div><div className="skeleton-text"></div></div>
+                    </div>
+                  ) : (
+                    <div className="project-updates-timeline">
+                      {projectUpdates.map((update, idx) => (
+                        <div key={update.id} className="update-timeline-item">
+                          <div className="update-timeline-marker">
+                            <span className="update-dot">{projectUpdates.length - idx}</span>
+                            {idx < projectUpdates.length - 1 && <div className="update-timeline-line" />}
+                          </div>
+                          <div className="update-timeline-content">
+                            {update.title && <div className="update-title">{update.title}</div>}
+                            <div className="update-text">{update.content}</div>
+                            <div className="update-meta">
+                              <span className="update-author">{update.admin_name}</span>
+                              <span className="update-date">{formatDate(update.created_at, true)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}

@@ -263,6 +263,17 @@ const initDb = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS project_updates (
+        id TEXT PRIMARY KEY,
+        app_id TEXT NOT NULL,
+        title TEXT,
+        content TEXT NOT NULL,
+        admin_id TEXT,
+        admin_name TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+      );
     `);
 
     // Migration: Add admin_notes column to use_case_intake if it doesn't exist

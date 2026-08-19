@@ -211,4 +211,18 @@ router.post('/app-requests', async (req, res) => {
   }
 });
 
+// Project Updates (public read-only)
+router.get('/apps/:id/updates', async (req, res) => {
+  try {
+    const updates = await queryAll(
+      'SELECT id, app_id, title, content, admin_name, created_at FROM project_updates WHERE app_id = $1 ORDER BY created_at DESC',
+      [req.params.id]
+    );
+    res.json(updates);
+  } catch (error) {
+    console.error('Error fetching project updates:', error);
+    res.status(500).json({ error: 'Failed to fetch updates' });
+  }
+});
+
 module.exports = router;

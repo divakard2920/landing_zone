@@ -2300,6 +2300,89 @@ body {
   border-radius: 4px;
 }
 
+/* Project Updates Timeline */
+.project-updates-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 4px 0;
+}
+
+.update-timeline-item {
+  display: flex;
+  gap: 12px;
+  position: relative;
+}
+
+.update-timeline-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.update-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: var(--brand-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.7rem;
+  z-index: 1;
+}
+
+.update-timeline-line {
+  width: 2px;
+  flex: 1;
+  min-height: 20px;
+  background-color: var(--border-dark);
+  margin: 4px 0;
+}
+
+.update-timeline-content {
+  flex: 1;
+  padding-bottom: 16px;
+}
+
+.update-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.update-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.update-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.update-author {
+  font-weight: 500;
+}
+
+.update-date {
+  opacity: 0.8;
+}
+
+.update-date::before {
+  content: '•';
+  margin-right: 8px;
+}
+
 @media (max-width: 900px) {
   .dashboard-cards {
     grid-template-columns: repeat(2, 1fr);

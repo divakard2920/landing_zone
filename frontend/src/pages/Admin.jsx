@@ -91,6 +91,9 @@ function Admin() {
   const [deletedProjects, setDeletedProjects] = useState([]);
   const [projectDoiHistory, setProjectDoiHistory] = useState([]);
   const [requesterInput, setRequesterInput] = useState('');
+  const [projectUpdates, setProjectUpdates] = useState([]);
+  const [updateForm, setUpdateForm] = useState({ title: '', content: '' });
+  const [savingUpdate, setSavingUpdate] = useState(false);
 
   const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '', type: 'info' });
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
@@ -476,13 +479,51 @@ function Admin() {
     setEditingProject(project);
     setProjectForm({ ...emptyProjectForm, ...project, doi_changed_at: '' });
     setRequesterInput('');
+    setProjectUpdates([]);
+    setUpdateForm({ title: '', content: '' });
     setShowProjectModal(true);
     try {
-      const res = await api.getDoiHistory(project.id);
-      setProjectDoiHistory(res.data);
+      const [doiRes, updatesRes] = await Promise.all([
+        api.getDoiHistory(project.id),
+        api.admin.getProjectUpdates(project.id)
+      ]);
+      setProjectDoiHistory(doiRes.data);
+      setProjectUpdates(updatesRes.data);
     } catch (error) {
-      console.error('Failed to load DOI history:', error);
+      console.error('Failed to load project data:', error);
       setProjectDoiHistory([]);
+      setProjectUpdates([]);
+    }
+  };
+
+  const handleAddProjectUpdate = async () => {
+    if (!updateForm.content.trim() || !editingProject) return;
+    setSavingUpdate(true);
+    try {
+      await api.admin.createProjectUpdate(editingProject.id, {
+        title: updateForm.title.trim(),
+        content: updateForm.content.trim()
+      });
+      const res = await api.admin.getProjectUpdates(editingProject.id);
+      setProjectUpdates(res.data);
+      setUpdateForm({ title: '', content: '' });
+      showToast('Update posted', 'success');
+      logActivity('posted update', 'project', editingProject.id, editingProject.name);
+    } catch (error) {
+      showToast('Failed to post update', 'error');
+    } finally {
+      setSavingUpdate(false);
+    }
+  };
+
+  const handleDeleteProjectUpdate = async (updateId) => {
+    if (!editingProject) return;
+    try {
+      await api.admin.deleteProjectUpdate(editingProject.id, updateId);
+      setProjectUpdates(projectUpdates.filter(u => u.id !== updateId));
+      showToast('Update deleted', 'success');
+    } catch (error) {
+      showToast('Failed to delete update', 'error');
     }
   };
 
@@ -1384,7 +1425,7 @@ function Admin() {
         <div className="admin-content-header">
           <h1>{activeTab === 'admin-users' ? 'Admin Users' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')}</h1>
           {activeTab === 'projects' && (
-            <button className="btn btn-primary" onClick={() => { setEditingProject(null); setProjectForm({ ...emptyProjectForm }); setProjectDoiHistory([]); setRequesterInput(''); setShowProjectModal(true); }}>
+            <button className="btn btn-primary" onClick={() => { setEditingProject(null); setProjectForm({ ...emptyProjectForm }); setProjectDoiHistory([]); setRequesterInput(''); setProjectUpdates([]); setUpdateForm({ title: '', content: '' }); setShowProjectModal(true); }}>
               + Add Project
             </button>
           )}
@@ -3525,6 +3566,87 @@ function Admin() {
                     <label>Dependencies</label>
                     <textarea className="form-control" value={projectForm.dependencies} onChange={e => setProjectForm({...projectForm, dependencies: e.target.value})} rows="2" placeholder="List dependencies (other projects, systems, teams)" />
                   </div>
+
+                  {/* Project Updates Section */}
+                  {editingProject && (
+                    <div className="form-group full-width" style={{ marginTop: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+                      <label style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 20h9"/>
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                        </svg>
+                        Project Updates
+                      </label>
+
+                      {/* Add new update form */}
+                      <div style={{ background: 'var(--bg-muted)', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Title (optional)"
+                          value={updateForm.title}
+                          onChange={e => setUpdateForm({ ...updateForm, title: e.target.value })}
+                          style={{ marginBottom: '8px' }}
+                        />
+                        <textarea
+                          className="form-control"
+                          placeholder="Write an update..."
+                          value={updateForm.content}
+                          onChange={e => setUpdateForm({ ...updateForm, content: e.target.value })}
+                          rows="2"
+                          style={{ marginBottom: '8px' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-primary"
+                          onClick={handleAddProjectUpdate}
+                          disabled={!updateForm.content.trim() || savingUpdate}
+                        >
+                          {savingUpdate ? 'Posting...' : 'Post Update'}
+                        </button>
+                      </div>
+
+                      {/* Updates timeline */}
+                      {projectUpdates.length > 0 ? (
+                        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                          {projectUpdates.map((update, idx) => (
+                            <div key={update.id} style={{
+                              padding: '12px',
+                              background: idx % 2 === 0 ? 'var(--bg-secondary)' : 'transparent',
+                              borderRadius: '6px',
+                              marginBottom: '8px',
+                              position: 'relative'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+                                <div>
+                                  {update.title && <div style={{ fontWeight: 600, marginBottom: '4px' }}>{update.title}</div>}
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    {update.admin_name} • {new Date(update.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn-icon-only"
+                                  onClick={() => handleDeleteProjectUpdate(update.id)}
+                                  style={{ padding: '4px', opacity: 0.6 }}
+                                  title="Delete update"
+                                >
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                                  </svg>
+                                </button>
+                              </div>
+                              <div style={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap' }}>{update.content}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                          No updates yet. Post the first update above.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="modal-actions">
                   <button type="button" className="btn btn-secondary" onClick={() => setShowProjectModal(false)} disabled={saving}>Cancel</button>

@@ -120,5 +120,15 @@ export const api = {
     createUseCaseIntake: (data) => axios.post(`${API_BASE}/admin/use-case-intake`, data),
     updateUseCaseIntake: (id, data) => axios.put(`${API_BASE}/admin/use-case-intake/${id}`, data),
     deleteUseCaseIntake: (id) => axios.delete(`${API_BASE}/admin/use-case-intake/${id}`),
+
+    // Project Updates
+    getProjectUpdates: (appId) => axios.get(`${API_BASE}/admin/apps/${appId}/updates`),
+    createProjectUpdate: (appId, data) => axios.post(`${API_BASE}/admin/apps/${appId}/updates`, data),
+    deleteProjectUpdate: (appId, updateId) => axios.delete(`${API_BASE}/admin/apps/${appId}/updates/${updateId}`),
+  },
+
+  // Public endpoints
+  public: {
+    getProjectUpdates: (appId) => axios.get(`${API_BASE}/public/apps/${appId}/updates`),
   },
 };
