@@ -2306,6 +2306,8 @@ body {
   flex-direction: column;
   gap: 0;
   padding: 4px 0;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .update-timeline-item {
