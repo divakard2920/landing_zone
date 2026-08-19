@@ -1084,14 +1084,14 @@ function ProjectDetail() {
                       placeholder="Title (optional)"
                       value={updateForm.title}
                       onChange={e => setUpdateForm({ ...updateForm, title: e.target.value })}
-                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '6px', boxSizing: 'border-box' }}
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '6px', boxSizing: 'border-box', fontFamily: 'inherit' }}
                     />
                     <textarea
                       placeholder="Write an update..."
                       value={updateForm.content}
                       onChange={e => setUpdateForm({ ...updateForm, content: e.target.value })}
                       rows={3}
-                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '8px', boxSizing: 'border-box', resize: 'vertical' }}
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '8px', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }}
                     />
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                       <button
