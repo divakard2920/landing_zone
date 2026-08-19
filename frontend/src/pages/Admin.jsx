@@ -3621,7 +3621,7 @@ function Admin() {
                                 <div>
                                   {update.title && <div style={{ fontWeight: 600, marginBottom: '4px' }}>{update.title}</div>}
                                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                    {update.admin_name} • {new Date(update.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    {update.admin_name} • {new Date(update.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
                                   </div>
                                 </div>
                                 <button

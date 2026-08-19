@@ -129,6 +129,6 @@ export const api = {
 
   // Public endpoints
   public: {
-    getProjectUpdates: (appId) => axios.get(`${API_BASE}/public/apps/${appId}/updates`),
+    getProjectUpdates: (appId) => axios.get(`${API_BASE}/apps/${appId}/updates`),
   },
 };

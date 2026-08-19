@@ -355,8 +355,8 @@ router.post('/apps', async (req, res) => {
         priority, strategic_focus, doi_stage, project_id,
         current_status, last_status, demand_type, platform,
         estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
-        usecase_type, usecase_identifier
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        usecase_type, usecase_identifier, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
     `, [
       id, name, description || null, url || null, icon || null, category || null,
       business_division || null, business_function || null, requester_name || null, ai_spoc || null,
@@ -364,7 +364,7 @@ router.post('/apps', async (req, res) => {
       current_status || null, last_status || null, demand_type || null, platform || null,
       estimated_costs || null, effectiveStartDate, end_date || null, ai_skills || null,
       risks || null, dependencies || null,
-      usecase_type || null, usecase_identifier
+      usecase_type || null, usecase_identifier, new Date().toISOString(), new Date().toISOString()
     ]);
 
     // Record initial DOI stage in history
@@ -375,8 +375,8 @@ router.post('/apps', async (req, res) => {
       );
     } else {
       await query(
-        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-        [uuidv4(), id, null, initialDoiStage, 'Project created']
+        'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+        [uuidv4(), id, null, initialDoiStage, new Date().toISOString(), 'Project created']
       );
     }
 
@@ -543,8 +543,8 @@ router.put('/apps/:id', async (req, res) => {
           );
         } else {
           await query(
-            'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-            [uuidv4(), id, oldDoiStage, newDoiStage, 'Stage updated']
+            'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+            [uuidv4(), id, oldDoiStage, newDoiStage, new Date().toISOString(), 'Stage updated']
           );
         }
       }
@@ -935,8 +935,8 @@ router.put('/app-requests/:id/approve', async (req, res) => {
 
     // Record initial DOI stage
     await query(
-      'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-      [uuidv4(), appId, null, 0, 'Project created from approved request']
+      'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+      [uuidv4(), appId, null, 0, new Date().toISOString(), 'Project created from approved request']
     );
 
     // Update request status
@@ -1482,8 +1482,8 @@ router.put('/use-case-intake/:id', async (req, res) => {
         );
         // Record DOI 1 in history
         await query(
-          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, notes) VALUES ($1, $2, $3, $4, $5)',
-          [uuidv4(), appId, 0, 1, status === 'In Progress' ? 'Started DOI1' : 'Use case approved']
+          'INSERT INTO doi_history (id, app_id, from_stage, to_stage, changed_at, notes) VALUES ($1, $2, $3, $4, $5, $6)',
+          [uuidv4(), appId, 0, 1, new Date().toISOString(), status === 'In Progress' ? 'Started DOI1' : 'Use case approved']
         );
       } else {
         // No project exists - create one at DOI 1
@@ -1683,8 +1683,8 @@ router.post('/apps/:id/updates', async (req, res) => {
 
     const id = uuidv4();
     await query(
-      'INSERT INTO project_updates (id, app_id, title, content, admin_id, admin_name) VALUES ($1, $2, $3, $4, $5, $6)',
-      [id, req.params.id, title || null, content, adminId, adminName]
+      'INSERT INTO project_updates (id, app_id, title, content, admin_id, admin_name, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, req.params.id, title || null, content, adminId, adminName, new Date().toISOString()]
     );
 
     const update = await queryOne('SELECT * FROM project_updates WHERE id = $1', [id]);

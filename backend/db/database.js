@@ -1,4 +1,9 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Parse TIMESTAMP without timezone as UTC instead of local time
+types.setTypeParser(1114, (stringValue) => {
+  return stringValue ? new Date(stringValue + 'Z') : null;
+});
 
 let pool;
 let credential;

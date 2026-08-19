@@ -91,6 +91,10 @@ function ProjectDetail() {
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [teamForm, setTeamForm] = useState({ name: '', role: '', email: '' });
   const [teamError, setTeamError] = useState(null);
+  const [projectUpdates, setProjectUpdates] = useState([]);
+  const [updateForm, setUpdateForm] = useState({ title: '', content: '' });
+  const [showAddUpdate, setShowAddUpdate] = useState(false);
+  const [savingUpdate, setSavingUpdate] = useState(false);
 
   useEffect(() => {
     loadProject();
@@ -120,11 +124,12 @@ function ProjectDetail() {
   const loadProject = async () => {
     try {
       setLoading(true);
-      const [projectRes, doiHistoryRes, doiStagesRes, teamRes] = await Promise.all([
+      const [projectRes, doiHistoryRes, doiStagesRes, teamRes, updatesRes] = await Promise.all([
         api.admin.getApps(),
         api.getDoiHistory(id),
         api.getDoiStages(),
-        api.admin.getTeam(id)
+        api.admin.getTeam(id),
+        api.admin.getProjectUpdates(id)
       ]);
 
       const projectData = projectRes.data.find(p => p.id === id);
@@ -138,6 +143,7 @@ function ProjectDetail() {
       setDoiHistory(doiHistoryRes.data);
       setDoiStages(doiStagesRes.data);
       setTeam(teamRes.data);
+      setProjectUpdates(updatesRes.data);
     } catch (error) {
       console.error('Failed to load project:', error);
     } finally {
@@ -389,6 +395,36 @@ function ProjectDetail() {
     } catch (error) {
       setTeamError('Failed to remove team member');
       setTimeout(() => setTeamError(null), 3000);
+    }
+  };
+
+  const addProjectUpdate = async () => {
+    if (!updateForm.content.trim()) return;
+    setSavingUpdate(true);
+    try {
+      await api.admin.createProjectUpdate(id, {
+        title: updateForm.title.trim(),
+        content: updateForm.content.trim()
+      });
+      const res = await api.admin.getProjectUpdates(id);
+      setProjectUpdates(res.data);
+      setUpdateForm({ title: '', content: '' });
+      setShowAddUpdate(false);
+      logActivity('posted update', 'project', id, project.name);
+    } catch (error) {
+      console.error('Failed to post update:', error);
+    } finally {
+      setSavingUpdate(false);
+    }
+  };
+
+  const deleteProjectUpdate = async (updateId) => {
+    if (!confirm('Delete this update?')) return;
+    try {
+      await api.admin.deleteProjectUpdate(id, updateId);
+      setProjectUpdates(projectUpdates.filter(u => u.id !== updateId));
+    } catch (error) {
+      console.error('Failed to delete update:', error);
     }
   };
 
@@ -1026,6 +1062,85 @@ function ProjectDetail() {
               ) : (
                 !showAddTeam && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No team members</p>
               )}
+              </div>
+
+              {/* Updates Section */}
+              <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Updates ({projectUpdates.length})</h3>
+                  <button
+                    onClick={() => setShowAddUpdate(!showAddUpdate)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--brand-primary)', fontSize: '1.2rem', padding: 0, lineHeight: 1 }}
+                    title="Post update"
+                  >
+                    {showAddUpdate ? '−' : '+'}
+                  </button>
+                </div>
+
+                {showAddUpdate && (
+                  <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-base)', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                    <input
+                      type="text"
+                      placeholder="Title (optional)"
+                      value={updateForm.title}
+                      onChange={e => setUpdateForm({ ...updateForm, title: e.target.value })}
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '6px', boxSizing: 'border-box' }}
+                    />
+                    <textarea
+                      placeholder="Write an update..."
+                      value={updateForm.content}
+                      onChange={e => setUpdateForm({ ...updateForm, content: e.target.value })}
+                      rows={3}
+                      style={{ width: '100%', padding: '8px 10px', border: '1px solid var(--border-light)', borderRadius: '4px', fontSize: '0.8rem', background: 'var(--bg-muted)', color: 'var(--text-primary)', marginBottom: '8px', boxSizing: 'border-box', resize: 'vertical' }}
+                    />
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => { setShowAddUpdate(false); setUpdateForm({ title: '', content: '' }); }}
+                        style={{ padding: '6px 10px', background: 'transparent', border: '1px solid var(--border-light)', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-muted)' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={addProjectUpdate}
+                        disabled={!updateForm.content.trim() || savingUpdate}
+                        style={{ padding: '6px 12px', background: 'var(--brand-primary)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 500, opacity: (!updateForm.content.trim() || savingUpdate) ? 0.5 : 1 }}
+                      >
+                        {savingUpdate ? 'Posting...' : 'Post'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {projectUpdates.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {projectUpdates.map(update => (
+                      <div key={update.id} style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '6px', border: '1px solid var(--border-light)', position: 'relative' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                          <div style={{ flex: 1 }}>
+                            {update.title && <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '4px' }}>{update.title}</div>}
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{update.content}</div>
+                            <div style={{ marginTop: '8px', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              {update.admin_name} • {new Date(update.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => deleteProjectUpdate(update.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '4px', opacity: 0.5, flexShrink: 0 }}
+                            title="Delete"
+                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  !showAddUpdate && <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0 }}>No updates yet</p>
+                )}
               </div>
             </div>
           </div>
