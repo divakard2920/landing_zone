@@ -2500,21 +2500,17 @@ function Landing() {
                           <div className="skeleton-item"><div className="skeleton-dot"></div><div className="skeleton-text"></div></div>
                         </div>
                       ) : (
-                        <div className="project-updates-timeline">
-                          {(projectUpdates || []).map((update, idx) => (
-                            <div key={update.id} className="update-timeline-item">
-                              <div className="update-timeline-marker">
-                                <span className="update-dot">{(projectUpdates || []).length - idx}</span>
-                                {idx < (projectUpdates || []).length - 1 && <div className="update-timeline-line" />}
+                        <div className="project-updates-cards">
+                          {(projectUpdates || []).map((update) => (
+                            <div key={update.id} className="update-card">
+                              <div className="update-card-header">
+                                <span className="update-card-title">{update.title || 'Update'}</span>
+                                <span className="update-card-date">{formatDate(update.created_at, true)}</span>
                               </div>
-                              <div className="update-timeline-content">
-                                {update.title && <div className="update-title">{update.title}</div>}
-                                <div className="update-text">{update.content}</div>
-                                <div className="update-meta">
-                                  <span className="update-author">{update.admin_name}</span>
-                                  <span className="update-date">{formatDate(update.created_at, true)}</span>
-                                </div>
-                              </div>
+                              <div className="update-card-content">{update.content}</div>
+                              {update.admin_name && (
+                                <div className="update-card-author">— {update.admin_name}</div>
+                              )}
                             </div>
                           ))}
                         </div>
