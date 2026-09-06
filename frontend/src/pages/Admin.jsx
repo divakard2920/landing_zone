@@ -3,7 +3,7 @@ import { api } from '../api';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { Tooltip } from 'react-tooltip';
-import { STATUS_OPTIONS, PRIORITY_OPTIONS, DEMAND_TYPES, PLATFORMS, USECASE_TYPES } from '../constants';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, HEALTH_OPTIONS, DEMAND_TYPES, PLATFORMS, USECASE_TYPES } from '../constants';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -50,10 +50,10 @@ const AppIcon = ({ icon, usecaseType }) => {
 const emptyProjectForm = {
   name: '', description: '', url: '', icon: '', category: '',
   business_division: '', business_function: '', requester_name: '', ai_spoc: '',
-  priority: '', strategic_focus: '', doi_stage: 0, doi_changed_at: '', project_id: '',
+  priority: '', project_health: '', strategic_focus: '', doi_stage: 0, doi_changed_at: '', project_id: '',
   current_status: '', last_status: '', demand_type: '', platform: '',
   estimated_costs: '', start_date: '', end_date: '', ai_skills: '',
-  risks: '', dependencies: '', usecase_type: ''
+  risks: '', dependencies: '', usecase_type: '', useful_links: ''
 };
 
 function Admin() {
@@ -89,6 +89,9 @@ function Admin() {
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [showDeletedProjects, setShowDeletedProjects] = useState(false);
   const [deletedProjects, setDeletedProjects] = useState([]);
+  const [projectViewMode, setProjectViewMode] = useState('table');
+  const [draggedProject, setDraggedProject] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
   const [projectDoiHistory, setProjectDoiHistory] = useState([]);
   const [requesterInput, setRequesterInput] = useState('');
   const [projectUpdates, setProjectUpdates] = useState([]);
@@ -165,7 +168,9 @@ function Admin() {
   };
 
   const sortData = (data, getSortValue) => {
-    if (!sortConfig.key) return data;
+    if (!sortConfig.key) {
+      return [...data].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    }
     return [...data].sort((a, b) => {
       const aVal = getSortValue(a, sortConfig.key);
       const bVal = getSortValue(b, sortConfig.key);
@@ -540,14 +545,98 @@ function Admin() {
   const handleInlineUpdate = async (project, field, value) => {
     try {
       const updateData = { ...project, [field]: value };
+      let healthChanged = null;
+
+      // Auto-set health based on status changes
+      if (field === 'current_status') {
+        if (value === 'On Hold') {
+          updateData.project_health = 'Delayed';
+          healthChanged = 'Delayed';
+        } else if (value === 'In Progress') {
+          updateData.project_health = 'On Track';
+          healthChanged = 'On Track';
+        }
+      }
+
       await api.admin.updateApp(project.id, updateData);
       const fieldLabel = field === 'current_status' ? 'Status' : 'Platform';
+      let message = `${fieldLabel} updated`;
+      if (healthChanged) {
+        message = `Status updated, health set to ${healthChanged}`;
+      }
       logActivity('updated', 'project', project.id, project.name, `${fieldLabel}: ${project[field] || 'none'} → ${value || 'none'}`);
-      showToast(`${fieldLabel} updated`, 'success');
+      showToast(message, 'success');
       loadData();
     } catch (error) {
       showToast(error.response?.data?.error || 'Failed to update', 'error');
     }
+  };
+
+  const handleDragStart = (e, project) => {
+    setDraggedProject(project);
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dragging');
+  };
+
+  const handleDragEnd = (e) => {
+    e.target.classList.remove('dragging');
+    setDraggedProject(null);
+    setDragOverColumn(null);
+  };
+
+  const handleDragOver = (e, status) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverColumn(status);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null);
+  };
+
+  const handleDrop = async (e, newStatus) => {
+    e.preventDefault();
+    setDragOverColumn(null);
+    if (draggedProject && draggedProject.current_status !== newStatus) {
+      await handleInlineUpdate(draggedProject, 'current_status', newStatus);
+    }
+    setDraggedProject(null);
+  };
+
+  const handleCardDrop = async (e, targetProject) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('drag-over');
+    if (!draggedProject || draggedProject.id === targetProject.id) return;
+
+    const draggedStatus = draggedProject.current_status || 'Backlog';
+    const targetStatus = targetProject.current_status || 'Backlog';
+
+    // If dropping on a card in a different status column, change status
+    if (draggedStatus !== targetStatus) {
+      await handleInlineUpdate(draggedProject, 'current_status', targetProject.current_status || 'Backlog');
+      setDraggedProject(null);
+      return;
+    }
+
+    // Same column - reorder
+    const currentOrder = [...projects].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+    const draggedIndex = currentOrder.findIndex(p => p.id === draggedProject.id);
+    const targetIndex = currentOrder.findIndex(p => p.id === targetProject.id);
+
+    const newOrder = [...currentOrder];
+    const [draggedItem] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedItem);
+
+    const rankings = newOrder.map((p, i) => ({ id: p.id, order: i }));
+    try {
+      await api.admin.reorderApps(rankings);
+      showToast('Order updated', 'success');
+      loadData();
+    } catch (error) {
+      showToast('Failed to update order', 'error');
+    }
+    setDraggedProject(null);
   };
 
   const handleAnnouncementSubmit = async (e) => {
@@ -1598,6 +1687,26 @@ function Admin() {
                   <button className="search-clear" onClick={() => setProjectSearchQuery('')} title="Clear search">×</button>
                 )}
               </div>
+              <div className="view-toggle">
+                <button
+                  className={`btn btn-sm ${projectViewMode === 'table' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setProjectViewMode('table')}
+                  title="Table View"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/>
+                  </svg>
+                </button>
+                <button
+                  className={`btn btn-sm ${projectViewMode === 'kanban' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setProjectViewMode('kanban')}
+                  title="Kanban View"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/>
+                  </svg>
+                </button>
+              </div>
               <button
                 className={`btn btn-sm ${showDeletedProjects ? 'btn-warning' : 'btn-outline'}`}
                 onClick={() => {
@@ -1612,9 +1721,12 @@ function Admin() {
                 {showDeletedProjects ? 'Show Active' : `Deleted (${deletedProjects.length})`}
               </button>
             </div>
+
+            {projectViewMode === 'table' && (
             <table className="admin-table">
               <thead>
                 <tr>
+                  {!showDeletedProjects && <th style={{ width: '40px' }}></th>}
                   <th className="sortable-th" onClick={() => handleSort('name')}><span className="th-content">Project Name<span className={`sort-icon ${sortConfig.key === 'name' ? 'active' : ''}`}>{sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
                   <th className="sortable-th" onClick={() => handleSort('division')}><span className="th-content">Division<span className={`sort-icon ${sortConfig.key === 'division' ? 'active' : ''}`}>{sortConfig.key === 'division' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
                   <th className="sortable-th" onClick={() => handleSort('function')}><span className="th-content">Function<span className={`sort-icon ${sortConfig.key === 'function' ? 'active' : ''}`}>{sortConfig.key === 'function' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : '↕'}</span></span></th>
@@ -1649,8 +1761,100 @@ function Admin() {
                     case 'platform': return p.platform?.toLowerCase() || '';
                     default: return '';
                   }
-                }).map(project => (
-                  <tr key={project.id}>
+                }).map((project, index) => (
+                  <tr
+                    key={project.id}
+                    className={`table-drag-row ${draggedProject?.id === project.id ? 'dragging' : ''}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add('drag-over');
+                    }}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove('drag-over');
+                    }}
+                    onDrop={async (e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('drag-over');
+                      if (!draggedProject || draggedProject.id === project.id) return;
+
+                      const currentOrder = [...projects].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+                      const draggedIndex = currentOrder.findIndex(p => p.id === draggedProject.id);
+                      const targetIndex = currentOrder.findIndex(p => p.id === project.id);
+
+                      const newOrder = [...currentOrder];
+                      const [draggedItem] = newOrder.splice(draggedIndex, 1);
+                      newOrder.splice(targetIndex, 0, draggedItem);
+
+                      const rankings = newOrder.map((p, i) => ({ id: p.id, order: i }));
+                      try {
+                        await api.admin.reorderApps(rankings);
+                        showToast('Order updated', 'success');
+                        loadData();
+                      } catch (error) {
+                        showToast('Failed to update order', 'error');
+                      }
+                      setDraggedProject(null);
+                    }}
+                  >
+                    {!showDeletedProjects && (
+                      <td className="reorder-cell">
+                        <div className="reorder-buttons">
+                          <button
+                            className="reorder-btn"
+                            title="Move up"
+                            disabled={index === 0}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const currentOrder = [...projects].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+                              const currentIndex = currentOrder.findIndex(p => p.id === project.id);
+                              if (currentIndex <= 0) return;
+
+                              const newOrder = [...currentOrder];
+                              [newOrder[currentIndex - 1], newOrder[currentIndex]] = [newOrder[currentIndex], newOrder[currentIndex - 1]];
+
+                              const rankings = newOrder.map((p, i) => ({ id: p.id, order: i }));
+                              try {
+                                await api.admin.reorderApps(rankings);
+                                showToast('Order updated', 'success');
+                                loadData();
+                              } catch (error) {
+                                showToast('Failed to update order', 'error');
+                              }
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M18 15l-6-6-6 6"/>
+                            </svg>
+                          </button>
+                          <button
+                            className="reorder-btn"
+                            title="Move down"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const currentOrder = [...projects].sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+                              const currentIndex = currentOrder.findIndex(p => p.id === project.id);
+                              if (currentIndex >= currentOrder.length - 1) return;
+
+                              const newOrder = [...currentOrder];
+                              [newOrder[currentIndex], newOrder[currentIndex + 1]] = [newOrder[currentIndex + 1], newOrder[currentIndex]];
+
+                              const rankings = newOrder.map((p, i) => ({ id: p.id, order: i }));
+                              try {
+                                await api.admin.reorderApps(rankings);
+                                showToast('Order updated', 'success');
+                                loadData();
+                              } catch (error) {
+                                showToast('Failed to update order', 'error');
+                              }
+                            }}
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    )}
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <div className="admin-project-icon">
@@ -1755,6 +1959,98 @@ function Admin() {
                 )}
               </tbody>
             </table>
+            )}
+
+            {projectViewMode === 'kanban' && !showDeletedProjects && (
+              <div className="kanban-board">
+                {STATUS_OPTIONS.map(status => {
+                  const columnProjects = projects.filter(p => {
+                    const projectStatus = p.current_status || '';
+                    if (status === 'Backlog') return !projectStatus || projectStatus === 'Backlog';
+                    return projectStatus === status;
+                  }).filter(p => {
+                    if (!projectSearchQuery) return true;
+                    const query = projectSearchQuery.toLowerCase();
+                    return (
+                      p.name?.toLowerCase().includes(query) ||
+                      p.project_id?.toLowerCase().includes(query) ||
+                      p.usecase_identifier?.toLowerCase().includes(query) ||
+                      p.business_division?.toLowerCase().includes(query)
+                    );
+                  });
+                  const statusClass = status.toLowerCase().replace(' ', '-');
+                  return (
+                    <div
+                      key={status}
+                      className={`kanban-column kanban-col-${statusClass} ${dragOverColumn === status ? 'drag-over' : ''}`}
+                      onDragOver={(e) => handleDragOver(e, status)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, status)}
+                    >
+                      <div className="kanban-column-header">
+                        <span className="kanban-column-title">{status}</span>
+                        <span className="kanban-column-count">{columnProjects.length}</span>
+                      </div>
+                      <div className="kanban-column-body">
+                        {columnProjects.sort((a, b) => (a.display_order || 0) - (b.display_order || 0)).map(project => (
+                          <div
+                            key={project.id}
+                            className="kanban-card-v2"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, project)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }}
+                            onDragLeave={(e) => { e.currentTarget.classList.remove('drag-over'); }}
+                            onDrop={(e) => handleCardDrop(e, project)}
+                            onClick={() => navigate(`/admin/projects/${project.id}`)}
+                          >
+                            <div className="kc-top">
+                              <div className="kc-ids">
+                                {project.usecase_identifier && <span className="kc-id">{project.usecase_identifier}</span>}
+                                {project.project_id && <span className="kc-id kc-id-secondary">#{project.project_id}</span>}
+                                {!project.usecase_identifier && !project.project_id && <span className="kc-id">#</span>}
+                              </div>
+                              <div className="kc-badges">
+                                {project.priority && <span className={`kc-priority kc-priority-${project.priority.toLowerCase()}`}>{project.priority}</span>}
+                                {project.project_health && <span className={`kc-health kc-health-${project.project_health.toLowerCase().replace(' ', '-')}`}>{project.project_health}</span>}
+                              </div>
+                            </div>
+                            <div className="kc-title">{project.name}</div>
+                            <div className="kc-tags">
+                              {project.business_division && <span className="kc-tag">{project.business_division}</span>}
+                              {project.platform && <span className="kc-tag">{project.platform}</span>}
+                            </div>
+                            <div className="kc-timeline">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>
+                              </svg>
+                              <span>{project.start_date || 'TBD'} → {project.end_date || 'TBD'}</span>
+                            </div>
+                            <div className="kc-bottom">
+                              <span className="kc-doi-label" style={{ color: ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][project.doi_stage || 0] }}>DOI {project.doi_stage || 0}</span>
+                              <div className="kc-doi-bar" style={{ '--doi-stage-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][project.doi_stage || 0] }}>
+                                {[0,1,2,3,4,5].map(i => (
+                                  <div key={i} className={`kc-doi-seg ${i <= (project.doi_stage || 0) ? 'active' : ''}`} />
+                                ))}
+                              </div>
+                              {project.ai_spoc && (
+                                <div className="kc-avatar" title={project.ai_spoc}>
+                                  {project.ai_spoc.split(' ').map(n => n[0]).join('').slice(0,2)}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {columnProjects.length === 0 && (
+                          <div className="kanban-empty">No projects</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
           </div>
         )}
 
@@ -3380,6 +3676,13 @@ function Admin() {
                     <select className="form-control" value={projectForm.priority} onChange={e => setProjectForm({...projectForm, priority: e.target.value})}>
                       <option value="">Select...</option>
                       {PRIORITY_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Project Health</label>
+                    <select className="form-control" value={projectForm.project_health} onChange={e => setProjectForm({...projectForm, project_health: e.target.value})}>
+                      <option value="">Select...</option>
+                      {HEALTH_OPTIONS.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
                   <div className="form-group">

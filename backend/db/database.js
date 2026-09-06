@@ -89,6 +89,7 @@ const initDb = async () => {
         requester_name TEXT,
         ai_spoc TEXT,
         priority TEXT,
+        project_health TEXT,
         strategic_focus TEXT,
         doi_stage INTEGER DEFAULT 0,
         project_id TEXT,
@@ -378,6 +379,38 @@ const initDb = async () => {
     if (deletedAtCheck.rows.length === 0) {
       await client.query('ALTER TABLE apps ADD COLUMN deleted_at TIMESTAMP');
       console.log('Migration: Added deleted_at column to apps table for soft delete');
+    }
+
+    // Migration: Add project_health column
+    const healthCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'apps' AND column_name = 'project_health'
+    `);
+    if (healthCheck.rows.length === 0) {
+      await client.query('ALTER TABLE apps ADD COLUMN project_health TEXT');
+      console.log('Migration: Added project_health column to apps table');
+    } else {
+      console.log('Migration: project_health column already exists');
+    }
+
+    // Migration: Add display_order column for ranking
+    const displayOrderCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'apps' AND column_name = 'display_order'
+    `);
+    if (displayOrderCheck.rows.length === 0) {
+      await client.query('ALTER TABLE apps ADD COLUMN display_order INTEGER DEFAULT 0');
+      console.log('Migration: Added display_order column to apps table');
+    }
+
+    // Migration: Add useful_links column for storing project links (JSON)
+    const linksCheck = await client.query(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'apps' AND column_name = 'useful_links'
+    `);
+    if (linksCheck.rows.length === 0) {
+      await client.query('ALTER TABLE apps ADD COLUMN useful_links TEXT');
+      console.log('Migration: Added useful_links column to apps table');
     }
 
     // Migration: Enable pgvector extension and add embedding column

@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import ReactRouterPrompt from 'react-router-prompt';
 import { api } from '../api';
 import { useTheme } from '../context/ThemeContext';
-import { STATUS_OPTIONS, PRIORITY_OPTIONS, DEMAND_TYPES, PLATFORMS, USECASE_TYPES } from '../constants';
+import { STATUS_OPTIONS, PRIORITY_OPTIONS, HEALTH_OPTIONS, DEMAND_TYPES, PLATFORMS, USECASE_TYPES } from '../constants';
 
 const isUploadedFile = (url) => url && (url.startsWith('/uploads') || url.startsWith('/api/') || url.startsWith('https://'));
 
@@ -656,6 +656,7 @@ function ProjectDetail() {
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     <Field label="Name" field="name" value={project.name} />
+                    <Field label="Project ID" field="project_id" value={project.project_id} />
                     <Field label="Use Case Type" field="usecase_type" value={project.usecase_type} type="select" options={USECASE_TYPES} />
                     <Field label="Current Status" field="current_status" value={project.current_status} type="select" options={STATUS_OPTIONS} />
                     <Field label="Priority" field="priority" value={project.priority} type="select" options={PRIORITY_OPTIONS} />
@@ -739,6 +740,7 @@ function ProjectDetail() {
                     })()}
                     <Field label="AI SPOC" field="ai_spoc" value={project.ai_spoc} />
                     <Field label="Demand Type" field="demand_type" value={project.demand_type} type="select" options={DEMAND_TYPES} />
+                    <Field label="Project Health" field="project_health" value={project.project_health} type="select" options={HEALTH_OPTIONS} />
                   </tbody>
                 </table>
               </div>
@@ -800,6 +802,83 @@ function ProjectDetail() {
                   <Field label="Dependencies" field="dependencies" value={project.dependencies} multiline />
                 </tbody>
               </table>
+            </div>
+
+            {/* Useful Links */}
+            <div style={{ marginTop: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Useful Links</h3>
+                <button
+                  className="btn btn-sm btn-outline"
+                  onClick={() => {
+                    const links = project.useful_links ? JSON.parse(project.useful_links) : [];
+                    links.push({ label: '', url: '', type: 'other' });
+                    setProject({ ...project, useful_links: JSON.stringify(links) });
+                  }}
+                >
+                  + Add Link
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(() => {
+                  const links = project.useful_links ? JSON.parse(project.useful_links) : [];
+                  if (links.length === 0) {
+                    return <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '12px 0' }}>No links added yet</div>;
+                  }
+                  return links.map((link, index) => (
+                    <div key={index} className="useful-link-item">
+                      <select
+                        value={link.type || 'other'}
+                        onChange={(e) => {
+                          const newLinks = [...links];
+                          newLinks[index].type = e.target.value;
+                          setProject({ ...project, useful_links: JSON.stringify(newLinks) });
+                        }}
+                        className="link-type-select"
+                      >
+                        <option value="jira">Jira</option>
+                        <option value="confluence">Confluence</option>
+                        <option value="sharepoint">SharePoint</option>
+                        <option value="github">GitHub</option>
+                        <option value="docs">Documentation</option>
+                        <option value="other">Other</option>
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="Label"
+                        value={link.label || ''}
+                        onChange={(e) => {
+                          const newLinks = [...links];
+                          newLinks[index].label = e.target.value;
+                          setProject({ ...project, useful_links: JSON.stringify(newLinks) });
+                        }}
+                        className="link-label-input"
+                      />
+                      <input
+                        type="url"
+                        placeholder="https://..."
+                        value={link.url || ''}
+                        onChange={(e) => {
+                          const newLinks = [...links];
+                          newLinks[index].url = e.target.value;
+                          setProject({ ...project, useful_links: JSON.stringify(newLinks) });
+                        }}
+                        className="link-url-input"
+                      />
+                      <button
+                        className="link-delete-btn"
+                        onClick={() => {
+                          const newLinks = links.filter((_, i) => i !== index);
+                          setProject({ ...project, useful_links: JSON.stringify(newLinks) });
+                        }}
+                        title="Remove link"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
           </div>
 
@@ -1112,7 +1191,7 @@ function ProjectDetail() {
                 )}
 
                 {projectUpdates.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '4px' }}>
                     {projectUpdates.map(update => (
                       <div key={update.id} style={{ padding: '10px', background: 'var(--bg-base)', borderRadius: '6px', border: '1px solid var(--border-light)', position: 'relative' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>

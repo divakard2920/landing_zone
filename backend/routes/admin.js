@@ -259,10 +259,10 @@ router.post('/apps', async (req, res) => {
     const {
       name, description, url, icon, category,
       business_division, business_function, requester_name, ai_spoc,
-      priority, strategic_focus, doi_stage, project_id,
+      priority, project_health, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
       estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
-      usecase_type
+      usecase_type, useful_links
     } = req.body;
 
     if (!name) {
@@ -352,19 +352,19 @@ router.post('/apps', async (req, res) => {
       INSERT INTO apps (
         id, name, description, url, icon, category,
         business_division, business_function, requester_name, ai_spoc,
-        priority, strategic_focus, doi_stage, project_id,
+        priority, project_health, strategic_focus, doi_stage, project_id,
         current_status, last_status, demand_type, platform,
         estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
-        usecase_type, usecase_identifier, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        usecase_type, usecase_identifier, useful_links, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
     `, [
       id, name, description || null, url || null, icon || null, category || null,
       business_division || null, business_function || null, requester_name || null, ai_spoc || null,
-      priority || null, strategic_focus || null, initialDoiStage, project_id || null,
+      priority || null, project_health || null, strategic_focus || null, initialDoiStage, project_id || null,
       current_status || null, last_status || null, demand_type || null, platform || null,
       estimated_costs || null, effectiveStartDate, end_date || null, ai_skills || null,
       risks || null, dependencies || null,
-      usecase_type || null, usecase_identifier, new Date().toISOString(), new Date().toISOString()
+      usecase_type || null, usecase_identifier, useful_links || null, new Date().toISOString(), new Date().toISOString()
     ]);
 
     // Record initial DOI stage in history
@@ -387,16 +387,39 @@ router.post('/apps', async (req, res) => {
   }
 });
 
+// Update project rankings (must be before /apps/:id to avoid conflict)
+router.put('/apps/reorder', async (req, res) => {
+  try {
+    const { rankings } = req.body;
+
+    if (!Array.isArray(rankings)) {
+      return res.status(400).json({ error: 'Rankings must be an array' });
+    }
+
+    for (const item of rankings) {
+      await query(
+        'UPDATE apps SET display_order = $1 WHERE id = $2',
+        [item.order, item.id]
+      );
+    }
+
+    res.json({ message: 'Rankings updated successfully' });
+  } catch (error) {
+    console.error('Error updating rankings:', error);
+    res.status(500).json({ error: 'Failed to update rankings' });
+  }
+});
+
 router.put('/apps/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const {
       name, description, url, icon, category,
       business_division, business_function, requester_name, ai_spoc,
-      priority, strategic_focus, doi_stage, project_id,
+      priority, project_health, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
       estimated_costs, start_date, end_date, ai_skills, risks, dependencies,
-      usecase_type
+      usecase_type, useful_links
     } = req.body;
 
     // Check for duplicate project name (excluding current project)
@@ -497,20 +520,20 @@ router.put('/apps/:id', async (req, res) => {
       UPDATE apps SET
         name = $1, description = $2, url = $3, icon = $4, category = $5,
         business_division = $6, business_function = $7, requester_name = $8, ai_spoc = $9,
-        priority = $10, strategic_focus = $11, doi_stage = $12, project_id = $13,
-        current_status = $14, last_status = $15, demand_type = $16, platform = $17,
-        estimated_costs = $18, start_date = $19, end_date = $20, ai_skills = $21,
-        risks = $22, dependencies = $23, usecase_type = $24, usecase_identifier = $25,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $26
+        priority = $10, project_health = $11, strategic_focus = $12, doi_stage = $13, project_id = $14,
+        current_status = $15, last_status = $16, demand_type = $17, platform = $18,
+        estimated_costs = $19, start_date = $20, end_date = $21, ai_skills = $22,
+        risks = $23, dependencies = $24, usecase_type = $25, usecase_identifier = $26,
+        useful_links = $27, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $28
     `, [
       name, description, url, icon, category,
       business_division, business_function, requester_name, ai_spoc,
-      priority, strategic_focus, doi_stage, project_id,
+      priority, project_health, strategic_focus, doi_stage, project_id,
       current_status, last_status, demand_type, platform,
       estimated_costs, start_date, end_date, ai_skills,
       risks, dependencies, usecase_type, usecase_identifier,
-      id
+      useful_links || null, id
     ]);
 
     // Handle DOI stage changes

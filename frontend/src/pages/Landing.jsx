@@ -110,7 +110,7 @@ function Landing() {
     demand_type: ''
   });
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('kanban');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
   const USECASE_TYPES = ['AI Usecase', 'Foundation'];
@@ -122,6 +122,7 @@ function Landing() {
     { key: 'doi_stage', label: 'DOI Stage' },
     { key: 'status', label: 'Status' },
     { key: 'priority', label: 'Priority' },
+    { key: 'project_health', label: 'Health' },
     { key: 'division', label: 'Division' },
     { key: 'function', label: 'Function' },
     { key: 'platform', label: 'Platform' },
@@ -132,7 +133,7 @@ function Landing() {
     { key: 'estimated_costs', label: 'Estimated Costs' },
   ];
 
-  const defaultColumns = ['project', 'doi_stage', 'status', 'priority', 'division', 'platform', 'timeline'];
+  const defaultColumns = ['project', 'doi_stage', 'status', 'priority', 'project_health', 'division', 'platform', 'timeline'];
 
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('tableColumns');
@@ -724,15 +725,15 @@ function Landing() {
       }
       return sortConfig.direction === 'desc' ? -comparison : comparison;
     }
-    // Default sort: by usecase_identifier first (nulls last)
+    // Default sort: by display_order (admin ranking)
+    const aOrder = a.display_order ?? 999999;
+    const bOrder = b.display_order ?? 999999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    // Then by usecase_identifier
     if (a.usecase_identifier && !b.usecase_identifier) return -1;
     if (!a.usecase_identifier && b.usecase_identifier) return 1;
     if (a.usecase_identifier && b.usecase_identifier) {
       return a.usecase_identifier.localeCompare(b.usecase_identifier);
-    }
-    // Then by created_at
-    if (a.created_at && b.created_at) {
-      return new Date(b.created_at) - new Date(a.created_at);
     }
     return 0;
   });
@@ -948,6 +949,16 @@ function Landing() {
                     <line x1="3" y1="6" x2="21" y2="6"/>
                     <line x1="3" y1="12" x2="21" y2="12"/>
                     <line x1="3" y1="18" x2="21" y2="18"/>
+                  </svg>
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+                  onClick={() => setViewMode('kanban')}
+                  data-tooltip-id="tooltip"
+                  data-tooltip-content="Kanban View"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/>
                   </svg>
                 </button>
               </div>
@@ -1727,7 +1738,7 @@ function Landing() {
                   </div>
                 )}
                 </div>
-              ) : (
+              ) : viewMode === 'table' ? (
                 <div className="projects-table-container">
                   {filteredApps.length > 0 ? (
                     <table className="projects-table">
@@ -1800,6 +1811,13 @@ function Landing() {
                                 ) : '-'}
                               </td>
                             )}
+                            {visibleColumns.includes('project_health') && (
+                              <td>
+                                {app.project_health ? (
+                                  <span className={`health-badge health-${app.project_health.toLowerCase().replace(' ', '-')}`}>{app.project_health}</span>
+                                ) : '-'}
+                              </td>
+                            )}
                             {visibleColumns.includes('division') && (
                               <td>{app.business_division || '-'}</td>
                             )}
@@ -1851,6 +1869,75 @@ function Landing() {
                       )}
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="kanban-board landing-kanban">
+                  {['Backlog', 'In Progress', 'On Hold', 'Done'].map(status => {
+                    const columnApps = filteredApps.filter(app => {
+                      const appStatus = app.current_status || '';
+                      if (status === 'Backlog') return !appStatus || appStatus === 'Backlog';
+                      return appStatus === status;
+                    });
+                    const statusClass = status.toLowerCase().replace(' ', '-');
+                    return (
+                      <div key={status} className={`kanban-column kanban-col-${statusClass}`}>
+                        <div className="kanban-column-header">
+                          <span className="kanban-column-title">{status}</span>
+                          <span className="kanban-column-count">{columnApps.length}</span>
+                        </div>
+                        <div className="kanban-column-body">
+                          {columnApps.map(app => (
+                            <div
+                              key={app.id}
+                              className="kanban-card-v2"
+                              onClick={() => setSelectedApp(app)}
+                              style={{ '--priority-color': app.priority === 'High' ? '#ef4444' : app.priority === 'Medium' ? '#f59e0b' : '#22c55e' }}
+                            >
+                              <div className="kc-top">
+                                <div className="kc-ids">
+                                  {app.usecase_identifier && <span className="kc-id">{app.usecase_identifier}</span>}
+                                  {app.project_id && <span className="kc-id kc-id-secondary">#{app.project_id}</span>}
+                                  {!app.usecase_identifier && !app.project_id && <span className="kc-id">#</span>}
+                                </div>
+                                <div className="kc-badges">
+                                  {app.priority && <span className={`kc-priority kc-priority-${app.priority.toLowerCase()}`}>{app.priority}</span>}
+                                  {app.project_health && <span className={`kc-health kc-health-${app.project_health.toLowerCase().replace(' ', '-')}`}>{app.project_health}</span>}
+                                </div>
+                              </div>
+                              <div className="kc-title">{app.name}</div>
+                              <div className="kc-tags">
+                                {app.business_division && <span className="kc-tag">{app.business_division}</span>}
+                                {app.platform && <span className="kc-tag">{app.platform}</span>}
+                                {app.demand_type && <span className="kc-tag">{app.demand_type}</span>}
+                              </div>
+                              <div className="kc-timeline">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>
+                                </svg>
+                                <span>{app.start_date || 'TBD'} → {app.end_date || 'TBD'}</span>
+                              </div>
+                              <div className="kc-bottom">
+                                <span className="kc-doi-label" style={{ color: ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0] }}>DOI {app.doi_stage || 0}</span>
+                                <div className="kc-doi-bar" style={{ '--doi-stage-color': ['#94a3b8', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981', '#059669'][app.doi_stage || 0] }}>
+                                  {[0,1,2,3,4,5].map(i => (
+                                    <div key={i} className={`kc-doi-seg ${i <= (app.doi_stage || 0) ? 'active' : ''}`} />
+                                  ))}
+                                </div>
+                                {app.ai_spoc && (
+                                  <div className="kc-avatar" title={app.ai_spoc}>
+                                    {app.ai_spoc.split(' ').map(n => n[0]).join('').slice(0,2)}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {columnApps.length === 0 && (
+                            <div className="kanban-empty">No projects</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -2393,6 +2480,77 @@ function Landing() {
                   <p className="dependencies-text">{selectedApp.dependencies}</p>
                 </div>
               )}
+
+              {/* Useful Links */}
+              {selectedApp.useful_links && (() => {
+                try {
+                  const links = JSON.parse(selectedApp.useful_links);
+                  if (links && links.length > 0) {
+                    return (
+                      <div className="slider-section">
+                        <h4>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                          </svg>
+                          Useful Links
+                        </h4>
+                        <div className="useful-links-list">
+                          {links.map((link, idx) => (
+                            <a
+                              key={idx}
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`useful-link-chip link-type-${link.type || 'other'}`}
+                            >
+                              {link.type === 'jira' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M11.53 2c0 2.4 1.97 4.35 4.35 4.35h1.78v1.7c0 2.4 1.94 4.34 4.34 4.35V2.84a.84.84 0 0 0-.84-.84H11.53zM6.77 6.8a4.36 4.36 0 0 0 4.34 4.34h1.8v1.72a4.36 4.36 0 0 0 4.34 4.34V7.63a.84.84 0 0 0-.83-.83H6.77zM2 11.6c0 2.4 1.95 4.34 4.35 4.34h1.78v1.72c0 2.4 1.94 4.34 4.34 4.34v-9.57a.84.84 0 0 0-.84-.83H2z"/>
+                                </svg>
+                              )}
+                              {link.type === 'confluence' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M2.51 18.88c-.23.38-.46.8-.67 1.18a.89.89 0 0 0 .32 1.22l3.72 2.25a.89.89 0 0 0 1.21-.32l.1-.17c.2-.33.42-.7.66-1.09 1.7-2.73 3.42-2.4 6.58-.83l3.65 1.83a.89.89 0 0 0 1.19-.41l1.74-3.63a.89.89 0 0 0-.41-1.19l-3.53-1.75c-5.66-2.82-10.48-2.6-14.56 2.91zM21.49 5.12c.23-.38.46-.8.67-1.18a.89.89 0 0 0-.32-1.22L18.12.47a.89.89 0 0 0-1.21.32l-.1.17c-.2.33-.42.7-.66 1.09-1.7 2.73-3.42 2.4-6.58.83L5.92 1.05a.89.89 0 0 0-1.19.41L3 5.09a.89.89 0 0 0 .41 1.19l3.53 1.75c5.66 2.82 10.48 2.6 14.55-2.91z"/>
+                                </svg>
+                              )}
+                              {link.type === 'sharepoint' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                  <circle cx="9" cy="9" r="7"/>
+                                  <circle cx="15" cy="15" r="6" opacity="0.7"/>
+                                  <circle cx="17" cy="9" r="4" opacity="0.5"/>
+                                </svg>
+                              )}
+                              {link.type === 'github' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+                                </svg>
+                              )}
+                              {link.type === 'docs' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                  <polyline points="14 2 14 8 20 8"/>
+                                </svg>
+                              )}
+                              {link.type === 'other' && (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                  <polyline points="15 3 21 3 21 9"/>
+                                  <line x1="10" y1="14" x2="21" y2="3"/>
+                                </svg>
+                              )}
+                              {link.label || link.url}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                } catch (e) {
+                  return null;
+                }
+              })()}
 
               {/* Team Members */}
               {selectedApp.team && selectedApp.team.length > 0 && (
