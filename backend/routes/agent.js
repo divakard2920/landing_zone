@@ -141,9 +141,9 @@ const getAllProjects = async () => {
   return queryAll(`
     SELECT
       id, name, description, usecase_type, doi_stage, current_status,
-      priority, business_division, business_function, platform,
+      priority, project_health, business_division, business_function, platform,
       demand_type, requester_name, ai_spoc, start_date, end_date,
-      usecase_identifier, icon
+      usecase_identifier, icon, useful_links, strategic_focus
     FROM apps
     WHERE deleted_at IS NULL
     ORDER BY created_at DESC
@@ -152,6 +152,18 @@ const getAllProjects = async () => {
 
 const getDoiStages = async () => {
   return queryAll('SELECT * FROM doi_stages ORDER BY id');
+};
+
+const getProjectUpdates = async (projectIds) => {
+  if (!projectIds || projectIds.length === 0) return [];
+  const placeholders = projectIds.map((_, i) => `$${i + 1}`).join(',');
+  return queryAll(
+    `SELECT app_id, title, content, admin_name, created_at
+     FROM project_updates
+     WHERE app_id IN (${placeholders})
+     ORDER BY created_at DESC`,
+    projectIds
+  );
 };
 
 const getRelevantProjects = async (userQuery, limit = 10) => {
@@ -577,7 +589,11 @@ const executeFunction = async (functionName, args, context) => {
   }
 };
 
-const buildSystemPrompt = (relevantProjects, doiStages, totalCount) => {
+const buildSystemPrompt = (relevantProjects, doiStages, totalCount, projectUpdates = []) => {
+  const updatesSection = projectUpdates.length > 0
+    ? `\n## Recent Project Updates\n${JSON.stringify(projectUpdates, null, 2)}\n`
+    : '';
+
   return `You are an AI assistant for KBase, the AI Projects Portal. You help users with project information AND new use case intake.
 
 ## IMPORTANT: Scope Restriction
@@ -590,7 +606,7 @@ ${JSON.stringify(doiStages, null, 2)}
 
 ## Relevant Projects (${relevantProjects.length} of ${totalCount} total)
 ${JSON.stringify(relevantProjects, null, 2)}
-
+${updatesSection}
 ## Tools Available
 - show_projects: Display project cards with visual UI
 - show_statistics: Display analytics/charts
@@ -810,7 +826,11 @@ router.post('/chat', async (req, res) => {
     const allProjects = await getAllProjects();
     const relevantProjects = await getRelevantProjects(userQuery, 10);
 
-    const systemPrompt = buildSystemPrompt(relevantProjects, doiStages, allProjects.length);
+    // Fetch project updates for relevant projects
+    const projectIds = relevantProjects.map(p => p.id);
+    const projectUpdates = await getProjectUpdates(projectIds);
+
+    const systemPrompt = buildSystemPrompt(relevantProjects, doiStages, allProjects.length, projectUpdates);
 
     const client = getOpenAIClient();
 
