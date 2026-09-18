@@ -10,6 +10,6 @@ export const PLATFORMS = ['MS Azure', 'AWS', 'GCP', 'Other'];
 
 export const PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
 
-export const HEALTH_OPTIONS = ['On Track', 'Delayed', 'At Risk'];
+export const HEALTH_OPTIONS = ['On Track', 'Delayed', 'At Risk', 'Pending'];
 
 export const USECASE_TYPES = ['AI Usecase', 'Foundation'];

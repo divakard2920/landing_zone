@@ -101,19 +101,21 @@ function Landing() {
 
   // Project filters
   const [filters, setFilters] = useState({
-    doi_stage: '',
-    priority: '',
-    status: '',
-    platform: '',
-    division: '',
-    usecase_type: '',
-    demand_type: ''
+    doi_stage: [],
+    priority: [],
+    status: [],
+    platform: [],
+    division: [],
+    usecase_type: [],
+    demand_type: [],
+    project_health: []
   });
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('kanban');
   const [showColumnSettings, setShowColumnSettings] = useState(false);
 
   const USECASE_TYPES = ['AI Usecase', 'Foundation'];
+  const HEALTH_OPTIONS = ['On Track', 'Delayed', 'At Risk', 'Pending'];
 
   // Available table columns configuration (only fields with admin inputs)
   const allColumns = [
@@ -702,16 +704,19 @@ function Landing() {
       field && field.toLowerCase().includes(query)
     ) || teamNames.toLowerCase().includes(query);
 
-    // Apply dropdown filters
-    const matchesDoi = !filters.doi_stage || (app.doi_stage || 0) === parseInt(filters.doi_stage);
-    const matchesPriority = !filters.priority || app.priority === filters.priority;
-    const matchesStatus = !filters.status || app.current_status === filters.status;
-    const matchesPlatform = !filters.platform || (app.platform || '').split(',').map(v => v.trim()).includes(filters.platform);
-    const matchesDivision = !filters.division || (app.business_division || '').split(',').map(v => v.trim()).includes(filters.division);
-    const matchesUsecaseType = !filters.usecase_type || app.usecase_type === filters.usecase_type;
-    const matchesDemandType = !filters.demand_type || app.demand_type === filters.demand_type;
+    // Apply dropdown filters (multi-select)
+    const matchesDoi = filters.doi_stage.length === 0 || filters.doi_stage.includes(String(app.doi_stage || 0));
+    const matchesPriority = filters.priority.length === 0 || filters.priority.includes(app.priority);
+    const matchesStatus = filters.status.length === 0 || filters.status.includes(app.current_status);
+    const matchesPlatform = filters.platform.length === 0 || filters.platform.some(p => (app.platform || '').split(',').map(v => v.trim()).includes(p));
+    const matchesDivision = filters.division.length === 0 || filters.division.some(d => (app.business_division || '').split(',').map(v => v.trim()).includes(d));
+    const matchesUsecaseType = filters.usecase_type.length === 0 || filters.usecase_type.includes(app.usecase_type);
+    const matchesDemandType = filters.demand_type.length === 0
+      ? app.demand_type !== 'L1 - Platform Provision'
+      : filters.demand_type.includes(app.demand_type);
+    const matchesHealth = filters.project_health.length === 0 || filters.project_health.includes(app.project_health);
 
-    return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision && matchesUsecaseType && matchesDemandType;
+    return matchesSearch && matchesDoi && matchesPriority && matchesStatus && matchesPlatform && matchesDivision && matchesUsecaseType && matchesDemandType && matchesHealth;
   }).sort((a, b) => {
     // If user selected a sort column, use that
     if (sortConfig.key) {
@@ -738,11 +743,32 @@ function Landing() {
     return 0;
   });
 
-  const activeFiltersCount = Object.values(filters).filter(v => v !== '').length;
+  const activeFiltersCount = Object.values(filters).filter(v => v.length > 0).length;
 
   const clearFilters = () => {
-    setFilters({ doi_stage: '', priority: '', status: '', platform: '', division: '', usecase_type: '', demand_type: '' });
+    setFilters({ doi_stage: [], priority: [], status: [], platform: [], division: [], usecase_type: [], demand_type: [], project_health: [] });
   };
+
+  const toggleFilter = (filterKey, value) => {
+    setFilters(prev => {
+      const current = prev[filterKey];
+      const newValues = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      return { ...prev, [filterKey]: newValues };
+    });
+  };
+
+  // Close multi-select dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.multi-select-filter')) {
+        document.querySelectorAll('.multi-select-filter.open').forEach(el => el.classList.remove('open'));
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   if (pageLoading) {
     return (
@@ -1024,82 +1050,125 @@ function Landing() {
           {showFilters && (
             <div className="filter-panel">
               <div className="filter-row">
-                <select
-                  value={filters.doi_stage}
-                  onChange={(e) => setFilters({...filters, doi_stage: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All DOI Stages</option>
-                  {doiStages.map(stage => (
-                    <option key={stage.id} value={stage.id}>DOI {stage.id} - {stage.label}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.doi_stage.length === 0 ? 'All DOI Stages' : `DOI (${filters.doi_stage.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {doiStages.map(stage => (
+                      <label key={stage.id} className="multi-select-option">
+                        <input type="checkbox" checked={filters.doi_stage.includes(String(stage.id))} onChange={() => toggleFilter('doi_stage', String(stage.id))} />
+                        <span>DOI {stage.id} - {stage.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                <select
-                  value={filters.priority}
-                  onChange={(e) => setFilters({...filters, priority: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All Priorities</option>
-                  {filterOptions.priorities.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.priority.length === 0 ? 'All Priorities' : `Priority (${filters.priority.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {filterOptions.priorities.map(p => (
+                      <label key={p} className="multi-select-option">
+                        <input type="checkbox" checked={filters.priority.includes(p)} onChange={() => toggleFilter('priority', p)} />
+                        <span>{p}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                <select
-                  value={filters.status}
-                  onChange={(e) => setFilters({...filters, status: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All Statuses</option>
-                  {filterOptions.statuses.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.status.length === 0 ? 'All Statuses' : `Status (${filters.status.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {filterOptions.statuses.map(s => (
+                      <label key={s} className="multi-select-option">
+                        <input type="checkbox" checked={filters.status.includes(s)} onChange={() => toggleFilter('status', s)} />
+                        <span>{s}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                <select
-                  value={filters.platform}
-                  onChange={(e) => setFilters({...filters, platform: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All Platforms</option>
-                  {filterOptions.platforms.map(p => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.platform.length === 0 ? 'All Platforms' : `Platform (${filters.platform.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {filterOptions.platforms.map(p => (
+                      <label key={p} className="multi-select-option">
+                        <input type="checkbox" checked={filters.platform.includes(p)} onChange={() => toggleFilter('platform', p)} />
+                        <span>{p}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                <select
-                  value={filters.division}
-                  onChange={(e) => setFilters({...filters, division: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All Divisions</option>
-                  {filterOptions.divisions.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.division.length === 0 ? 'All Divisions' : `Division (${filters.division.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {filterOptions.divisions.map(d => (
+                      <label key={d} className="multi-select-option">
+                        <input type="checkbox" checked={filters.division.includes(d)} onChange={() => toggleFilter('division', d)} />
+                        <span>{d}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                <select
-                  value={filters.usecase_type}
-                  onChange={(e) => setFilters({...filters, usecase_type: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All Use Case Types</option>
-                  {USECASE_TYPES.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.usecase_type.length === 0 ? 'All Use Case Types' : `Type (${filters.usecase_type.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {USECASE_TYPES.map(t => (
+                      <label key={t} className="multi-select-option">
+                        <input type="checkbox" checked={filters.usecase_type.includes(t)} onChange={() => toggleFilter('usecase_type', t)} />
+                        <span>{t}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
-                <select
-                  value={filters.demand_type}
-                  onChange={(e) => setFilters({...filters, demand_type: e.target.value})}
-                  className="filter-select"
-                >
-                  <option value="">All Demand Types</option>
-                  {filterOptions.demandTypes.map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.demand_type.length === 0 ? 'All Demand Types' : `Demand (${filters.demand_type.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {filterOptions.demandTypes.map(d => (
+                      <label key={d} className="multi-select-option">
+                        <input type="checkbox" checked={filters.demand_type.includes(d)} onChange={() => toggleFilter('demand_type', d)} />
+                        <span>{d}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="multi-select-filter">
+                  <div className="multi-select-label" onClick={(e) => e.currentTarget.parentElement.classList.toggle('open')}>
+                    <span>{filters.project_health.length === 0 ? 'All Health' : `Health (${filters.project_health.length})`}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+                  </div>
+                  <div className="multi-select-dropdown">
+                    {HEALTH_OPTIONS.map(h => (
+                      <label key={h} className="multi-select-option">
+                        <input type="checkbox" checked={filters.project_health.includes(h)} onChange={() => toggleFilter('project_health', h)} />
+                        <span>{h}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
 
                 {activeFiltersCount > 0 && (
                   <button className="clear-filters" onClick={clearFilters}>× Clear</button>

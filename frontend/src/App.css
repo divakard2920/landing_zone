@@ -200,6 +200,15 @@
   box-shadow: 0 0 0 2px rgba(59, 158, 255, 0.2);
 }
 
+[data-theme="dark"] .multi-select-label {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .multi-select-filter.open .multi-select-label {
+  box-shadow: 0 0 0 2px rgba(59, 158, 255, 0.2);
+}
+
 [data-theme="dark"] .center-panel {
   background: var(--bg-panel);
   border-color: var(--border-light);
@@ -838,8 +847,15 @@ body {
 }
 
 .center-panel-full {
-  max-width: 1400px;
+  max-width: 1800px;
   margin: 0 auto;
+  width: 100%;
+}
+
+@media (min-width: 1920px) {
+  .center-panel-full {
+    max-width: 95%;
+  }
 }
 
 /* Left Sidebar - C Shape (Icon Only) */
@@ -1331,21 +1347,43 @@ body {
 }
 
 .health-badge.health-on-track {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
+  background: #DFF3E4;
+  color: #1B8A4A;
+  animation: pulse-ontrack 2.5s ease-in-out infinite;
 }
 
 .health-badge.health-delayed {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fde68a;
+  background: #FFF1CC;
+  color: #C78A00;
+  animation: pulse-delayed 2s ease-in-out infinite;
 }
 
 .health-badge.health-at-risk {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #FCE3DC;
+  color: #D35400;
+  animation: pulse-risk 1.5s ease-in-out infinite;
+}
+
+.health-badge.health-pending {
+  background: #E5E7EB;
+  color: #6B7280;
+}
+
+[data-theme="dark"] .health-badge.health-on-track {
+  background: #1B4D32;
+  color: #4ADE80;
+}
+[data-theme="dark"] .health-badge.health-delayed {
+  background: #4D3A00;
+  color: #FBBF24;
+}
+[data-theme="dark"] .health-badge.health-at-risk {
+  background: #4D2114;
+  color: #FB923C;
+}
+[data-theme="dark"] .health-badge.health-pending {
+  background: #374151;
+  color: #9CA3AF;
 }
 
 .project-card-title {
@@ -1518,8 +1556,9 @@ body {
 .filter-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
+  justify-content: space-between;
 }
 
 .filter-select {
@@ -1538,6 +1577,95 @@ body {
   outline: none;
   border-color: var(--brand-primary);
   box-shadow: 0 0 0 2px rgba(0, 69, 126, 0.1);
+}
+
+/* Multi-select filter dropdown */
+.multi-select-filter {
+  position: relative;
+  flex: 0 1 auto;
+}
+
+.multi-select-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  background-color: var(--bg-base);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.multi-select-label:hover {
+  border-color: var(--brand-primary);
+}
+
+.multi-select-filter.open .multi-select-label {
+  border-color: var(--brand-primary);
+  box-shadow: 0 0 0 2px rgba(0, 69, 126, 0.1);
+}
+
+.multi-select-filter.open .multi-select-label svg {
+  transform: rotate(180deg);
+}
+
+.multi-select-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.multi-select-filter.open .multi-select-dropdown {
+  display: block;
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.multi-select-option:hover {
+  background: var(--bg-muted);
+}
+
+.multi-select-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand-primary);
+  cursor: pointer;
+}
+
+.multi-select-option span {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme="dark"] .multi-select-dropdown {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .clear-filters {
@@ -5765,29 +5893,67 @@ select.form-control {
 }
 
 .kc-health-on-track {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
+  background: #DFF3E4;
+  color: #1B8A4A;
+  animation: pulse-ontrack 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-ontrack {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 .kc-health-delayed {
-  background: #fffbeb;
-  color: #d97706;
-  border: 1px solid #fde68a;
+  background: #FFF1CC;
+  color: #C78A00;
+  animation: pulse-delayed 2s ease-in-out infinite;
 }
 .kc-health-at-risk {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
+  background: #FCE3DC;
+  color: #D35400;
+  animation: pulse-risk 1.5s ease-in-out infinite;
+}
+.kc-health-pending {
+  background: #E5E7EB;
+  color: #6B7280;
+}
+
+@keyframes pulse-delayed {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes pulse-risk {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 [data-theme="dark"] .kc-health-on-track {
-  background: rgba(22, 163, 74, 0.2);
+  background: #1B4D32;
+  color: #4ADE80;
 }
 [data-theme="dark"] .kc-health-delayed {
-  background: rgba(217, 119, 6, 0.2);
+  background: #4D3A00;
+  color: #FBBF24;
 }
 [data-theme="dark"] .kc-health-at-risk {
-  background: rgba(220, 38, 38, 0.2);
+  background: #4D2114;
+  color: #FB923C;
+}
+[data-theme="dark"] .kc-health-pending {
+  background: #374151;
+  color: #9CA3AF;
 }
 
 .kc-title {
