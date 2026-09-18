@@ -143,7 +143,7 @@ const getAllProjects = async () => {
       id, name, description, usecase_type, doi_stage, current_status,
       priority, project_health, business_division, business_function, platform,
       demand_type, requester_name, ai_spoc, start_date, end_date,
-      usecase_identifier, icon, useful_links, strategic_focus
+usecase_identifier, icon, useful_links, strategic_focus
     FROM apps
     WHERE deleted_at IS NULL
     ORDER BY created_at DESC
