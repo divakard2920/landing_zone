@@ -282,7 +282,7 @@ function Landing() {
 
     const headers = [
       'Project Name', 'Project ID', 'Description', 'DOI Stage', 'Status',
-      'Priority', 'Platform', 'Division', 'Function', 'Demand Type',
+      'Priority', 'Project Health', 'Platform', 'Division', 'Function', 'Demand Type',
       'Requester', 'AI SPOC', 'Start Date', 'End Date', 'Budget',
       'AI Skills', 'Team Members'
     ];
@@ -305,6 +305,7 @@ function Landing() {
         `DOI ${app.doi_stage || 0}`,
         app.current_status || '',
         app.priority || '',
+        app.project_health || '',
         app.platform || '',
         app.business_division || '',
         app.business_function || '',
@@ -330,11 +331,23 @@ function Landing() {
         row.getCell(6).font = { color: { argb: 'FF16A34A' } };
         row.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } };
       }
+
+      const healthColors = {
+        'On Track': { font: 'FF1B8A4A', fill: 'FFDFF3E4' },
+        'Delayed': { font: 'FFC78A00', fill: 'FFFFF1CC' },
+        'At Risk': { font: 'FFD35400', fill: 'FFFCE3DC' },
+        'Pending': { font: 'FF6B7280', fill: 'FFE5E7EB' }
+      };
+      const health = healthColors[app.project_health];
+      if (health) {
+        row.getCell(7).font = { bold: true, color: { argb: health.font } };
+        row.getCell(7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: health.fill } };
+      }
     });
 
     worksheet.columns = [
       { width: 25 }, { width: 15 }, { width: 40 }, { width: 12 }, { width: 18 },
-      { width: 10 }, { width: 12 }, { width: 15 }, { width: 15 }, { width: 20 },
+      { width: 10 }, { width: 15 }, { width: 12 }, { width: 15 }, { width: 15 }, { width: 20 },
       { width: 18 }, { width: 18 }, { width: 12 }, { width: 12 }, { width: 12 },
       { width: 25 }, { width: 35 }
     ];

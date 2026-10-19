@@ -67,6 +67,81 @@ const AppIcon = ({ icon, usecaseType }) => {
   );
 };
 
+const moveCursorToEnd = e => { const len = e.target.value.length; e.target.setSelectionRange?.(len, len); };
+
+// Defined at module scope so it isn't recreated (and remounted) on every keystroke
+const Field = ({ label, field, value, type = 'text', options = [], multiline = false, editingField, setEditingField, hoveredField, setHoveredField, project, setProject, originalProject }) => {
+  const isEditing = editingField === field;
+  const isHovered = hoveredField === field;
+  const isChanged = project && originalProject && project[field] !== originalProject[field];
+
+  if (isEditing) {
+    return (
+      <tr>
+        <td style={{ padding: '10px 16px 10px 0', color: 'var(--text-muted)', fontSize: '0.9rem', verticalAlign: 'top', whiteSpace: 'nowrap', width: '140px' }}>{label}</td>
+        <td style={{ padding: '6px 0' }}>
+          {type === 'select' ? (
+            <select
+              style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--brand-primary)', borderRadius: '4px', fontSize: '0.9rem', outline: 'none', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+              value={project[field] || ''}
+              onChange={e => { setProject({ ...project, [field]: e.target.value }); setEditingField(null); }}
+              onBlur={() => setEditingField(null)}
+              autoFocus
+            >
+              <option value="">—</option>
+              {options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : multiline ? (
+            <textarea
+              autoFocus
+              onFocus={moveCursorToEnd}
+              style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--brand-primary)', borderRadius: '4px', fontSize: '0.9rem', outline: 'none', resize: 'vertical', minHeight: '60px', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
+              value={project[field] || ''}
+              onChange={e => setProject({ ...project, [field]: e.target.value })}
+              onBlur={() => setEditingField(null)}
+            />
+          ) : (
+            <input
+              type={type}
+              autoFocus
+              onFocus={e => { if (e.target.type === 'text') moveCursorToEnd(e); }}
+              style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--brand-primary)', borderRadius: '4px', fontSize: '0.9rem', outline: 'none', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
+              value={project[field] || ''}
+              onChange={e => setProject({ ...project, [field]: e.target.value })}
+              onBlur={() => setEditingField(null)}
+              onKeyDown={e => e.key === 'Enter' && setEditingField(null)}
+            />
+          )}
+        </td>
+      </tr>
+    );
+  }
+
+  
+  return (
+    <tr
+      onClick={() => setEditingField(field)}
+      onMouseEnter={() => setHoveredField(field)}
+      onMouseLeave={() => setHoveredField(null)}
+      style={{ cursor: 'pointer', background: isChanged ? 'var(--change-bg)' : 'transparent' }}
+    >
+      <td style={{ padding: '10px 16px 10px 0', color: 'var(--text-muted)', fontSize: '0.9rem', verticalAlign: 'top', whiteSpace: 'nowrap', width: '140px' }}>
+        {isChanged && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--change-indicator)', marginRight: 6 }}></span>}
+        {label}
+      </td>
+      <td style={{ padding: '10px 0', fontSize: '0.9rem', color: 'var(--text-primary)', position: 'relative' }}>
+        <span style={{ whiteSpace: multiline ? 'pre-wrap' : 'normal' }}>{value || '—'}</span>
+        {isHovered && (
+          <svg style={{ marginLeft: '8px', opacity: 0.4, verticalAlign: 'middle' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        )}
+      </td>
+    </tr>
+  );
+};
+
 function ProjectDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -428,75 +503,7 @@ function ProjectDetail() {
     }
   };
 
-  const Field = ({ label, field, value, type = 'text', options = [], multiline = false }) => {
-    const isEditing = editingField === field;
-    const isHovered = hoveredField === field;
-    const isChanged = project && originalProject && project[field] !== originalProject[field];
-
-    if (isEditing) {
-      return (
-        <tr>
-          <td style={{ padding: '10px 16px 10px 0', color: 'var(--text-muted)', fontSize: '0.9rem', verticalAlign: 'top', whiteSpace: 'nowrap', width: '140px' }}>{label}</td>
-          <td style={{ padding: '6px 0' }}>
-            {type === 'select' ? (
-              <select
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--brand-primary)', borderRadius: '4px', fontSize: '0.9rem', outline: 'none', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
-                value={project[field] || ''}
-                onChange={e => { setProject({ ...project, [field]: e.target.value }); setEditingField(null); }}
-                onBlur={() => setEditingField(null)}
-                autoFocus
-              >
-                <option value="">—</option>
-                {options.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            ) : multiline ? (
-              <textarea
-                ref={el => { if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--brand-primary)', borderRadius: '4px', fontSize: '0.9rem', outline: 'none', resize: 'vertical', minHeight: '60px', background: 'var(--bg-base)', color: 'var(--text-primary)', fontFamily: 'inherit' }}
-                value={project[field] || ''}
-                onChange={e => setProject({ ...project, [field]: e.target.value })}
-                onBlur={() => setEditingField(null)}
-              />
-            ) : (
-              <input
-                type={type}
-                ref={el => { if (el) { el.focus(); if (el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } }}
-                style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--brand-primary)', borderRadius: '4px', fontSize: '0.9rem', outline: 'none', background: 'var(--bg-base)', color: 'var(--text-primary)' }}
-                value={project[field] || ''}
-                onChange={e => setProject({ ...project, [field]: e.target.value })}
-                onBlur={() => setEditingField(null)}
-                onKeyDown={e => e.key === 'Enter' && setEditingField(null)}
-              />
-            )}
-          </td>
-        </tr>
-      );
-    }
-
-    
-    return (
-      <tr
-        onClick={() => setEditingField(field)}
-        onMouseEnter={() => setHoveredField(field)}
-        onMouseLeave={() => setHoveredField(null)}
-        style={{ cursor: 'pointer', background: isChanged ? 'var(--change-bg)' : 'transparent' }}
-      >
-        <td style={{ padding: '10px 16px 10px 0', color: 'var(--text-muted)', fontSize: '0.9rem', verticalAlign: 'top', whiteSpace: 'nowrap', width: '140px' }}>
-          {isChanged && <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--change-indicator)', marginRight: 6 }}></span>}
-          {label}
-        </td>
-        <td style={{ padding: '10px 0', fontSize: '0.9rem', color: 'var(--text-primary)', position: 'relative' }}>
-          <span style={{ whiteSpace: multiline ? 'pre-wrap' : 'normal' }}>{value || '—'}</span>
-          {isHovered && (
-            <svg style={{ marginLeft: '8px', opacity: 0.4, verticalAlign: 'middle' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          )}
-        </td>
-      </tr>
-    );
-  };
+  const fieldCtx = { editingField, setEditingField, hoveredField, setHoveredField, project, setProject, originalProject };
 
   return (
     <div className="admin-page">
@@ -655,13 +662,13 @@ function ProjectDetail() {
                 <h3 style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>General</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <Field label="Name" field="name" value={project.name} />
-                    <Field label="Project ID" field="project_id" value={project.project_id} />
-                    <Field label="Use Case Type" field="usecase_type" value={project.usecase_type} type="select" options={USECASE_TYPES} />
-                    <Field label="Current Status" field="current_status" value={project.current_status} type="select" options={STATUS_OPTIONS} />
-                    <Field label="Priority" field="priority" value={project.priority} type="select" options={PRIORITY_OPTIONS} />
-                    <Field label="Platform" field="platform" value={project.platform} type="select" options={PLATFORMS} />
-                    <Field label="Application URL" field="url" value={project.url} type="url" />
+                    <Field label="Name" field="name" value={project.name} {...fieldCtx} />
+                    <Field label="Project ID" field="project_id" value={project.project_id} {...fieldCtx} />
+                    <Field label="Use Case Type" field="usecase_type" value={project.usecase_type} type="select" options={USECASE_TYPES} {...fieldCtx} />
+                    <Field label="Current Status" field="current_status" value={project.current_status} type="select" options={STATUS_OPTIONS} {...fieldCtx} />
+                    <Field label="Priority" field="priority" value={project.priority} type="select" options={PRIORITY_OPTIONS} {...fieldCtx} />
+                    <Field label="Platform" field="platform" value={project.platform} type="select" options={PLATFORMS} {...fieldCtx} />
+                    <Field label="Application URL" field="url" value={project.url} type="url" {...fieldCtx} />
                   </tbody>
                 </table>
               </div>
@@ -670,8 +677,8 @@ function ProjectDetail() {
                 <h3 style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>Organization</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <Field label="Business Division" field="business_division" value={project.business_division} />
-                    <Field label="Business Function" field="business_function" value={project.business_function} />
+                    <Field label="Business Division" field="business_division" value={project.business_division} {...fieldCtx} />
+                    <Field label="Business Function" field="business_function" value={project.business_function} {...fieldCtx} />
                     {/* Requester Name(s) with chips */}
                     {(() => {
                       const isChanged = project?.requester_name !== originalProject?.requester_name;
@@ -694,7 +701,7 @@ function ProjectDetail() {
                                 {getRequesters().map((name, idx) => (
                                   <span key={idx} className="tag-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: 'var(--brand-primary)', color: 'white', borderRadius: '4px', fontSize: '0.85rem' }}>
                                     {name}
-                                    <button type="button" onClick={(e) => { e.stopPropagation(); removeRequester(name); }} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, fontSize: '1rem', lineHeight: 1 }} title="Remove requester">&times;</button>
+                                    <button type="button" onMouseDown={e => e.preventDefault()} onClick={(e) => { e.stopPropagation(); removeRequester(name); }} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', padding: 0, fontSize: '1rem', lineHeight: 1 }} title="Remove requester">&times;</button>
                                   </span>
                                 ))}
                                 <input
@@ -738,9 +745,9 @@ function ProjectDetail() {
                         </tr>
                       );
                     })()}
-                    <Field label="AI SPOC" field="ai_spoc" value={project.ai_spoc} />
-                    <Field label="Demand Type" field="demand_type" value={project.demand_type} type="select" options={DEMAND_TYPES} />
-                    <Field label="Project Health" field="project_health" value={project.project_health} type="select" options={HEALTH_OPTIONS} />
+                    <Field label="AI SPOC" field="ai_spoc" value={project.ai_spoc} {...fieldCtx} />
+                    <Field label="Demand Type" field="demand_type" value={project.demand_type} type="select" options={DEMAND_TYPES} {...fieldCtx} />
+                    <Field label="Project Health" field="project_health" value={project.project_health} type="select" options={HEALTH_OPTIONS} {...fieldCtx} />
                   </tbody>
                 </table>
               </div>
@@ -777,7 +784,7 @@ function ProjectDetail() {
                 </div>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <Field label="Estimated Costs" field="estimated_costs" value={project.estimated_costs} />
+                    <Field label="Estimated Costs" field="estimated_costs" value={project.estimated_costs} {...fieldCtx} />
                   </tbody>
                 </table>
               </div>
@@ -786,8 +793,8 @@ function ProjectDetail() {
                 <h3 style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>Technical</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
-                    <Field label="AI Skills" field="ai_skills" value={project.ai_skills} />
-                    <Field label="Strategic Focus" field="strategic_focus" value={project.strategic_focus} />
+                    <Field label="AI Skills" field="ai_skills" value={project.ai_skills} {...fieldCtx} />
+                    <Field label="Strategic Focus" field="strategic_focus" value={project.strategic_focus} {...fieldCtx} />
                   </tbody>
                 </table>
               </div>
@@ -798,8 +805,8 @@ function ProjectDetail() {
               <h3 style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid var(--border-light)', paddingBottom: '8px' }}>Risks & Dependencies</h3>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                  <Field label="Risks" field="risks" value={project.risks} multiline />
-                  <Field label="Dependencies" field="dependencies" value={project.dependencies} multiline />
+                  <Field label="Risks" field="risks" value={project.risks} multiline {...fieldCtx} />
+                  <Field label="Dependencies" field="dependencies" value={project.dependencies} multiline {...fieldCtx} />
                 </tbody>
               </table>
             </div>

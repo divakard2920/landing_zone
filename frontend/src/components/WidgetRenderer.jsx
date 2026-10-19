@@ -70,48 +70,55 @@ function DropdownWidget({ widget, data, colors, total, selected, onSelectionChan
   );
 }
 
-function aggregateData(apps, dataField, doiStages = []) {
-  const counts = {};
+const MULTI_VALUE_FIELDS = ['business_division', 'platform'];
 
-  const getDoiLabel = (stage) => {
-    const doi = doiStages.find(d => d.id === stage);
-    return doi ? doi.label : `DOI ${stage}`;
-  };
+// Group values case- and whitespace-insensitively so "Group", "group " and "GROUP" count as one
+// Also strips invisible characters (zero-width spaces, BOM, non-breaking spaces) that often come from copy-paste or Excel
+const cleanValue = (value) => String(value).replace(/[\u200B-\u200D\u2060\uFEFF\u00AD]/g, '').replace(/[\s\u00A0]+/g, ' ').trim();
+const normalizeKey = (value) => cleanValue(value).toLowerCase();
 
-  const multiValueFields = ['business_division', 'platform'];
-
-  apps.forEach(app => {
-    let value = app[dataField];
-
-    if (dataField === 'doi_stage') {
-      value = getDoiLabel(value);
-      counts[value] = (counts[value] || 0) + 1;
-    } else if (multiValueFields.includes(dataField) && value && value.includes(',')) {
-      const values = value.split(',').map(v => v.trim()).filter(Boolean);
-      values.forEach(v => {
-        counts[v] = (counts[v] || 0) + 1;
-      });
-    } else {
-      if (value === null || value === undefined || value === '') {
-        value = 'Unspecified';
-      }
-      counts[value] = (counts[value] || 0) + 1;
-    }
-  });
-
-  return Object.entries(counts).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-}
-
-function getAppFieldValue(app, dataField, doiStages = []) {
+// Returns the cleaned display values for an app's field (several for multi-value fields)
+function getAppFieldValues(app, dataField, doiStages = []) {
   let value = app[dataField];
   if (dataField === 'doi_stage') {
     const doi = doiStages.find(d => d.id === value);
-    value = doi ? doi.label : `DOI ${value}`;
+    return [doi ? doi.label : `DOI ${value}`];
   }
-  if (value === null || value === undefined || value === '') {
-    value = 'Unspecified';
+  if (value === null || value === undefined || cleanValue(value) === '') {
+    return ['Unspecified'];
   }
-  return value;
+  const parts = MULTI_VALUE_FIELDS.includes(dataField) ? String(value).split(',') : [String(value)];
+  const cleaned = parts.map(cleanValue).filter(Boolean);
+  return cleaned.length > 0 ? cleaned : ['Unspecified'];
+}
+
+function aggregateData(apps, dataField, doiStages = []) {
+  const groups = {};
+
+  apps.forEach(app => {
+    const seen = new Set();
+    getAppFieldValues(app, dataField, doiStages).forEach(v => {
+      const key = normalizeKey(v);
+      if (seen.has(key)) return;
+      seen.add(key);
+      if (!groups[key]) groups[key] = { count: 0, spellings: {} };
+      groups[key].count += 1;
+      groups[key].spellings[v] = (groups[key].spellings[v] || 0) + 1;
+    });
+  });
+
+  // Label each group with its most common spelling
+  return Object.values(groups)
+    .map(({ count, spellings }) => ({
+      name: Object.entries(spellings).sort((a, b) => b[1] - a[1])[0][0],
+      value: count
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function appMatchesSelection(app, field, selectedValues, doiStages = []) {
+  const selectedKeys = new Set(selectedValues.map(normalizeKey));
+  return getAppFieldValues(app, field, doiStages).some(v => selectedKeys.has(normalizeKey(v)));
 }
 
 function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, doiStages = [] }) {
@@ -123,10 +130,7 @@ function WidgetRenderer({ widget, apps, widgetFilters = {}, setWidgetFilters, do
     let result = apps;
     Object.entries(widgetFilters).forEach(([field, selectedValues]) => {
       if (selectedValues && selectedValues.length > 0) {
-        result = result.filter(app => {
-          const appValue = getAppFieldValue(app, field, doiStages);
-          return selectedValues.includes(appValue);
-        });
+        result = result.filter(app => appMatchesSelection(app, field, selectedValues, doiStages));
       }
     });
     return result;

@@ -3646,7 +3646,7 @@ function Admin() {
                       {getRequesters().map((name, idx) => (
                         <span key={idx} className="tag-item">
                           {name}
-                          <button type="button" className="tag-remove" onClick={() => removeRequester(name)}>&times;</button>
+                          <button type="button" className="tag-remove" onMouseDown={e => e.preventDefault()} onClick={() => removeRequester(name)}>&times;</button>
                         </span>
                       ))}
                       <input
